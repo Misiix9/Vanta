@@ -1,0 +1,210 @@
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+use tauri::Emitter;
+
+/// Top-level Vanta configuration.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct VantaConfig {
+    pub general: GeneralConfig,
+    pub appearance: AppearanceConfig,
+    pub scripts: ScriptsConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GeneralConfig {
+    pub hotkey: String,
+    pub max_results: usize,
+    pub launch_on_login: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AppearanceConfig {
+    pub blur_radius: u32,
+    pub opacity: f64,
+    pub border_radius: u32,
+    pub colors: ColorsConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ColorsConfig {
+    pub background: String,
+    pub surface: String,
+    pub accent: String,
+    pub accent_glow: String,
+    pub text_primary: String,
+    pub text_secondary: String,
+    pub border: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ScriptsConfig {
+    pub directory: String,
+    pub timeout_ms: u64,
+}
+
+impl Default for VantaConfig {
+    fn default() -> Self {
+        Self {
+            general: GeneralConfig {
+                hotkey: "Alt+Space".to_string(),
+                max_results: 8,
+                launch_on_login: false,
+            },
+            appearance: AppearanceConfig {
+                blur_radius: 40,
+                opacity: 0.85,
+                border_radius: 24,
+                colors: ColorsConfig {
+                    background: "#000000".to_string(),      // Pure OLED Black
+                    surface: "#0A0A0A".to_string(),         // Item BG
+                    accent: "#FFFFFF".to_string(),          // Monochrome Accent
+                    accent_glow: "rgba(255, 255, 255, 0.25)".to_string(),
+                    text_primary: "#F5F5F5".to_string(),    // Off-White
+                    text_secondary: "#888888".to_string(),  // Grey
+                    border: "rgba(255, 255, 255, 0.08)".to_string(),
+                },
+            },
+            scripts: ScriptsConfig {
+                directory: "~/.config/vanta/scripts".to_string(),
+                timeout_ms: 5000,
+            },
+        }
+    }
+}
+
+/// Returns the path to the Vanta config directory (~/.config/vanta/).
+pub fn config_dir() -> PathBuf {
+    let base = dirs::config_dir().unwrap_or_else(|| {
+        let home = dirs::home_dir().expect("Could not determine home directory");
+        home.join(".config")
+    });
+    base.join("vanta")
+}
+
+/// Returns the path to the config file (~/.config/vanta/config.json).
+pub fn config_path() -> PathBuf {
+    config_dir().join("config.json")
+}
+
+/// Load config from disk or create the default config file.
+pub fn load_or_create_default() -> VantaConfig {
+    let path = config_path();
+
+    if path.exists() {
+        match fs::read_to_string(&path) {
+            Ok(contents) => match serde_json::from_str::<VantaConfig>(&contents) {
+                Ok(config) => {
+                    log::info!("Loaded config from {}", path.display());
+                    return config;
+                }
+                Err(e) => {
+                    log::warn!("Invalid config.json, using defaults: {}", e);
+                }
+            },
+            Err(e) => {
+                log::warn!("Could not read config.json, using defaults: {}", e);
+            }
+        }
+    }
+
+    // Create default config
+    let default_config = VantaConfig::default();
+    let dir = config_dir();
+
+    if let Err(e) = fs::create_dir_all(&dir) {
+        log::error!("Could not create config directory {}: {}", dir.display(), e);
+        return default_config;
+    }
+
+    // Also create the scripts directory
+    let scripts_dir = dir.join("scripts");
+    if let Err(e) = fs::create_dir_all(&scripts_dir) {
+        log::warn!("Could not create scripts directory: {}", e);
+    }
+
+    match serde_json::to_string_pretty(&default_config) {
+        Ok(json) => {
+            if let Err(e) = fs::write(&path, &json) {
+                log::error!("Could not write default config: {}", e);
+            } else {
+                log::info!("Created default config at {}", path.display());
+            }
+        }
+        Err(e) => {
+            log::error!("Could not serialize default config: {}", e);
+        }
+    }
+
+    default_config
+}
+
+/// Watch config.json for changes and emit `config-updated` events to the frontend.
+pub fn watch_config(app_handle: tauri::AppHandle) {
+    use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    let path = config_path();
+    let watch_dir = config_dir();
+
+    if !watch_dir.exists() {
+        log::warn!("Config directory does not exist, skipping watcher");
+        return;
+    }
+
+    let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
+
+    let mut watcher: RecommendedWatcher = match Watcher::new(
+        tx,
+        notify::Config::default().with_poll_interval(Duration::from_secs(1)),
+    ) {
+        Ok(w) => w,
+        Err(e) => {
+            log::error!("Failed to create config watcher: {}", e);
+            return;
+        }
+    };
+
+    if let Err(e) = watcher.watch(&watch_dir, RecursiveMode::NonRecursive) {
+        log::error!("Failed to watch config dir: {}", e);
+        return;
+    }
+
+    log::info!("Watching config at {}", path.display());
+
+    for event in rx {
+        match event {
+            Ok(ev) => {
+                let dominated_by_config = ev.paths.iter().any(|p| p.ends_with("config.json"));
+                let is_modify = matches!(
+                    ev.kind,
+                    EventKind::Modify(_) | EventKind::Create(_)
+                );
+
+                if dominated_by_config && is_modify {
+                    // Brief delay to let the file finish writing
+                    std::thread::sleep(Duration::from_millis(100));
+
+                    match fs::read_to_string(&path) {
+                        Ok(contents) => match serde_json::from_str::<VantaConfig>(&contents) {
+                            Ok(new_config) => {
+                                log::info!("Config updated, emitting event");
+                                let _ = app_handle.emit("config-updated", &new_config);
+                            }
+                            Err(e) => {
+                                log::warn!("Config parse error after change: {}", e);
+                            }
+                        },
+                        Err(e) => {
+                            log::warn!("Could not read config after change: {}", e);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Config watcher error: {}", e);
+            }
+        }
+    }
+}

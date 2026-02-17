@@ -1,0 +1,67 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Vanta",
+  "version": "1.0.0",
+  "identifier": "dev.vanta.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Vanta",
+        "width": 680,
+        "height": 420,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "visible": true,
+        "skipTaskbar": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: blob: stream:; font-src 'self'; connect-src 'self' asset:;",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "/usr/share/icons/**",
+          "/usr/share/pixmaps/**",
+          "/usr/local/share/icons/**",
+          "/usr/local/share/pixmaps/**",
+          "/var/lib/flatpak/exports/share/icons/**",
+          "/var/lib/flatpak/exports/share/pixmaps/**",
+          "/var/lib/snapd/desktop/icons/**",
+          "/snap/**",
+          "/opt/**",
+          "/run/current-system/sw/share/icons/**",
+          "/nix/store/**",
+          "$HOME/.local/share/icons/**",
+          "$HOME/.local/share/pixmaps/**",
+          "$HOME/.local/share/flatpak/exports/share/icons/**",
+          "$HOME/.icons/**",
+          "/var/lib/flatpak/app/**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "appimage",
+      "deb",
+      "rpm"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

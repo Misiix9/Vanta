@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Vanta
+Comment=Liquid Glass command palette
+Exec=vanta
+Icon=vanta
+Terminal=false
+Categories=Utility;
+Keywords=launcher;command;palette;

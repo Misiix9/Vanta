@@ -1,0 +1,41 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:path:default",
+    "opener:default",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-is-registered",
+    "fs:default",
+    "fs:allow-stat",
+    "fs:allow-read-file",
+    {
+      "identifier": "fs:scope",
+      "allow": [
+        "/usr/share/icons/**",
+        "/usr/share/pixmaps/**",
+        "/usr/local/share/icons/**",
+        "/usr/local/share/pixmaps/**",
+        "/var/lib/flatpak/exports/share/icons/**",
+        "/var/lib/flatpak/exports/share/pixmaps/**",
+        "/var/lib/snapd/desktop/icons/**",
+        "/snap/**",
+        "/opt/**",
+        "/run/current-system/sw/share/icons/**",
+        "/nix/store/**",
+        "/nix/var/nix/profiles/default/share/icons/**",
+        "$HOME/.local/share/icons/**",
+        "$HOME/.local/share/pixmaps/**",
+        "$HOME/.local/share/flatpak/exports/share/icons/**",
+        "$HOME/.icons/**",
+        "$HOME/.nix-profile/share/icons/**"
+      ]
+    }
+  ]
+}
