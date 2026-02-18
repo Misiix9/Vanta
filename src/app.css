@@ -114,16 +114,30 @@ body {
   }
 }
 
-/* Scrollbar styling */
+/* Global Scrollbar Reset */
 ::-webkit-scrollbar {
-  width: 4px;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+html,
+body {
+  scrollbar-width: none !important;
+  /* Firefox */
+  -ms-overflow-style: none !important;
+  /* IE */
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
+/* Ensure no scrollbars interfere with our custom solution */
+.results-container,
+[role="listbox"] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.results-container::-webkit-scrollbar,
+[role="listbox"]::-webkit-scrollbar {
+  display: none !important;
 }

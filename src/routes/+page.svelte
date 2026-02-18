@@ -26,6 +26,7 @@
   let searchTime: number | null = $state(null);
   let blurMode: string = $state("fallback");
   let searchInputRef: SearchInput | undefined = $state();
+  let resultsListRef: ResultsList | undefined = $state();
   let availableScripts: ScriptEntry[] = $state([]);
   let actionInFlight = $state(false); // guard: don't dismiss during actions
   let isVisible = $state(true);
@@ -261,10 +262,16 @@
       case "ArrowDown":
         e.preventDefault();
         selectedIndex = (selectedIndex + 1) % totalItems;
+        // Manual scroll trigger
+        if (!isScriptMode)
+          setTimeout(() => resultsListRef?.scrollToSelected(), 0);
         break;
       case "ArrowUp":
         e.preventDefault();
         selectedIndex = selectedIndex <= 0 ? totalItems - 1 : selectedIndex - 1;
+        // Manual scroll trigger
+        if (!isScriptMode)
+          setTimeout(() => resultsListRef?.scrollToSelected(), 0);
         break;
       case "Enter":
         e.preventDefault();
@@ -325,7 +332,12 @@
     </div>
   {:else}
     <!-- Normal app results -->
-    <ResultsList {results} bind:selectedIndex onActivate={handleActivate} />
+    <ResultsList
+      bind:this={resultsListRef}
+      {results}
+      bind:selectedIndex
+      onActivate={handleActivate}
+    />
   {/if}
 
   <StatusBar

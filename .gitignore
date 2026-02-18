@@ -22,3 +22,4 @@ pkg/
 *.deb
 *.rpm
 *.AppImage
+vanta-bin/

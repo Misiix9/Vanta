@@ -23,10 +23,13 @@ pub enum ResultSource {
 
 /// Perform fuzzy search across cached app entries using nucleo-matcher.
 /// Returns top `max_results` entries sorted by score (descending).
+/// Perform fuzzy search across cached app entries using nucleo-matcher.
+/// Returns top `max_results` entries sorted by score (descending).
 pub fn fuzzy_search(
     query: &str,
     apps: &[AppEntry],
     max_results: usize,
+    usage_map: &std::collections::HashMap<String, u32>,
 ) -> Vec<SearchResult> {
     let start = std::time::Instant::now();
 
@@ -43,16 +46,23 @@ pub fn fuzzy_search(
         false,
     );
 
-    let mut scored: Vec<(u16, Vec<u32>, &AppEntry)> = Vec::new();
+    let mut scored: Vec<(u32, Vec<u32>, &AppEntry)> = Vec::new();
 
     for app in apps {
+        // Calculate history boost first
+        let usage = usage_map.get(&app.exec).copied().unwrap_or(0);
+        // Cap the bonus at 200 points (e.g. 40 launches) to prevent overuse from
+        // completely overshadowing relevance.
+        let usage_bonus = std::cmp::min(usage * 5, 200);
+
         // Match against name (primary)
         let mut haystack_buf = Vec::new();
         let haystack = Utf32Str::new(&app.name, &mut haystack_buf);
         let mut indices = Vec::new();
 
         if let Some(score) = pattern.indices(haystack, &mut matcher, &mut indices) {
-            scored.push((score, indices.clone(), app));
+            let final_score = score as u32 + usage_bonus;
+            scored.push((final_score, indices.clone(), app));
             continue;
         }
 
@@ -63,7 +73,9 @@ pub fn fuzzy_search(
             let haystack = Utf32Str::new(gname, &mut haystack_buf);
             if let Some(score) = pattern.indices(haystack, &mut matcher, &mut indices) {
                 // Slightly lower score for secondary matches
-                scored.push((score.saturating_sub(10), indices.clone(), app));
+                let base_score = score.saturating_sub(10);
+                let final_score = base_score as u32 + usage_bonus;
+                scored.push((final_score, indices.clone(), app));
                 continue;
             }
         }
@@ -74,7 +86,9 @@ pub fn fuzzy_search(
             indices.clear();
             let haystack = Utf32Str::new(comment, &mut haystack_buf);
             if let Some(score) = pattern.indices(haystack, &mut matcher, &mut indices) {
-                scored.push((score.saturating_sub(20), indices.clone(), app));
+                let base_score = score.saturating_sub(20);
+                let final_score = base_score as u32 + usage_bonus;
+                scored.push((final_score, indices.clone(), app));
             }
         }
     }
@@ -90,7 +104,7 @@ pub fn fuzzy_search(
             subtitle: app.generic_name.clone().or_else(|| app.comment.clone()),
             icon: app.icon.clone(),
             exec: app.exec.clone(),
-            score: score as u32,
+            score: score,
             match_indices: indices,
             source: ResultSource::Application,
         })

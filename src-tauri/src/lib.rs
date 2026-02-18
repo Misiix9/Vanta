@@ -50,7 +50,17 @@ async fn search(
         .map_err(|_| "Failed to access config".to_string())?;
 
     let max_results = config.general.max_results;
-    let results = matcher::fuzzy_search(&query, &apps, max_results);
+
+    // Get usage history for boosting
+    let usage_map = {
+        let history = state
+            .history
+            .lock()
+            .map_err(|_| "Failed to access history".to_string())?;
+        history.usage.clone()
+    };
+
+    let results = matcher::fuzzy_search(&query, &apps, max_results, &usage_map);
     Ok(results)
 }
 
