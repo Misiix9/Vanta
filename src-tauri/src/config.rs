@@ -3,11 +3,12 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Emitter;
 
-/// Top-level Vanta configuration.
+//
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VantaConfig {
     pub general: GeneralConfig,
     pub appearance: AppearanceConfig,
+    pub window: WindowConfig,
     pub scripts: ScriptsConfig,
 }
 
@@ -16,6 +17,12 @@ pub struct GeneralConfig {
     pub hotkey: String,
     pub max_results: usize,
     pub launch_on_login: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WindowConfig {
+    pub width: f64,
+    pub height: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -51,17 +58,21 @@ impl Default for VantaConfig {
                 max_results: 8,
                 launch_on_login: false,
             },
+            window: WindowConfig {
+                width: 800.0,
+                height: 600.0,
+            },
             appearance: AppearanceConfig {
                 blur_radius: 40,
                 opacity: 0.85,
                 border_radius: 24,
                 colors: ColorsConfig {
-                    background: "#000000".to_string(),      // Pure OLED Black
-                    surface: "#0A0A0A".to_string(),         // Item BG
-                    accent: "#FFFFFF".to_string(),          // Monochrome Accent
+                    background: "#000000".to_string(), // Pure OLED Black
+                    surface: "#0A0A0A".to_string(),    // Item BG
+                    accent: "#FFFFFF".to_string(),     // Monochrome Accent
                     accent_glow: "rgba(255, 255, 255, 0.25)".to_string(),
-                    text_primary: "#F5F5F5".to_string(),    // Off-White
-                    text_secondary: "#888888".to_string(),  // Grey
+                    text_primary: "#F5F5F5".to_string(), // Off-White
+                    text_secondary: "#888888".to_string(), // Grey
                     border: "rgba(255, 255, 255, 0.08)".to_string(),
                 },
             },
@@ -139,7 +150,19 @@ pub fn load_or_create_default() -> VantaConfig {
     default_config
 }
 
-/// Watch config.json for changes and emit `config-updated` events to the frontend.
+impl VantaConfig {
+    /// Save the current configuration to disk.
+    pub fn save(&self) -> Result<(), String> {
+        let path = config_path();
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+        fs::write(&path, json)
+            .map_err(|e| format!("Failed to write config to {}: {}", path.display(), e))?;
+
+        Ok(())
+    }
+}
 pub fn watch_config(app_handle: tauri::AppHandle) {
     use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
     use std::sync::mpsc;
@@ -177,10 +200,7 @@ pub fn watch_config(app_handle: tauri::AppHandle) {
         match event {
             Ok(ev) => {
                 let dominated_by_config = ev.paths.iter().any(|p| p.ends_with("config.json"));
-                let is_modify = matches!(
-                    ev.kind,
-                    EventKind::Modify(_) | EventKind::Create(_)
-                );
+                let is_modify = matches!(ev.kind, EventKind::Modify(_) | EventKind::Create(_));
 
                 if dominated_by_config && is_modify {
                     // Brief delay to let the file finish writing
