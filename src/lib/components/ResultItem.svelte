@@ -17,6 +17,7 @@
     } = $props();
 
     let loadFailed = $state(false);
+    let iconUrl = $derived(result.icon ? convertFileSrc(result.icon) : "");
 
     /**
      * Highlight matching characters in the title based on match_indices.
@@ -65,13 +66,19 @@
     style="animation-delay: {index * 30}ms"
 >
     <div class="item-icon">
-        {#if result.icon && !loadFailed}
+        {#if result.source === "Calculator"}
+            <span class="icon-emoji">🧮</span>
+        {:else if typeof result.source === "object" && "Script" in result.source}
+            <span class="icon-emoji">⚡</span>
+        {:else if result.icon && !loadFailed}
             <img
-                src={convertFileSrc(result.icon)}
+                src={iconUrl}
                 alt={result.title}
                 class="icon-img"
                 onerror={handleImageError}
             />
+        {:else if result.source === "Window"}
+            <span class="icon-emoji">🪟</span>
         {:else}
             <img
                 src="/package.svg"
@@ -136,6 +143,11 @@
         flex-shrink: 0;
         font-weight: 600;
         font-size: 16px;
+    }
+
+    .icon-emoji {
+        font-size: 24px;
+        line-height: 1;
     }
 
     .icon-fallback {

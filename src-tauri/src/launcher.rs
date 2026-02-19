@@ -4,6 +4,24 @@ use std::process::Command;
 pub fn launch(exec: &str) -> Result<(), String> {
     let start = std::time::Instant::now();
 
+    // Check for window focus action
+    if exec.starts_with("focus:") {
+        let address = exec.trim_start_matches("focus:");
+        // Try Hyprland focus
+        let _ = Command::new("hyprctl")
+            .arg("dispatch")
+            .arg("focuswindow")
+            .arg(format!("address:{}", address))
+            .spawn();
+
+        // Try Sway focus (address is con_id)
+        let _ = Command::new("swaymsg")
+            .arg(format!("[con_id={}] focus", address))
+            .spawn();
+
+        return Ok(());
+    }
+
     let cleaned = strip_field_codes(exec);
 
     if cleaned.is_empty() {

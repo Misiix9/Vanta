@@ -48,7 +48,7 @@ export interface SearchResult {
     source: ResultSource;
 }
 
-export type ResultSource = "Application" | "Calculator" | { Script: { keyword: string } };
+export type ResultSource = "Application" | "Calculator" | "Window" | { Script: { keyword: string } };
 
 export interface BlurStatus {
     mode: "native" | "fallback";

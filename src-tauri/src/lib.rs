@@ -7,6 +7,7 @@ pub mod math; // New math module
 pub mod scanner;
 pub mod scripts;
 pub mod window;
+pub mod windows; // New windows enumeration module
 
 use std::sync::Mutex;
 use tauri::Manager;
@@ -79,19 +80,63 @@ async fn search(
 
     let mut results = matcher::fuzzy_search(&query, &apps, max_results, &usage_map);
 
+    // Search Open Windows
+    let open_windows = windows::list_windows();
+    
+    // Perform simple substring match for now (or fuzzy if I want to duplicate logic, but simple is faster for now)
+    let query_lower = query.to_lowercase();
+    for win in open_windows {
+        if win.title.to_lowercase().contains(&query_lower) || win.class.to_lowercase().contains(&query_lower) {
+             
+             // Try to find matching app for icon
+             let matched_app = apps.iter().find(|app| {
+                 // 1. Match StartupWMClass (most accurate)
+                 if let Some(ref wm_class) = app.startup_wm_class {
+                     if wm_class.eq_ignore_ascii_case(&win.class) {
+                         return true;
+                     }
+                 }
+                 // 2. Match Exec (first part)
+                 // e.g. Exec="gnome-terminal --wait" -> "gnome-terminal"
+                 if let Some(cmd) = app.exec.split_whitespace().next() {
+                     // Check against class
+                     if cmd.eq_ignore_ascii_case(&win.class) {
+                         return true;
+                     }
+                     // Some windows have class="Alacritty", exec="alacritty"
+                 }
+                 // 3. Match Name
+                 if app.name.eq_ignore_ascii_case(&win.class) {
+                     return true;
+                 }
+                 
+                 false
+             });
+
+             let icon = matched_app.and_then(|a| a.icon.clone());
+
+             let win_result = SearchResult {
+                title: win.title,
+                subtitle: Some(format!("Switch to Window (Workspace {})", win.workspace)),
+                icon: icon, // Use matched app icon, or None (will fallback to emoji in frontend)
+                exec: format!("focus:{}", win.address), 
+                score: 1000000, // Very high priority
+                match_indices: vec![],
+                source: matcher::ResultSource::Window,
+            };
+            results.insert(0, win_result);
+        }
+    }
+
     // Check for math
     if let Some(val) = math::evaluate(&query) {
         let val_str = format!("{}", val);
         let calc_result = SearchResult {
             title: format!("= {}", val_str),
             subtitle: Some("Click to Copy".to_string()),
-            // We'll use a special icon prefix or just handle it in frontend if possible.
-            // For now, let's use a standard icon path or name.
-            // If the frontend loads icons by name, we can use "calculator".
-            // If it expects a path, we might need a dummy path or handle "calculator" special case.
             icon: Some("calculator".to_string()), 
             exec: format!("copy:{}", val_str), 
-            score: 999999, // Ensure it's always top
+            score: 999999, // High priority but below explicit window switch? Or above?
             match_indices: vec![],
             source: matcher::ResultSource::Calculator,
         };

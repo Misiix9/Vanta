@@ -20,6 +20,7 @@ pub struct SearchResult {
 pub enum ResultSource {
     Application,
     Calculator,
+    Window,
 }
 
 /// Perform fuzzy search across cached app entries using nucleo-matcher.

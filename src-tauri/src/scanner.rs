@@ -13,6 +13,7 @@ pub struct AppEntry {
     pub icon: Option<String>,
     pub categories: Vec<String>,
     pub terminal: bool,
+    pub startup_wm_class: Option<String>,
     pub desktop_file_path: String,
 }
 
@@ -149,6 +150,7 @@ fn parse_desktop_file(path: &Path, cache: &mut IconCache) -> Option<AppEntry> {
     let mut comment: Option<String> = None;
     let mut exec: Option<String> = None;
     let mut icon_name: Option<String> = None;
+    let mut startup_wm_class: Option<String> = None;
     let mut categories: Vec<String> = Vec::new();
     let mut terminal = false;
     let mut no_display = false;
@@ -182,6 +184,7 @@ fn parse_desktop_file(path: &Path, cache: &mut IconCache) -> Option<AppEntry> {
                 "Comment" => comment = Some(value.to_string()),
                 "Exec" => exec = Some(value.to_string()),
                 "Icon" => icon_name = Some(value.to_string()),
+                "StartupWMClass" => startup_wm_class = Some(value.to_string()),
                 "Terminal" => terminal = value.eq_ignore_ascii_case("true"),
                 "NoDisplay" => no_display = value.eq_ignore_ascii_case("true"),
                 "Hidden" => hidden = value.eq_ignore_ascii_case("true"),
@@ -217,6 +220,7 @@ fn parse_desktop_file(path: &Path, cache: &mut IconCache) -> Option<AppEntry> {
         icon,
         categories,
         terminal,
+        startup_wm_class,
         desktop_file_path: path.to_string_lossy().to_string(),
     })
 }
