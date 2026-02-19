@@ -16,9 +16,12 @@
   import ResultsList from "$lib/components/ResultsList.svelte";
   import StatusBar from "$lib/components/StatusBar.svelte";
   import ScriptResultItem from "$lib/components/ScriptResultItem.svelte";
+  import SettingsView from "$lib/components/SettingsView.svelte";
 
   let query = $state("");
+  let vantaConfig: VantaConfig | undefined = $state();
   let results: SearchResult[] = $state([]);
+  let view: "launcher" | "settings" = $state("launcher");
   let scriptResults: ScriptItem[] = $state([]);
   let isScriptMode = $state(false);
   let activeScriptKeyword = $state("");
@@ -41,6 +44,7 @@
   onMount(async () => {
     try {
       const config = await invoke<VantaConfig>("get_config");
+      vantaConfig = config;
       applyTheme(config);
     } catch (e) {
       console.error("Failed to load config:", e);
@@ -57,6 +61,7 @@
     // Listen for config hot-reload events
     await listen<VantaConfig>("config-updated", (event) => {
       console.log("Config updated:", event.payload);
+      vantaConfig = event.payload;
       applyTheme(event.payload);
     });
 
@@ -256,6 +261,24 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    // Global: Ctrl+, toggles settings
+    if (e.key === "," && e.ctrlKey) {
+      e.preventDefault();
+      view = view === "launcher" ? "settings" : "launcher";
+      return;
+    }
+
+    // If in settings, intercept Esc/Enter to close
+    if (view === "settings") {
+      if (e.key === "Escape" || e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        view = "launcher";
+      }
+      return; // Block other keys
+    }
+
+    // Launcher logic
     if (totalItems === 0) return;
 
     switch (e.key) {
@@ -299,51 +322,56 @@
 <div
   class="vanta-shell vanta-glass"
   class:css-blur={blurMode === "fallback"}
-  onmouseenter={() => (isMouseOver = true)}
-  onmouseleave={() => (isMouseOver = false)}
   role="application"
 >
-  <SearchInput
-    bind:this={searchInputRef}
-    bind:query
-    onSearch={handleSearch}
-    onEscape={handleEscape}
-  />
-
-  {#if isScriptMode}
-    <!-- Script results -->
-    <div class="results-container" role="listbox" aria-label="Script results">
-      {#if scriptResults.length === 0}
-        <div class="empty-state">
-          <span class="empty-icon">⚡</span>
-          <span>Running {activeScriptKeyword}...</span>
-        </div>
-      {:else}
-        {#each scriptResults as item, i}
-          <ScriptResultItem
-            {item}
-            index={i}
-            isSelected={i === selectedIndex}
-            onSelect={(idx) => (selectedIndex = idx)}
-            onActivate={handleScriptActivate}
-          />
-        {/each}
-      {/if}
-    </div>
+  {#if view === "settings" && vantaConfig}
+    <SettingsView
+      bind:config={vantaConfig}
+      onClose={() => (view = "launcher")}
+    />
   {:else}
-    <!-- Normal app results -->
-    <ResultsList
-      bind:this={resultsListRef}
-      {results}
-      bind:selectedIndex
-      onActivate={handleActivate}
+    <SearchInput
+      bind:this={searchInputRef}
+      bind:query
+      onSearch={handleSearch}
+      onEscape={handleEscape}
+    />
+
+    {#if isScriptMode}
+      <!-- Script results -->
+      <div class="results-container" role="listbox" aria-label="Script results">
+        {#if scriptResults.length === 0}
+          <div class="empty-state">
+            <span class="empty-icon">⚡</span>
+            <span>Running {activeScriptKeyword}...</span>
+          </div>
+        {:else}
+          {#each scriptResults as item, i}
+            <ScriptResultItem
+              {item}
+              index={i}
+              isSelected={i === selectedIndex}
+              onSelect={(idx) => (selectedIndex = idx)}
+              onActivate={handleScriptActivate}
+            />
+          {/each}
+        {/if}
+      </div>
+    {:else}
+      <!-- Normal app results -->
+      <ResultsList
+        bind:this={resultsListRef}
+        {results}
+        bind:selectedIndex
+        onActivate={handleActivate}
+      />
+    {/if}
+
+    <StatusBar
+      resultCount={isScriptMode ? scriptResults.length : results.length}
+      {searchTime}
     />
   {/if}
-
-  <StatusBar
-    resultCount={isScriptMode ? scriptResults.length : results.length}
-    {searchTime}
-  />
 </div>
 
 <style>

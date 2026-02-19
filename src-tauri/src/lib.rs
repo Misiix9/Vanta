@@ -36,6 +36,22 @@ async fn get_config(
 }
 
 #[tauri::command]
+async fn save_config(
+    new_config: VantaConfig,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let mut config = state
+        .config
+        .lock()
+        .map_err(|_| "Failed to access config state".to_string())?;
+    
+    *config = new_config;
+    config.save()?;
+    
+    Ok(())
+}
+
+#[tauri::command]
 async fn search(
     query: String,
     state: tauri::State<'_, AppState>,
@@ -230,12 +246,12 @@ pub fn run() {
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             get_config,
+            save_config,
             search,
             launch_app,
             rescan_apps,
             hide_window,
             show_window,
-            get_scripts,
             get_scripts,
             execute_script,
             get_suggestions,
@@ -243,9 +259,17 @@ pub fn run() {
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
-            // Initialize window (apply blur/transparency)
+            // Initialize window (apply blur/transparency/size)
             if let Some(win) = app.get_webview_window("main") {
                 let _ = window::init_window(&win, &app_handle);
+                
+                // Apply window size from config
+                let (width, height) = {
+                    let state = app.state::<AppState>();
+                    let config = state.config.lock().unwrap();
+                    (config.window.width, config.window.height)
+                };
+                let _ = win.set_size(tauri::LogicalSize::new(width, height));
             }
 
             // Register global hotkey (e.g. Alt+Space)

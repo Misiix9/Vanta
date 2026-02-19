@@ -26,9 +26,15 @@ export interface ScriptsConfig {
     timeout_ms: number;
 }
 
+export interface WindowConfig {
+    width: number;
+    height: number;
+}
+
 export interface VantaConfig {
     general: GeneralConfig;
     appearance: AppearanceConfig;
+    window: WindowConfig;
     scripts: ScriptsConfig;
 }
 
