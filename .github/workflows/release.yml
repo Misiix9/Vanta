@@ -70,24 +70,25 @@ jobs:
             src-tauri/target/**/bundle/rpm/*.rpm
           draft: true
           prerelease: false
-          name: Vanta v${{ steps.get_version.outputs.VERSION }}
+          name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
             ## Vanta ${{ steps.get_version.outputs.VERSION }}
-            **Clipboard Memory & Window Switcher**
+          body: |
+            ## Vanta ${{ steps.get_version.outputs.VERSION }}
+            **File Search, Smart Icons & CI Fixes**
 
             ### New Features
-            - **Clipboard History**: Access your clipboard history with `Super+V` (configurable).
-                - Dedicated UI with numbered entries.
-                - Robust watcher (text-only) to prevent garbage data.
-                - Works on Hyprland/Sway/Wayland.
-            - **Window Switcher**: Search and switch to open windows directly from the launcher.
-                - Displays window icons and workspace info.
-                - "Always on Top" visibility fix for Hyprland.
+            - **📂 File Search**: Search your Home directory!
+                - Trigger: Type `/` or `~/`.
+                - Usage: Recursively scans up to 3 levels deep (ignoring hidden files).
+                - Action: Opens files with your default system app (`xdg-open`).
+            - **✨ Smart Icons**: Dynamic black & white icons for file types.
+                - Recognizes: Folders, Text, PDF, Images, Video, Audio, Archives.
+                - Generated on-the-fly (lightweight).
 
             ### Improvements
-            - **Performance**: Faster fuzzy search.
-            - **Stability**: Fixed "Invalid declaration" build errors and duplicate key crashes.
-            - **UX**: Numbered clipboard items for easier navigation.
+            - **CI/CD**: Fixed release workflow title format (removed duplicate 'v').
+            - **Deps**: Added `walkdir` for efficient file scanning.
 
             ### Installation
             - **Debian/Ubuntu**: Download `.deb`

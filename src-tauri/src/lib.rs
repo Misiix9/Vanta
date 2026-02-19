@@ -7,6 +7,7 @@ pub mod matcher;
 pub mod math; // New math module
 pub mod scanner;
 pub mod scripts;
+pub mod files; // New files module
 pub mod window;
 pub mod windows; // New windows enumeration module
 
@@ -142,6 +143,12 @@ async fn search(
             source: matcher::ResultSource::Calculator,
         };
         results.insert(0, calc_result);
+    }
+
+    // Check for file search
+    if query.starts_with("/") || query.starts_with("~/") {
+        let file_results = files::search_home(&query);
+        results.extend(file_results);
     }
 
     Ok(results)

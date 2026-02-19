@@ -4,6 +4,13 @@ use std::process::Command;
 pub fn launch(exec: &str) -> Result<(), String> {
     let start = std::time::Instant::now();
 
+    // Check if it's a file path first (for file search results)
+    let path = std::path::Path::new(exec);
+    if path.exists() && path.is_file() {
+        open::that(exec).map_err(|e| format!("Failed to open file: {}", e))?;
+        return Ok(());
+    }
+
     // Check for window focus action
     if exec.starts_with("focus:") {
         let address = exec.trim_start_matches("focus:");

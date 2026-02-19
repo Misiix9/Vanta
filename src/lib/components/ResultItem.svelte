@@ -1,6 +1,7 @@
 <script lang="ts">
     import { convertFileSrc } from "@tauri-apps/api/core";
     import type { SearchResult } from "$lib/types";
+    import FileIcon from "./FileIcon.svelte";
 
     let {
         result,
@@ -70,6 +71,8 @@
             <span class="icon-emoji">🧮</span>
         {:else if typeof result.source === "object" && "Script" in result.source}
             <span class="icon-emoji">⚡</span>
+        {:else if result.icon && (result.icon === "dir" || result.icon.startsWith("file"))}
+            <FileIcon type={result.icon} />
         {:else if result.icon && !loadFailed}
             <img
                 src={iconUrl}
