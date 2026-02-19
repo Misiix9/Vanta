@@ -3,6 +3,7 @@ pub mod errors;
 pub mod history;
 pub mod launcher;
 pub mod matcher;
+pub mod math; // New math module
 pub mod scanner;
 pub mod scripts;
 pub mod window;
@@ -76,7 +77,27 @@ async fn search(
         history.usage.clone()
     };
 
-    let results = matcher::fuzzy_search(&query, &apps, max_results, &usage_map);
+    let mut results = matcher::fuzzy_search(&query, &apps, max_results, &usage_map);
+
+    // Check for math
+    if let Some(val) = math::evaluate(&query) {
+        let val_str = format!("{}", val);
+        let calc_result = SearchResult {
+            title: format!("= {}", val_str),
+            subtitle: Some("Click to Copy".to_string()),
+            // We'll use a special icon prefix or just handle it in frontend if possible.
+            // For now, let's use a standard icon path or name.
+            // If the frontend loads icons by name, we can use "calculator".
+            // If it expects a path, we might need a dummy path or handle "calculator" special case.
+            icon: Some("calculator".to_string()), 
+            exec: format!("copy:{}", val_str), 
+            score: 999999, // Ensure it's always top
+            match_indices: vec![],
+            source: matcher::ResultSource::Calculator,
+        };
+        results.insert(0, calc_result);
+    }
+
     Ok(results)
 }
 

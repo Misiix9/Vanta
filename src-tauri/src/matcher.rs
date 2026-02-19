@@ -19,6 +19,7 @@ pub struct SearchResult {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ResultSource {
     Application,
+    Calculator,
 }
 
 /// Perform fuzzy search across cached app entries using nucleo-matcher.

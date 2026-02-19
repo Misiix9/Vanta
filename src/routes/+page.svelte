@@ -203,10 +203,16 @@
   async function handleActivate(result: SearchResult) {
     actionInFlight = true;
     try {
-      await invoke("launch_app", { exec: result.exec });
-      resetAndHide();
+      if (result.exec.startsWith("copy:")) {
+        const value = result.exec.slice(5);
+        await navigator.clipboard.writeText(value);
+        resetAndHide();
+      } else {
+        await invoke("launch_app", { exec: result.exec });
+        resetAndHide();
+      }
     } catch (e) {
-      console.error("Launch failed:", e);
+      console.error("Launch/Copy failed:", e);
     } finally {
       setTimeout(() => (actionInFlight = false), 200);
     }
