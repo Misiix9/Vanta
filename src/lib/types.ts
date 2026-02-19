@@ -46,9 +46,16 @@ export interface SearchResult {
     score: number;
     match_indices: number[];
     source: ResultSource;
+    id?: number | string;
 }
 
-export type ResultSource = "Application" | "Calculator" | "Window" | { Script: { keyword: string } };
+export type ResultSource = "Application" | "Calculator" | "Window" | "Clipboard" | { Script: { keyword: string } };
+
+export interface ClipboardItem {
+    id: number;
+    content: string;
+    timestamp: string;
+}
 
 export interface BlurStatus {
     mode: "native" | "fallback";

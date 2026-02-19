@@ -40,8 +40,12 @@
     isScriptMode ? scriptResults.length : results.length,
   );
 
-  // Load config on mount and listen for updates
+  // Clipboard State
+  let currentMode: "launcher" | "clipboard" = $state("launcher");
+  let clipboardHistory: any[] = [];
+
   onMount(async () => {
+    // ... existing onMount code ...
     try {
       const config = await invoke<VantaConfig>("get_config");
       vantaConfig = config;
@@ -76,8 +80,21 @@
       console.log("Scripts updated:", availableScripts.length);
     });
 
+    // Listen for Clipboard Shortcut
+    await listen("open_clipboard", async () => {
+      currentMode = "clipboard";
+      query = "";
+      try {
+        clipboardHistory = await invoke("get_clipboard_history");
+        updateClipboardSuggestions("");
+      } catch (e) {
+        console.error("Failed to fetch history", e);
+      }
+      await invoke("show_window");
+      setTimeout(() => searchInputRef?.focus?.(), 50);
+    });
+
     // ── Click-away dismiss ──
-    // Currently disabled to support "Focus Follows Mouse" workflows
     const appWindow = getCurrentWebviewWindow();
     await appWindow.onFocusChanged(({ payload: focused }) => {
       // Focus logic placeholder
@@ -86,19 +103,47 @@
     // Listen for window shown event → refocus the search input and reload suggestions
     await listen("tauri://focus", () => {
       isVisible = true;
-      // Re-focus search input when window is shown
       setTimeout(() => {
         searchInputRef?.focus?.();
-        // Refresh suggestions to reflect recent usage
-        if (query.trim() === "") {
+        if (query.trim() === "" && currentMode === "launcher") {
           loadSuggestions();
         }
       }, 50);
     });
 
-    // Initial load of suggestions
     loadSuggestions();
   });
+
+  function updateClipboardSuggestions(q: string) {
+    if (!q) {
+      results = clipboardHistory.map((item) => ({
+        title: item.content.replace(/\n/g, " ").substring(0, 100),
+        subtitle: new Date(item.timestamp).toLocaleString(),
+        icon: null,
+        exec: `copy:${item.content}`,
+        score: 0,
+        source: "Clipboard",
+        id: item.id,
+        match_indices: [],
+      }));
+    } else {
+      const lower = q.toLowerCase();
+      const filtered = clipboardHistory.filter((item) =>
+        item.content.toLowerCase().includes(lower),
+      );
+      results = filtered.map((item) => ({
+        title: item.content.replace(/\n/g, " ").substring(0, 100),
+        subtitle: new Date(item.timestamp).toLocaleString(),
+        icon: null,
+        exec: `copy:${item.content}`,
+        score: 0,
+        source: "Clipboard",
+        id: item.id,
+        match_indices: [],
+      }));
+    }
+    selectedIndex = 0;
+  }
 
   /**
    * Check if query begins with a known script keyword.
@@ -133,6 +178,11 @@
   }
 
   async function handleSearch(q: string) {
+    if (currentMode === "clipboard") {
+      updateClipboardSuggestions(q);
+      return;
+    }
+
     if (!q.trim()) {
       isScriptMode = false;
       activeScriptKeyword = "";
@@ -255,6 +305,7 @@
 
     scriptResults = [];
     isScriptMode = false;
+    currentMode = "launcher"; // Reset mode
     activeScriptKeyword = "";
     selectedIndex = 0;
     searchTime = null;
@@ -263,6 +314,11 @@
   }
 
   async function handleEscape() {
+    if (currentMode === "clipboard" && query === "") {
+      currentMode = "launcher";
+      loadSuggestions();
+      return;
+    }
     resetAndHide();
   }
 

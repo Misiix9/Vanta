@@ -100,7 +100,7 @@
       onscroll={handleScroll}
       role="listbox"
     >
-      {#each results as result, i (result.exec + result.title)}
+      {#each results as result, i (result.id || result.exec + result.title)}
         <div
           bind:this={itemElements[i]}
           id="result-item-{i}"

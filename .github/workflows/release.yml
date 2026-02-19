@@ -73,17 +73,26 @@ jobs:
           name: Vanta v${{ steps.get_version.outputs.VERSION }}
           body: |
             ## Vanta ${{ steps.get_version.outputs.VERSION }}
-            **Initial Release** - A hyper-fast, scriptable command palette for Wayland.
+            **Clipboard Memory & Window Switcher**
 
-            ### Key Features
-            - Liquid Glass UI: Modern frosted aesthetic designed for Hyprland/Sway.
-            - Blazing Fast: Powered by Rust & nucleo-matcher.
-            - Limitlessly Scriptable: Extend functionality with Python, Bash, Node.js, etc.
+            ### New Features
+            - **Clipboard History**: Access your clipboard history with `Super+V` (configurable).
+                - Dedicated UI with numbered entries.
+                - Robust watcher (text-only) to prevent garbage data.
+                - Works on Hyprland/Sway/Wayland.
+            - **Window Switcher**: Search and switch to open windows directly from the launcher.
+                - Displays window icons and workspace info.
+                - "Always on Top" visibility fix for Hyprland.
+
+            ### Improvements
+            - **Performance**: Faster fuzzy search.
+            - **Stability**: Fixed "Invalid declaration" build errors and duplicate key crashes.
+            - **UX**: Numbered clipboard items for easier navigation.
 
             ### Installation
-            - Debian/Ubuntu: Download .deb
-            - Fedora/OpenSUSE: Download .rpm
-            - Universal: Download and run .AppImage
-            - Arch Linux: Install vanta-bin from AUR.
+            - **Debian/Ubuntu**: Download `.deb`
+            - **Fedora/OpenSUSE**: Download `.rpm`
+            - **Universal**: Download and run `.AppImage`
+            - **Arch Linux**: Install `vanta-bin` from AUR (updated shortly).
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

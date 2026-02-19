@@ -1,3 +1,4 @@
+pub mod clipboard; // New clipboard module
 pub mod config;
 pub mod errors;
 pub mod history;
@@ -10,7 +11,7 @@ pub mod window;
 pub mod windows; // New windows enumeration module
 
 use std::sync::Mutex;
-use tauri::Manager;
+use tauri::{Manager, Emitter}; // Added Emitter for .emit()
 
 use config::VantaConfig;
 use history::History;
@@ -261,9 +262,22 @@ async fn execute_script(
     .map_err(|e| format!("Script task failed: {}", e))?
 }
 
+#[tauri::command]
+async fn get_clipboard_history() -> Result<Vec<clipboard::ClipboardItem>, String> {
+    clipboard::get_history().map_err(|e| format!("Failed to get history: {}", e))
+}
+
+
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::init();
+
+    // Init clipboard
+    if let Err(e) = clipboard::init_db() {
+        log::error!("Failed to init clipboard DB: {}", e);
+    }
+    clipboard::start_watcher();
 
 
     let vanta_config = config::load_or_create_default();
@@ -300,8 +314,21 @@ pub fn run() {
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(
-             |app, _args, _cwd| {
-                let _ = window::toggle_window(app);
+             |app, args, _cwd| {
+                println!("Single instance triggered with args: {:?}", args);
+                let lower_args: Vec<String> = args.iter().map(|s| s.to_lowercase()).collect();
+                if lower_args.contains(&"--clipboard".to_string()) || lower_args.contains(&"-c".to_string()) {
+                    println!("Opening clipboard mode");
+                    if let Some(win) = app.get_webview_window("main") {
+                        let _ = win.set_always_on_top(true);
+                        let _ = win.center();
+                        let _ = window::show_window(&win);
+                        let _ = win.emit("open_clipboard", ());
+                    }
+                } else {
+                    println!("Toggling window");
+                    let _ = window::toggle_window(app);
+                }
             },
         ));
     }
@@ -320,7 +347,11 @@ pub fn run() {
             show_window,
             get_scripts,
             execute_script,
+            execute_script,
             get_suggestions,
+            get_suggestions,
+            get_suggestions,
+            get_clipboard_history,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
@@ -338,52 +369,73 @@ pub fn run() {
                 let _ = win.set_size(tauri::LogicalSize::new(width, height));
             }
 
-            // Register global hotkey (e.g. Alt+Space)
+            // Register global hotkey (e.g. Alt+Space) AND Clipboard (Super+V)
             #[cfg(desktop)]
             {
                 use tauri_plugin_global_shortcut::{
-                    GlobalShortcutExt, ShortcutState,
+                    GlobalShortcutExt, ShortcutState, Shortcut,
                 };
+                use std::str::FromStr;
 
+                let mut shortcuts = Vec::new();
+                let mut config_shortcut: Option<Shortcut> = None;
+                let mut clipboard_shortcut: Option<Shortcut> = None;
 
-                let shortcut_result: Result<
-                    tauri_plugin_global_shortcut::Shortcut,
-                    _,
-                > = hotkey_str.parse();
+                // 1. Config Hotkey
+                if let Ok(s) = Shortcut::from_str(&hotkey_str) {
+                    config_shortcut = Some(s);
+                    shortcuts.push(s);
+                } else {
+                    log::error!("Invalid config hotkey: {}", hotkey_str);
+                }
 
-                match shortcut_result {
-                    Ok(shortcut) => {
-                        let shortcut_clone = shortcut;
-                        let plugin = tauri_plugin_global_shortcut::Builder::new()
-                            .with_handler(move |app, sc, event| {
-                                if sc == &shortcut_clone
-                                    && event.state() == ShortcutState::Pressed
-                                {
+                // 2. Clipboard Hotkey
+                let clipboard_hotkey_str = "Super+V";
+                if let Ok(s) = Shortcut::from_str(clipboard_hotkey_str) {
+                    clipboard_shortcut = Some(s);
+                    shortcuts.push(s);
+                } else {
+                    log::error!("Invalid clipboard hotkey: {}", clipboard_hotkey_str);
+                }
+
+                // Clone for move into closure
+                let cfg_sc = config_shortcut.clone();
+                let clip_sc = clipboard_shortcut.clone();
+
+                let plugin = tauri_plugin_global_shortcut::Builder::new()
+                    .with_handler(move |app, sc, event| {
+                        if event.state() == ShortcutState::Pressed {
+                            if let Some(ref cfg) = cfg_sc {
+                                if sc == cfg {
                                     let _ = window::toggle_window(app);
+                                    return;
                                 }
-                            })
-                            .build();
-
-                        if let Err(e) = app.handle().plugin(plugin) {
-                            log::error!("Failed to init global-shortcut plugin: {}", e);
-                        } else if let Err(e) =
-                            app.global_shortcut().register(shortcut)
-                        {
-                            log::error!(
-                                "Failed to register hotkey '{}': {}",
-                                hotkey_str,
-                                e
-                            );
-                        } else {
-                            log::info!("Global hotkey registered: {}", hotkey_str);
+                            }
+                            if let Some(ref clip) = clip_sc {
+                                if sc == clip {
+                                    // Open window
+                                    if let Some(win) = app.get_webview_window("main") {
+                                        let _ = win.set_always_on_top(true);
+                                        let _ = win.center();
+                                        let _ = window::show_window(&win);
+                                        // Emit event for clipboard mode
+                                        let _ = win.emit("open_clipboard", ());
+                                    }
+                                }
+                            }
                         }
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "Invalid hotkey '{}': {}. Using fallback — no global shortcut.",
-                            hotkey_str,
-                            e
-                        );
+                    })
+                    .build();
+
+                if let Err(e) = app.handle().plugin(plugin) {
+                    log::error!("Failed to init global-shortcut plugin: {}", e);
+                } else {
+                    for s in shortcuts {
+                        if let Err(e) = app.global_shortcut().register(s) {
+                            log::error!("Failed to register hotkey: {}", e);
+                        } else {
+                            log::info!("Registered global hotkey: {}", s);
+                        }
                     }
                 }
             }

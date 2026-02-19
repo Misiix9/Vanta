@@ -79,6 +79,8 @@
             />
         {:else if result.source === "Window"}
             <span class="icon-emoji">🪟</span>
+        {:else if result.source === "Clipboard"}
+            <span class="icon-number">{index + 1}</span>
         {:else}
             <img
                 src="/package.svg"
@@ -148,6 +150,14 @@
     .icon-emoji {
         font-size: 24px;
         line-height: 1;
+    }
+
+    .icon-number {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--vanta-text-dim);
+        font-variant-numeric: tabular-nums;
+        opacity: 0.8;
     }
 
     .icon-fallback {
