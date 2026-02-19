@@ -229,6 +229,34 @@
                 </label>
             </div>
         </section>
+
+        <!-- File Search Section -->
+        <section>
+            <h3>File Search</h3>
+            <div class="control-group">
+                <label>
+                    Include Hidden Files
+                    <input
+                        type="checkbox"
+                        bind:checked={config.files.include_hidden}
+                        onchange={debouncedSave}
+                    />
+                </label>
+            </div>
+            <div class="control-group">
+                <label>
+                    Max Depth ({config.files.max_depth})
+                    <input
+                        type="range"
+                        min="1"
+                        max="10"
+                        step="1"
+                        bind:value={config.files.max_depth}
+                        oninput={debouncedSave}
+                    />
+                </label>
+            </div>
+        </section>
     </div>
 </div>
 

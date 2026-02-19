@@ -31,11 +31,17 @@ export interface WindowConfig {
     height: number;
 }
 
+export interface FilesConfig {
+    include_hidden: boolean;
+    max_depth: number;
+}
+
 export interface VantaConfig {
     general: GeneralConfig;
     appearance: AppearanceConfig;
     window: WindowConfig;
     scripts: ScriptsConfig;
+    files: FilesConfig;
 }
 
 export interface SearchResult {

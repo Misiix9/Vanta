@@ -73,21 +73,22 @@ jobs:
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
             ## Vanta ${{ steps.get_version.outputs.VERSION }}
-
-            **File Search, Smart Icons & CI Fixes**
+            **File Search Settings & Enhancements**
 
             ### New Features
-            - **File Search**: Search your Home directory!
-                - Trigger: Type `/` or `~/`.
-                - Usage: Recursively scans up to 3 levels deep (ignoring hidden files).
-                - Action: Opens files with your default system app (`xdg-open`).
-            - **Smart Icons**: Dynamic black & white icons for file types.
-                - Recognizes: Folders, Text, PDF, Images, Video, Audio, Archives.
-                - Generated on-the-fly (lightweight).
+            - **⚙️ File Search Settings**: Configure your search!
+                - Toggle **Hidden Files**: Search dotfiles (e.g., `.config`, `.bashrc`).
+                - **Custom Depth**: Adjust search depth (1-10 levels) for performance vs. reach.
 
             ### Improvements
-            - **CI/CD**: Fixed release workflow title format (removed duplicate 'v').
-            - **Deps**: Added `walkdir` for efficient file scanning.
+            - **Performance**: Optimized file walker.
+            - **Stability**: Fixed potential crash on deep recursion.
+
+            ### Installation
+            - **Debian/Ubuntu**: Download `.deb`
+            - **Fedora/OpenSUSE**: Download `.rpm`
+            - **Universal**: Download and run `.AppImage`
+            - **Arch Linux**: Install `vanta-bin` from AUR (updated shortly).
 
             ### Installation
             - **Debian/Ubuntu**: Download `.deb`

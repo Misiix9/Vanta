@@ -20,12 +20,15 @@ use matcher::{ResultSource, SearchResult};
 use scanner::AppEntry;
 use scripts::{ScriptEntry, ScriptOutput};
 
+use files::FileIndex;
+
 // Everything is Mutex'd because Tauri commands are async.
 pub struct AppState {
     pub apps: Mutex<Vec<AppEntry>>,
     pub config: Mutex<VantaConfig>,
     pub scripts_cache: Mutex<Vec<ScriptEntry>>,
     pub history: Mutex<History>,
+    pub file_index: FileIndex,
 }
 
 #[tauri::command]
@@ -44,14 +47,26 @@ async fn save_config(
     new_config: VantaConfig,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut config = state
-        .config
-        .lock()
-        .map_err(|_| "Failed to access config state".to_string())?;
-    
-    *config = new_config;
-    config.save()?;
-    
+    let new_files_config = new_config.files.clone();
+
+    {
+        let mut config = state
+            .config
+            .lock()
+            .map_err(|_| "Failed to access config state".to_string())?;
+        *config = new_config;
+        config.save()?;
+    }
+
+    // Re-index in background whenever file settings may have changed
+    let index_clone = state.file_index.clone();
+    std::thread::spawn(move || {
+        let entries = files::build_index(&new_files_config);
+        if let Ok(mut guard) = index_clone.lock() {
+            *guard = entries;
+        }
+    });
+
     Ok(())
 }
 
@@ -64,12 +79,13 @@ async fn search(
         .apps
         .lock()
         .map_err(|_| "Failed to access application cache".to_string())?;
-    let config = state
-        .config
-        .lock()
-        .map_err(|_| "Failed to access config".to_string())?;
-
-    let max_results = config.general.max_results;
+    let (max_results, _files_max_depth, _files_include_hidden) = {
+        let config = state
+            .config
+            .lock()
+            .map_err(|_| "Failed to access config".to_string())?;
+        (config.general.max_results, config.files.max_depth, config.files.include_hidden)
+    };
 
     // Get usage history for boosting
     let usage_map = {
@@ -145,10 +161,11 @@ async fn search(
         results.insert(0, calc_result);
     }
 
-    // Check for file search
-    if query.starts_with("/") || query.starts_with("~/") {
-        let file_results = files::search_home(&query);
-        results.extend(file_results);
+    // Check for file search - instant in-memory lookup!
+    if query.starts_with('/') || query.starts_with("~/") {
+        let index_guard = state.file_index.lock().unwrap();
+        let file_results = files::search_index(&index_guard, &query, 20);
+        return Ok(file_results);
     }
 
     Ok(results)
@@ -308,11 +325,15 @@ pub fn run() {
         History::new()
     };
 
+    // Create an empty file index. Background thread will populate it shortly.
+    let file_index: files::FileIndex = std::sync::Arc::new(Mutex::new(Vec::new()));
+
     let app_state = AppState {
         apps: Mutex::new(apps),
         config: Mutex::new(vanta_config),
         scripts_cache: Mutex::new(discovered_scripts),
         history: Mutex::new(history),
+        file_index: file_index.clone(),
     };
 
     let mut builder = tauri::Builder::default();
@@ -464,6 +485,24 @@ pub fn run() {
             std::thread::spawn(move || {
                 scripts::watch_scripts(handle_for_scripts);
             });
+
+            // Build the file index in the background (so startup is instant)
+            {
+                let index_clone = app_handle.state::<AppState>().file_index.clone();
+                let files_config = {
+                    let state = app_handle.state::<AppState>();
+                    let cfg = state.config.lock().unwrap();
+                    cfg.files.clone()
+                };
+                std::thread::spawn(move || {
+                    log::info!("Building file index...");
+                    let entries = files::build_index(&files_config);
+                    log::info!("File index ready: {} entries", entries.len());
+                    if let Ok(mut guard) = index_clone.lock() {
+                        *guard = entries;
+                    }
+                });
+            }
 
             Ok(())
         })

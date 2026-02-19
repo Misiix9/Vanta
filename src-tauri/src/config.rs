@@ -10,6 +10,29 @@ pub struct VantaConfig {
     pub appearance: AppearanceConfig,
     pub window: WindowConfig,
     pub scripts: ScriptsConfig,
+    #[serde(default)]
+    pub files: FilesConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FilesConfig {
+    #[serde(default)]
+    pub include_hidden: bool,
+    #[serde(default = "default_max_depth")]
+    pub max_depth: usize,
+}
+
+fn default_max_depth() -> usize {
+    3
+}
+
+impl Default for FilesConfig {
+    fn default() -> Self {
+        Self {
+            include_hidden: false,
+            max_depth: 3,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -79,6 +102,10 @@ impl Default for VantaConfig {
             scripts: ScriptsConfig {
                 directory: "~/.config/vanta/scripts".to_string(),
                 timeout_ms: 5000,
+            },
+            files: FilesConfig {
+                include_hidden: false,
+                max_depth: 3,
             },
         }
     }
