@@ -73,16 +73,15 @@ jobs:
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
             ## Vanta ${{ steps.get_version.outputs.VERSION }}
-          body: |
-            ## Vanta ${{ steps.get_version.outputs.VERSION }}
+
             **File Search, Smart Icons & CI Fixes**
 
             ### New Features
-            - **📂 File Search**: Search your Home directory!
+            - **File Search**: Search your Home directory!
                 - Trigger: Type `/` or `~/`.
                 - Usage: Recursively scans up to 3 levels deep (ignoring hidden files).
                 - Action: Opens files with your default system app (`xdg-open`).
-            - **✨ Smart Icons**: Dynamic black & white icons for file types.
+            - **Smart Icons**: Dynamic black & white icons for file types.
                 - Recognizes: Folders, Text, PDF, Images, Video, Audio, Archives.
                 - Generated on-the-fly (lightweight).
 
