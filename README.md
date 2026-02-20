@@ -15,7 +15,7 @@
 
 ## Why Vanta?
 
-Traditional application launchers are often bloated, slow, or ugly. Vanta is built differently. It leverages **Rust** for instant startup times and uses a transparent, borderless UI designed specifically for Wayland compositors like Hyprland and Sway.
+Traditional application launchers are often bloated, slow, or ugly. **Vanta** is built differently. It leverages **Rust** for instant startup times and uses a transparent, borderless UI designed specifically for Wayland compositors like Hyprland and Sway.
 
 Vanta is also deeply scriptable — if your script can output JSON, Vanta can run it. Calculate math, control Spotify, fetch weather, or manage Docker containers without ever leaving your keyboard.
 
@@ -182,5 +182,5 @@ Configuration lives at `~/.config/vanta/config.json`, created automatically on f
 ---
 
 <div align="center">
-  <sub>Built by <a href="https://github.com/Misiix9">Misiix9</a></sub>
+  <sub>Built by <a href="https://github.com/Misiix9">onxy</a></sub>
 </div>
