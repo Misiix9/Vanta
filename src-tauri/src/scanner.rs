@@ -236,6 +236,20 @@ pub fn scan_desktop_entries() -> Vec<AppEntry> {
     let mut entries: Vec<AppEntry> = Vec::new();
     let mut seen_names: HashSet<String> = HashSet::new();
 
+    // Add Vanta Store generic entry
+    entries.push(AppEntry {
+        name: "Install Script (Vanta Store)".to_string(),
+        generic_name: Some("Type 'install <github-url>' or a local file path to fetch".to_string()),
+        comment: Some("Downloads and installs scripts directly into Vanta".to_string()),
+        exec: "install:".to_string(),
+        icon: Some("system-software-install".to_string()),
+        categories: vec![],
+        terminal: false,
+        startup_wm_class: None,
+        desktop_file_path: "vanta://store".to_string(),
+    });
+    seen_names.insert("Install Script (Vanta Store)".to_string());
+
     for dir in desktop_dirs() {
         if !dir.exists() {
             continue;

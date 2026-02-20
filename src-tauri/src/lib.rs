@@ -7,6 +7,7 @@ pub mod matcher;
 pub mod math; // New math module
 pub mod scanner;
 pub mod scripts;
+pub mod store; // Script download module
 pub mod files; // New files module
 pub mod window;
 pub mod windows; // New windows enumeration module
@@ -168,6 +169,36 @@ async fn search(
         return Ok(file_results);
     }
 
+    if query.starts_with("install ") {
+        let url = query.trim_start_matches("install ").trim().to_string();
+        if !url.is_empty() {
+            let is_local = std::path::Path::new(&url).exists();
+            
+            let title = if is_local {
+                format!("Install Local File: {}", std::path::Path::new(&url).file_name().unwrap_or_default().to_string_lossy())
+            } else {
+                format!("Install Web Script: {}", url)
+            };
+            
+            let subtitle = if is_local {
+                "Press Enter to extract/copy this file directly into the Vanta Store".to_string()
+            } else {
+                "Press Enter to download and install this script from GitHub".to_string()
+            };
+
+            let inst_result = SearchResult {
+                title,
+                subtitle: Some(subtitle),
+                icon: Some("system-software-install".to_string()),
+                exec: format!("install:{}", url),
+                score: 1000000, // Top priority
+                match_indices: vec![],
+                source: matcher::ResultSource::Application,
+            };
+            results.insert(0, inst_result);
+        }
+    }
+
     Ok(results)
 }
 
@@ -175,12 +206,13 @@ async fn search(
 async fn launch_app(
     exec: String,
     state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     // Track usage
     if let Ok(mut history) = state.history.lock() {
         history.increment(&exec);
     }
-    launcher::launch(&exec).map_err(|e| format!("Failed to launch: {}", e))
+    launcher::launch(&exec, Some(&app_handle)).map_err(|e| format!("Failed to launch: {}", e))
 }
 
 #[tauri::command]
@@ -306,6 +338,7 @@ async fn get_clipboard_history() -> Result<Vec<clipboard::ClipboardItem>, String
 async fn open_path(
     path: String,
     state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let path_obj = std::path::Path::new(&path);
     if !path_obj.exists() {
@@ -354,7 +387,7 @@ async fn open_path(
             final_exec = format!("{} \"{}\"", final_exec, path);
         }
         
-        launcher::launch(&final_exec).map_err(|e| format!("Failed to launch custom opener: {}", e))?;
+        launcher::launch(&final_exec, Some(&app_handle)).map_err(|e| format!("Failed to launch custom opener: {}", e))?;
     } else {
         // Fallback to default if app string was not found (maybe it was uninstalled)
         log::warn!("Custom opener '{}' not found, falling back to default.", app_exec_id);

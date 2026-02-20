@@ -73,19 +73,15 @@ jobs:
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
             ## Vanta ${{ steps.get_version.outputs.VERSION }}
-            **Custom File Openers & Stability Audit**
+            **Script Store & v1.7.0 Update**
 
             ### New Features
-            - **Custom Openers**: Map system apps to files & folders natively in Settings.
-            - **Smart Routing**: "Open Documents in File Manager" toggle added.
-            - **Robust Execution**: Sh-c subshell parses spaces and %F variables properly.
+            - **Script Fetch Tool**: Users can install scripts by typing `install <GitHub-URL>` in the search bar.
+            - **Local Script Support**: You can now pass local paths (e.g. `install /home/user/script.zip` or `install /home/user/script.py`) to easily ingest scripts/archives directly into Vanta's store.
+            - **Script Routing**: Vanta automatically extracts ZIP archives and assigns executing permissions directly in `~/.config/vanta/scripts/`, ready to execute!
 
-            ### Audit Fixes
-            - **Clipboard**: Truncated clipboard history prevents 10+ GB SQLite memory leak.
-            - **Svelte UI**: Replaced slider bindings to fix window-resizing GUI freeze.
-            - **Fuzzy Search**: Removed intermediate allocations for faster file indexing.
-            - **Config Loader**: Added `/tmp/` fallback to eliminate startup panics.
-            - **Launcher**: Fixed silent focus failures by converting them to warnings.
+            ### Bug Fixes
+            - Custom Openers GUI tweaks and robust space handling.
 
             ### Installation
             - **Debian/Ubuntu**: Download `.deb`

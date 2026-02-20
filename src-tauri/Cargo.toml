@@ -1,6 +1,6 @@
 [package]
 name = "vanta"
-version = "1.6.0"
+version = "1.7.0"
 description = "Liquid Glass command palette for Linux"
 authors = ["onxy"]
 edition = "2021"
@@ -32,3 +32,5 @@ tauri-plugin-fs = "2.4.5"
 rusqlite = { version = "0.32", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2"
+reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
+zip = "0.6"

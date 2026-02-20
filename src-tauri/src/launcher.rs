@@ -1,8 +1,46 @@
 use std::process::Command;
+use tauri::Emitter;
 
 // Handles .desktop Exec placeholders (like %u, %F) so we don't pass garbage to the shell.
-pub fn launch(exec: &str) -> Result<(), String> {
+pub fn launch(exec: &str, app_handle: Option<&tauri::AppHandle>) -> Result<(), String> {
     let start = std::time::Instant::now();
+
+    if exec.starts_with("install:") {
+        let url = exec.trim_start_matches("install:").to_string();
+        if url.is_empty() {
+            return Err("No URL provided".to_string());
+        }
+
+        if let Some(handle) = app_handle {
+            let _ = handle.emit(
+                "download_status",
+                serde_json::json!({"status": "downloading"}),
+            );
+            let app_handle_clone = handle.clone();
+            std::thread::spawn(move || {
+                if let Err(e) = crate::store::download_script(&url) {
+                    log::error!("Failed to install script: {}", e);
+                    let _ = app_handle_clone.emit(
+                        "download_status",
+                        serde_json::json!({"status": "failed", "error": e.to_string()}),
+                    );
+                } else {
+                    log::info!("Script downloaded and installed successfully.");
+                    let _ = app_handle_clone
+                        .emit("download_status", serde_json::json!({"status": "success"}));
+                }
+            });
+            return Ok(());
+        } else {
+            if let Err(e) = crate::store::download_script(&url) {
+                log::error!("Failed to install script: {}", e);
+                return Err(e);
+            } else {
+                log::info!("Script downloaded and installed successfully.");
+                return Ok(());
+            }
+        }
+    }
 
     // Check for window focus action
     if exec.starts_with("focus:") {

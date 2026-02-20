@@ -262,7 +262,9 @@
         resetAndHide();
       } else {
         await invoke("launch_app", { exec: result.exec });
-        resetAndHide();
+        if (!result.exec.startsWith("install:")) {
+          resetAndHide();
+        }
       }
     } catch (e) {
       console.error("Launch/Copy failed:", e);
