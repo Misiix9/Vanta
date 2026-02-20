@@ -257,6 +257,9 @@
         const value = result.exec.slice(5);
         await navigator.clipboard.writeText(value);
         resetAndHide();
+      } else if (result.source === "File") {
+        await invoke("open_path", { path: result.exec });
+        resetAndHide();
       } else {
         await invoke("launch_app", { exec: result.exec });
         resetAndHide();

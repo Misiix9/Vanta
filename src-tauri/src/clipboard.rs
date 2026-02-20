@@ -82,7 +82,13 @@ pub fn start_watcher() {
                 .args(["--type", "text/plain"])
                 .output()
             {
-                let content = String::from_utf8_lossy(&output.stdout).to_string();
+                // Truncate output to prevent massive memory/DB spikes (e.g. 100,000 chars limit)
+                let raw_content = String::from_utf8_lossy(&output.stdout);
+                let content = if raw_content.len() > 100_000 {
+                    format!("{}... [Truncated by Vanta]", &raw_content[..100_000])
+                } else {
+                    raw_content.to_string()
+                };
 
                 if !content.is_empty() && content != last_content {
                     println!(

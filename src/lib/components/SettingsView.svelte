@@ -11,6 +11,16 @@
     }: { config: VantaConfig; onClose: () => void } = $props();
 
     let saveTimeout: any = null;
+    let availableApps: { name: string; exec: string }[] = $state([]);
+
+    async function loadApps() {
+        try {
+            const apps: any[] = await invoke("get_apps");
+            availableApps = apps.map((a) => ({ name: a.name, exec: a.exec }));
+        } catch (e) {
+            console.error("Failed to fetch apps for settings:", e);
+        }
+    }
 
     function debouncedSave() {
         // 1. Apply visual changes instantly via CSS variables
@@ -65,6 +75,7 @@
     // Initial apply
     onMount(() => {
         applyLivePreview();
+        loadApps();
     });
 
     function handleKeydown(e: KeyboardEvent) {
@@ -179,7 +190,7 @@
                         min="400"
                         max="1920"
                         bind:value={config.window.width}
-                        oninput={() => {
+                        onchange={() => {
                             debouncedSave();
                             updateWindowSize();
                         }}
@@ -194,7 +205,7 @@
                         min="300"
                         max="1080"
                         bind:value={config.window.height}
-                        oninput={() => {
+                        onchange={() => {
                             debouncedSave();
                             updateWindowSize();
                         }}
@@ -243,6 +254,50 @@
                     />
                 </label>
             </div>
+
+            <div class="control-group">
+                <label>
+                    Default File Manager
+                    <select
+                        class="vanta-select"
+                        bind:value={config.files.file_manager}
+                        onchange={debouncedSave}
+                    >
+                        <option value="default">System Default</option>
+                        {#each availableApps as app}
+                            <option value={app.exec}>{app.name}</option>
+                        {/each}
+                    </select>
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Default Text Editor
+                    <select
+                        class="vanta-select"
+                        bind:value={config.files.file_editor}
+                        onchange={debouncedSave}
+                    >
+                        <option value="default">System Default</option>
+                        {#each availableApps as app}
+                            <option value={app.exec}>{app.name}</option>
+                        {/each}
+                    </select>
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Open Documents in File Manager
+                    <input
+                        type="checkbox"
+                        bind:checked={config.files.open_docs_in_manager}
+                        onchange={debouncedSave}
+                    />
+                </label>
+            </div>
+
             <div class="control-group">
                 <label>
                     Max Depth ({config.files.max_depth})
@@ -252,7 +307,7 @@
                         max="10"
                         step="1"
                         bind:value={config.files.max_depth}
-                        oninput={debouncedSave}
+                        onchange={debouncedSave}
                     />
                 </label>
             </div>
@@ -327,8 +382,50 @@
         color: var(--vanta-text);
         padding: 4px 8px;
         border-radius: 6px;
-        width: 120px;
+        width: 150px;
         text-align: right;
+    }
+
+    .vanta-select {
+        background: var(--vanta-bg); /* Black background */
+        border: 1px solid var(--vanta-border);
+        color: var(--vanta-text);
+        padding: 4px 8px;
+        border-radius: 6px;
+        width: 150px;
+        text-align: left;
+        color-scheme: dark; /* Force dark mode dropdown rendering */
+    }
+
+    .vanta-select option {
+        background: var(--vanta-bg);
+        color: var(--vanta-text);
+    }
+
+    input[type="checkbox"] {
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        border-radius: 4px;
+        background: transparent;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    input[type="checkbox"]:checked {
+        background: var(--vanta-accent);
+        border-color: var(--vanta-accent);
+    }
+
+    input[type="checkbox"]:checked::after {
+        content: "✓";
+        color: var(--vanta-bg);
+        font-size: 14px;
+        font-weight: bold;
     }
 
     input[type="color"] {

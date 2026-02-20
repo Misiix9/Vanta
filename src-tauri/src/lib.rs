@@ -245,6 +245,17 @@ async fn rescan_apps(
 }
 
 #[tauri::command]
+async fn get_apps(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<scanner::AppEntry>, String> {
+    let apps = state
+        .apps
+        .lock()
+        .map_err(|_| "Failed to access app cache".to_string())?;
+    Ok(apps.clone())
+}
+
+#[tauri::command]
 async fn hide_window(window: tauri::WebviewWindow) -> Result<(), String> {
     window::hide_window(&window)
 }
@@ -289,6 +300,68 @@ async fn execute_script(
 #[tauri::command]
 async fn get_clipboard_history() -> Result<Vec<clipboard::ClipboardItem>, String> {
     clipboard::get_history().map_err(|e| format!("Failed to get history: {}", e))
+}
+
+#[tauri::command]
+async fn open_path(
+    path: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let path_obj = std::path::Path::new(&path);
+    if !path_obj.exists() {
+        return Err("Path does not exist".to_string());
+    }
+
+    let is_dir = path_obj.is_dir();
+    
+    let config = {
+        state.config.lock()
+            .map_err(|_| "Failed to access config".to_string())?
+            .files.clone()
+    };
+    
+    // Choose which configured app to use
+    let app_exec_id = if is_dir || config.open_docs_in_manager {
+        config.file_manager
+    } else {
+        config.file_editor
+    };
+
+    if app_exec_id == "default" {
+        open::that(&path).map_err(|e| format!("Failed to open path: {}", e))?;
+        return Ok(());
+    }
+
+    // Attempt to find the full exec string from apps cache
+    let matched_app = {
+        let apps = state.apps.lock()
+            .map_err(|_| "Failed to access apps cache".to_string())?;
+        apps.iter().find(|a| a.exec == app_exec_id).cloned()
+    };
+
+    if let Some(app) = matched_app {
+        // Construct the execution string and send it to the launcher
+        // The exec string usually looks like `nautilus %U` or `code %F`
+        // We replace any % placeholders or just append the path.
+        let mut final_exec = app.exec.clone();
+        
+        if final_exec.contains("%u") || final_exec.contains("%U") || final_exec.contains("%f") || final_exec.contains("%F") {
+            final_exec = final_exec.replace("%u", &format!("\"{}\"", path));
+            final_exec = final_exec.replace("%U", &format!("\"{}\"", path));
+            final_exec = final_exec.replace("%f", &format!("\"{}\"", path));
+            final_exec = final_exec.replace("%F", &format!("\"{}\"", path));
+        } else {
+            final_exec = format!("{} \"{}\"", final_exec, path);
+        }
+        
+        launcher::launch(&final_exec).map_err(|e| format!("Failed to launch custom opener: {}", e))?;
+    } else {
+        // Fallback to default if app string was not found (maybe it was uninstalled)
+        log::warn!("Custom opener '{}' not found, falling back to default.", app_exec_id);
+        open::that(&path).map_err(|e| format!("Failed to open path: {}", e))?;
+    }
+
+    Ok(())
 }
 
 
@@ -380,6 +453,8 @@ pub fn run() {
             get_suggestions,
             get_suggestions,
             get_clipboard_history,
+            open_path,
+            get_apps,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();

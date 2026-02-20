@@ -4697,7 +4697,7 @@ dependencies = [
 
 [[package]]
 name = "vanta"
-version = "1.5.1"
+version = "1.6.0"
 dependencies = [
  "chrono",
  "dirs 5.0.1",

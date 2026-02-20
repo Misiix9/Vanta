@@ -4,27 +4,26 @@ use std::process::Command;
 pub fn launch(exec: &str) -> Result<(), String> {
     let start = std::time::Instant::now();
 
-    // Check if it's a file path first (for file search results)
-    let path = std::path::Path::new(exec);
-    if path.exists() && path.is_file() {
-        open::that(exec).map_err(|e| format!("Failed to open file: {}", e))?;
-        return Ok(());
-    }
-
     // Check for window focus action
     if exec.starts_with("focus:") {
         let address = exec.trim_start_matches("focus:");
         // Try Hyprland focus
-        let _ = Command::new("hyprctl")
+        if let Err(e) = Command::new("hyprctl")
             .arg("dispatch")
             .arg("focuswindow")
             .arg(format!("address:{}", address))
-            .spawn();
+            .spawn()
+        {
+            log::warn!("Hyprland focus failed: {}", e);
+        }
 
         // Try Sway focus (address is con_id)
-        let _ = Command::new("swaymsg")
+        if let Err(e) = Command::new("swaymsg")
             .arg(format!("[con_id={}] focus", address))
-            .spawn();
+            .spawn()
+        {
+            log::warn!("Sway focus failed: {}", e);
+        }
 
         return Ok(());
     }
@@ -35,18 +34,16 @@ pub fn launch(exec: &str) -> Result<(), String> {
         return Err("Empty exec command after parsing".to_string());
     }
 
-    let parts: Vec<&str> = cleaned.split_whitespace().collect();
-    let (cmd, args) = parts.split_first().ok_or("Invalid exec command")?;
+    log::info!("Launching via sh -c: {}", cleaned);
 
-    log::info!("Launching: {} {:?}", cmd, args);
-
-    Command::new(cmd)
-        .args(args.iter())
+    Command::new("sh")
+        .arg("-c")
+        .arg(&cleaned)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()
-        .map_err(|e| format!("Failed to spawn '{}': {}", cmd, e))?;
+        .map_err(|e| format!("Failed to spawn '{}': {}", cleaned, e))?;
 
     let elapsed = start.elapsed();
     log::debug!("Launch took {:?}", elapsed);

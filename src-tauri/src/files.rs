@@ -84,7 +84,7 @@ pub fn search_index(index: &[FileEntry], query: &str, limit: usize) -> Vec<Searc
                 exec: entry.path.clone(),
                 score: 50,
                 match_indices: vec![],
-                source: ResultSource::Application,
+                source: ResultSource::File,
             });
 
             if results.len() >= limit {

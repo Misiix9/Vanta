@@ -34,6 +34,9 @@ export interface WindowConfig {
 export interface FilesConfig {
     include_hidden: boolean;
     max_depth: number;
+    file_manager: string;
+    file_editor: string;
+    open_docs_in_manager: boolean;
 }
 
 export interface VantaConfig {
@@ -55,7 +58,7 @@ export interface SearchResult {
     id?: number | string;
 }
 
-export type ResultSource = "Application" | "Calculator" | "Window" | "Clipboard" | { Script: { keyword: string } };
+export type ResultSource = "Application" | "Calculator" | "Window" | "Clipboard" | "File" | { Script: { keyword: string } };
 
 export interface ClipboardItem {
     id: number;

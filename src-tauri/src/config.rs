@@ -20,10 +20,20 @@ pub struct FilesConfig {
     pub include_hidden: bool,
     #[serde(default = "default_max_depth")]
     pub max_depth: usize,
+    #[serde(default = "default_opener")]
+    pub file_manager: String,
+    #[serde(default = "default_opener")]
+    pub file_editor: String,
+    #[serde(default)]
+    pub open_docs_in_manager: bool,
 }
 
 fn default_max_depth() -> usize {
     3
+}
+
+fn default_opener() -> String {
+    "default".to_string()
 }
 
 impl Default for FilesConfig {
@@ -31,6 +41,9 @@ impl Default for FilesConfig {
         Self {
             include_hidden: false,
             max_depth: 3,
+            file_manager: "default".to_string(),
+            file_editor: "default".to_string(),
+            open_docs_in_manager: false,
         }
     }
 }
@@ -106,6 +119,9 @@ impl Default for VantaConfig {
             files: FilesConfig {
                 include_hidden: false,
                 max_depth: 3,
+                file_manager: "default".to_string(),
+                file_editor: "default".to_string(),
+                open_docs_in_manager: false,
             },
         }
     }
@@ -114,8 +130,9 @@ impl Default for VantaConfig {
 /// Returns the path to the Vanta config directory (~/.config/vanta/).
 pub fn config_dir() -> PathBuf {
     let base = dirs::config_dir().unwrap_or_else(|| {
-        let home = dirs::home_dir().expect("Could not determine home directory");
-        home.join(".config")
+        dirs::home_dir()
+            .map(|home| home.join(".config"))
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
     });
     base.join("vanta")
 }

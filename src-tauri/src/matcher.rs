@@ -21,6 +21,7 @@ pub enum ResultSource {
     Application,
     Calculator,
     Window,
+    File,
 }
 
 /// Perform fuzzy search across cached app entries using nucleo-matcher.
@@ -49,6 +50,8 @@ pub fn fuzzy_search(
     );
 
     let mut scored: Vec<(u32, Vec<u32>, &AppEntry)> = Vec::new();
+    let mut haystack_buf = Vec::new();
+    let mut indices = Vec::new();
 
     for app in apps {
         // Calculate history boost first
@@ -58,9 +61,9 @@ pub fn fuzzy_search(
         let usage_bonus = std::cmp::min(usage * 5, 200);
 
         // Match against name (primary)
-        let mut haystack_buf = Vec::new();
+        haystack_buf.clear();
+        indices.clear();
         let haystack = Utf32Str::new(&app.name, &mut haystack_buf);
-        let mut indices = Vec::new();
 
         if let Some(score) = pattern.indices(haystack, &mut matcher, &mut indices) {
             let final_score = score as u32 + usage_bonus;

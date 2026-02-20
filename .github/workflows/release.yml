@@ -73,27 +73,24 @@ jobs:
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
             ## Vanta ${{ steps.get_version.outputs.VERSION }}
-            **File Search Settings & Enhancements**
+            **Custom File Openers & Stability Audit**
 
             ### New Features
-            - **⚙️ File Search Settings**: Configure your search!
-                - Toggle **Hidden Files**: Search dotfiles (e.g., `.config`, `.bashrc`).
-                - **Custom Depth**: Adjust search depth (1-10 levels) for performance vs. reach.
+            - **Custom Openers**: Map system apps to files & folders natively in Settings.
+            - **Smart Routing**: "Open Documents in File Manager" toggle added.
+            - **Robust Execution**: Sh-c subshell parses spaces and %F variables properly.
 
-            ### Improvements
-            - **Performance**: Optimized file walker.
-            - **Stability**: Fixed potential crash on deep recursion.
-
-            ### Installation
-            - **Debian/Ubuntu**: Download `.deb`
-            - **Fedora/OpenSUSE**: Download `.rpm`
-            - **Universal**: Download and run `.AppImage`
-            - **Arch Linux**: Install `vanta-bin` from AUR (updated shortly).
+            ### Audit Fixes
+            - **Clipboard**: Truncated clipboard history prevents 10+ GB SQLite memory leak.
+            - **Svelte UI**: Replaced slider bindings to fix window-resizing GUI freeze.
+            - **Fuzzy Search**: Removed intermediate allocations for faster file indexing.
+            - **Config Loader**: Added `/tmp/` fallback to eliminate startup panics.
+            - **Launcher**: Fixed silent focus failures by converting them to warnings.
 
             ### Installation
             - **Debian/Ubuntu**: Download `.deb`
             - **Fedora/OpenSUSE**: Download `.rpm`
             - **Universal**: Download and run `.AppImage`
-            - **Arch Linux**: Install `vanta-bin` from AUR (updated shortly).
+            - **Arch Linux**: Install `vanta-bin` from AUR.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
