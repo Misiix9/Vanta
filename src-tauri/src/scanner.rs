@@ -238,11 +238,11 @@ pub fn scan_desktop_entries() -> Vec<AppEntry> {
 
     // Add Vanta Store generic entry
     entries.push(AppEntry {
-        name: "Install Script (Vanta Store)".to_string(),
+        name: "Vanta Store".to_string(),
         generic_name: Some("Type 'install <github-url>' or a local file path to fetch".to_string()),
         comment: Some("Downloads and installs scripts directly into Vanta".to_string()),
-        exec: "install:".to_string(),
-        icon: Some("system-software-install".to_string()),
+        exec: "fill:install ".to_string(),
+        icon: Some("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" x2=\"12\" y1=\"15\" y2=\"3\"/></svg>".to_string()),
         categories: vec![],
         terminal: false,
         startup_wm_class: None,

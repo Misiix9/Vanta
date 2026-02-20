@@ -253,18 +253,26 @@
   async function handleActivate(result: SearchResult) {
     actionInFlight = true;
     try {
-      if (result.exec.startsWith("copy:")) {
+      if (result.exec.startsWith("fill:")) {
+        query = result.exec.slice(5);
+        await handleSearch(query);
+        setTimeout(() => {
+          document.querySelector("input")?.focus();
+        }, 10);
+        return;
+      } else if (result.exec.startsWith("copy:")) {
         const value = result.exec.slice(5);
         await navigator.clipboard.writeText(value);
         resetAndHide();
+      } else if (result.exec.startsWith("install:")) {
+        await invoke("launch_app", { exec: result.exec });
+        // deliberately leaving window open to view progress
       } else if (result.source === "File") {
         await invoke("open_path", { path: result.exec });
         resetAndHide();
       } else {
         await invoke("launch_app", { exec: result.exec });
-        if (!result.exec.startsWith("install:")) {
-          resetAndHide();
-        }
+        resetAndHide();
       }
     } catch (e) {
       console.error("Launch/Copy failed:", e);
@@ -373,6 +381,21 @@
         break;
       case "Tab":
         e.preventDefault();
+        if (!isScriptMode && results[selectedIndex]) {
+          const res = results[selectedIndex];
+          if (res.exec.startsWith("fill:")) {
+            handleActivate(res);
+            break;
+          } else if (res.exec.startsWith("install:")) {
+            query = "install " + res.exec.slice(8) + " ";
+            handleSearch(query);
+            setTimeout(() => {
+              document.querySelector("input")?.focus();
+            }, 10);
+            break;
+          }
+        }
+
         if (e.shiftKey) {
           selectedIndex =
             selectedIndex <= 0 ? totalItems - 1 : selectedIndex - 1;

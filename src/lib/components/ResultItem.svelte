@@ -71,6 +71,10 @@
             <span class="icon-emoji">🧮</span>
         {:else if typeof result.source === "object" && "Script" in result.source}
             <span class="icon-emoji">⚡</span>
+        {:else if result.icon && result.icon.startsWith("<svg")}
+            <div class="icon-svg">
+                {@html result.icon}
+            </div>
         {:else if result.icon && (result.icon === "dir" || result.icon.startsWith("file"))}
             <FileIcon type={result.icon} />
         {:else if result.icon && !loadFailed}
@@ -167,10 +171,18 @@
         opacity: 0.5;
     }
 
-    .icon-img {
+    .icon-img,
+    .icon-svg {
         width: 100%;
         height: 100%;
         object-fit: contain;
+    }
+
+    .icon-svg :global(svg) {
+        width: 100%;
+        height: 100%;
+        color: var(--vanta-text);
+        opacity: 0.8;
     }
 
     .item-content {

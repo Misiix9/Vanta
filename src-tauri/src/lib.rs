@@ -171,6 +171,113 @@ async fn search(
 
     if query.starts_with("install ") {
         let url = query.trim_start_matches("install ").trim().to_string();
+        
+        if url.starts_with('/') || url.starts_with("~/") {
+            let expanded_url = if url.starts_with("~/") {
+                 let home = dirs::home_dir().unwrap_or_default();
+                 url.replacen("~/", &format!("{}/", home.display()), 1)
+            } else if url.starts_with('/') {
+                 let home_str = dirs::home_dir().unwrap_or_default().to_string_lossy().into_owned();
+                 if url.starts_with(&home_str) {
+                     url.clone()
+                 } else {
+                     if url == "/" {
+                         format!("{}/", home_str)
+                     } else {
+                         url.replacen("/", &format!("{}/", home_str), 1)
+                     }
+                 }
+            } else {
+                 url.clone()
+            };
+            
+            let path = std::path::Path::new(&expanded_url);
+            
+            let (dir_to_read, file_prefix) = if path.is_dir() && expanded_url.ends_with('/') {
+                (path.to_path_buf(), "".to_string())
+            } else {
+                (path.parent().unwrap_or(std::path::Path::new("/")).to_path_buf(), path.file_name().unwrap_or_default().to_string_lossy().to_string())
+            };
+            
+            if let Ok(entries) = std::fs::read_dir(&dir_to_read) {
+                for entry in entries.flatten() {
+                    let file_name = entry.file_name().to_string_lossy().into_owned();
+                    // Don't suggest hidden files unless prefix starts with .
+                    if file_name.starts_with('.') && !file_prefix.starts_with('.') {
+                        continue;
+                    }
+                    if file_name.to_lowercase().starts_with(&file_prefix.to_lowercase()) {
+                        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+                        
+                        let mut suggestion_path = dir_to_read.join(&file_name).to_string_lossy().into_owned();
+                        if is_dir {
+                            suggestion_path.push('/');
+                        }
+                        
+                        let display_path = if url.starts_with("~/") {
+                            let home_str = dirs::home_dir().unwrap_or_default().to_string_lossy().into_owned();
+                            suggestion_path.replacen(&home_str, "~", 1)
+                        } else if url.starts_with('/') {
+                            let home_str = dirs::home_dir().unwrap_or_default().to_string_lossy().into_owned();
+                            if url.starts_with(&home_str) {
+                                suggestion_path.clone()
+                            } else {
+                                suggestion_path.replacen(&home_str, "", 1)
+                            }
+                        } else {
+                            suggestion_path.clone()
+                        };
+                        
+                        let dir_str = dir_to_read.to_string_lossy().into_owned();
+                        let subtitle = if is_dir {
+                             format!("{} (Dir)", dir_str)
+                        } else {
+                             dir_str
+                        };
+                        
+                        let exec_cmd = if is_dir {
+                             format!("fill:install {}", display_path)
+                        } else {
+                             format!("install:{}", suggestion_path)
+                        };
+                        
+                        let icon = if is_dir { "dir".to_string() } else { format!("file:{}", suggestion_path) };
+                        
+                        results.push(SearchResult {
+                            title: file_name,
+                            subtitle: Some(subtitle),
+                            icon: Some(icon),
+                            exec: exec_cmd,
+                            score: if is_dir { 900000 } else { 800000 },
+                            match_indices: vec![],
+                            source: matcher::ResultSource::File,
+                        });
+                    }
+                }
+            }
+        } else if !url.is_empty() && !url.contains("github.com") && !url.starts_with("http") {
+             let index_guard = state.file_index.lock().unwrap();
+             let file_results = files::search_index(&index_guard, &url, 15);
+             for mut res in file_results {
+                 let path = std::path::Path::new(&res.exec);
+                 let is_dir = path.is_dir();
+                 
+                 let dir_found = path.parent().unwrap_or(std::path::Path::new("")).to_string_lossy().into_owned();
+                 
+                 res.subtitle = Some(if is_dir { format!("{} (Dir)", dir_found) } else { dir_found });
+                 
+                 if is_dir {
+                      res.exec = format!("fill:install {}/", res.exec);
+                      res.score = 900000;
+                 } else {
+                      res.exec = format!("install:{}", res.exec);
+                      res.score = 800000;
+                 }
+                 
+                 results.push(res);
+             }
+        }
+
         if !url.is_empty() {
             let is_local = std::path::Path::new(&url).exists();
             
@@ -189,12 +296,13 @@ async fn search(
             let inst_result = SearchResult {
                 title,
                 subtitle: Some(subtitle),
-                icon: Some("system-software-install".to_string()),
+                icon: Some("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" x2=\"12\" y1=\"15\" y2=\"3\"/></svg>".to_string()),
                 exec: format!("install:{}", url),
                 score: 1000000, // Top priority
                 match_indices: vec![],
                 source: matcher::ResultSource::Application,
             };
+            // Put the exact match at the top
             results.insert(0, inst_result);
         }
     }
