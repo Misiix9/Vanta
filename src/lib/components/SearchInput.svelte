@@ -39,7 +39,7 @@
   });
 </script>
 
-<div class="search-wrapper">
+<div class="search-bar">
   <!-- No search icon, purely text based for minimalism -->
   <input
     bind:this={inputEl}
@@ -81,58 +81,4 @@
   {/if}
 </div>
 
-<style>
-  .search-wrapper {
-    width: 100%;
-    padding: 24px 24px 12px 24px;
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
 
-  .vanta-input {
-    width: 100%;
-    background: transparent;
-    border: none;
-    outline: none;
-
-    /* Typography */
-    font-family: "SN Pro", "Inter", sans-serif;
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--vanta-text);
-
-    /* Custom Caret */
-    caret-color: var(--vanta-accent);
-  }
-
-  .vanta-input::placeholder {
-    color: var(--vanta-text-dim);
-    opacity: 0.3;
-  }
-
-  /* Clear button - Keep it, but minimal */
-  .clear-btn {
-    background: none;
-    border: none;
-    color: var(--vanta-text-dim);
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-
-  .search-wrapper:hover .clear-btn,
-  .vanta-input:focus + .clear-btn {
-    opacity: 0.5;
-  }
-
-  .clear-btn:hover {
-    opacity: 1 !important;
-    background: rgba(255, 255, 255, 0.1);
-  }
-</style>

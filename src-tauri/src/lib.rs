@@ -11,7 +11,7 @@ pub mod store; // Script download module
 pub mod files; // New files module
 pub mod window;
 pub mod windows; // New windows enumeration module
-
+pub mod themes;
 use std::sync::Mutex;
 use tauri::{Manager, Emitter}; // Added Emitter for .emit()
 
@@ -596,6 +596,8 @@ pub fn run() {
             get_clipboard_history,
             open_path,
             get_apps,
+            themes::get_installed_themes,
+            themes::resize_window_for_theme,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
@@ -612,6 +614,9 @@ pub fn run() {
                 };
                 let _ = win.set_size(tauri::LogicalSize::new(width, height));
             }
+
+            // Seed the default theme on first run
+            themes::seed_default_theme(&app_handle);
 
             // Register global hotkey (e.g. Alt+Space) AND Clipboard (Super+V)
             #[cfg(desktop)]

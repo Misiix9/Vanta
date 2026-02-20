@@ -69,25 +69,42 @@ jobs:
             src-tauri/target/**/bundle/deb/*.deb
             src-tauri/target/**/bundle/rpm/*.rpm
           draft: true
-          prerelease: false
-          name: Vanta ${{ steps.get_version.outputs.VERSION }}
+          prerelease: true
+          name: Vanta ${{ steps.get_version.outputs.VERSION }} (Pre-release)
           body: |
-            ## Vanta ${{ steps.get_version.outputs.VERSION }}
-            **Script Store**
+            ## ⚠️ Pre-release — Proceed with caution
+            This is an early release of the **Ultimate Theme Engine**. The default bundled theme is not fully polished yet. Expect rough edges in the default visual style. Custom themes work correctly — you are encouraged to create your own `.css` file in `~/.config/vanta/themes/` and select it from the Settings screen.
 
-            ### New Features
-            - **Script Fetch Tool**: Users can install scripts by typing `install <GitHub-URL>` in the search bar.
-            - **Local Script Support**: You can now pass local paths (e.g. `install /home/user/script.zip` or `install /home/user/script.py`) to easily ingest scripts/archives directly into Vanta's store.
-            - **Interactive Path Autocomplete**: When installing local files, Vanta now provides real-time directory contents and allows you to smoothly traverse your filesystem using the `Tab` key!
-            - **Script Routing**: Vanta automatically extracts ZIP archives and assigns executing permissions directly in `~/.config/vanta/scripts/`, ready to execute!
+            ---
 
-            ### Bug Fixes
-            - Custom Openers GUI tweaks and robust space handling.
+            ## What's New in ${{ steps.get_version.outputs.VERSION }}
 
-            ### Installation
+            ### Ultimate Theme Engine
+            - **Borderless Transparent Window**: The app window is now fully undecorated and transparent, acting as a pure canvas for CSS-driven designs.
+            - **External CSS Theming**: All visual styles have been moved out of the app binary. Themes live in `~/.config/vanta/themes/*.css` and are loaded at runtime — no rebuilds required.
+            - **Theme Parser**: The Rust backend parses `/* Theme Name: */`, `--vanta-width`, and `--vanta-height` directly from your CSS files, enabling per-theme window sizing.
+            - **Hot-Swap in Settings**: A new **Theme Profile** dropdown in Settings lets you switch themes live without restarting. The window resizes automatically.
+            - **Smart Installer**: The `install` command now routes `.css` files into `~/.config/vanta/themes/` automatically (local paths and remote URLs both work).
+            - **Bundled Default Theme**: A default theme is seeded to `~/.config/vanta/themes/default.css` on first launch so the app always looks correct out of the box.
+
+            ### Bug Fixes & Improvements
+            - Fixed settings panel bleed-through: settings and clipboard views now fully cover the launcher.
+            - Fixed Escape in clipboard mode: now closes the window instead of returning to launcher.
+            - Removed TailwindCSS build dependency — the frontend is now a pure unstyled Svelte bundle.
+            - Clipboard history and settings views no longer render the launcher behind them.
+
+            ---
+
+            ## ⚠️ Known Issues
+            - The bundled `default.css` is functional but not fully styled — some elements may appear basic or unstyled. This will be addressed in `v1.8.1`.
+            - Theme hot-reload does not force a window re-center if dimensions are unchanged.
+
+            ---
+
+            ## Installation
             - **Debian/Ubuntu**: Download `.deb`
             - **Fedora/OpenSUSE**: Download `.rpm`
             - **Universal**: Download and run `.AppImage`
-            - **Arch Linux**: Install `vanta-bin` from AUR.
+            - **Arch Linux**: Install `vanta-bin` from AUR (`yay -S vanta-bin`)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

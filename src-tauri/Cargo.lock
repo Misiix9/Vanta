@@ -5083,7 +5083,7 @@ dependencies = [
 
 [[package]]
 name = "vanta"
-version = "1.7.0"
+version = "1.8.0"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
@@ -5094,6 +5094,7 @@ dependencies = [
  "notify",
  "nucleo-matcher",
  "open",
+ "regex",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",

@@ -3,12 +3,18 @@
     import { invoke } from "@tauri-apps/api/core";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { LogicalSize } from "@tauri-apps/api/dpi";
-    import type { VantaConfig } from "$lib/types";
+    import type { VantaConfig, ThemeMeta } from "$lib/types";
+    import { applyTheme } from "$lib/theme";
 
     let {
         config = $bindable(),
+        availableThemes = [],
         onClose,
-    }: { config: VantaConfig; onClose: () => void } = $props();
+    }: {
+        config: VantaConfig;
+        availableThemes?: ThemeMeta[];
+        onClose: () => void;
+    } = $props();
 
     let saveTimeout: any = null;
     let availableApps: { name: string; exec: string }[] = $state([]);
@@ -24,7 +30,7 @@
 
     function debouncedSave() {
         // 1. Apply visual changes instantly via CSS variables
-        applyLivePreview();
+        applyTheme(config);
 
         // 2. Debounce the actual save to disk
         if (saveTimeout) clearTimeout(saveTimeout);
@@ -47,34 +53,22 @@
         }
     }
 
-    function applyLivePreview() {
-        const root = document.documentElement;
-        const c = config.appearance.colors;
-
-        root.style.setProperty("--vanta-bg", c.background);
-        root.style.setProperty("--vanta-surface", c.surface);
-        root.style.setProperty("--vanta-border", c.border);
-        root.style.setProperty("--vanta-text", c.text_primary);
-        root.style.setProperty("--vanta-text-dim", c.text_secondary);
-        root.style.setProperty("--vanta-accent", c.accent);
-
-        root.style.setProperty(
-            "--vanta-radius",
-            `${config.appearance.border_radius}px`,
+    function onThemeChange() {
+        const selected = availableThemes.find(
+            (t) => t.id === config.appearance.theme,
         );
-        root.style.setProperty(
-            "--vanta-blur",
-            `${config.appearance.blur_radius}px`,
-        );
-        root.style.setProperty(
-            "--vanta-opacity",
-            `${config.appearance.opacity}`,
-        );
+        if (selected) {
+            invoke("resize_window_for_theme", {
+                width: selected.width,
+                height: selected.height,
+            });
+        }
+        debouncedSave();
     }
 
     // Initial apply
     onMount(() => {
-        applyLivePreview();
+        applyTheme(config);
         loadApps();
     });
 
@@ -88,7 +82,10 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="settings-container">
+<div
+    class="settings-panel"
+    style="position:absolute;inset:0;z-index:50;background:var(--vanta-bg,#000);border-radius:var(--vanta-radius,24px);overflow:hidden;"
+>
     <header>
         <h2>Settings</h2>
         <div class="actions">
@@ -99,7 +96,24 @@
     <div class="sections">
         <!-- Theme Section -->
         <section>
-            <h3>Theme</h3>
+            <h3>Theme Profile</h3>
+
+            <div class="control-group">
+                <label>
+                    Active Theme
+                    <select
+                        class="vanta-select"
+                        bind:value={config.appearance.theme}
+                        onchange={onThemeChange}
+                    >
+                        {#each availableThemes as theme}
+                            <option value={theme.id}>{theme.name}</option>
+                        {/each}
+                    </select>
+                </label>
+            </div>
+
+            <h3 style="margin-top: 1rem;">Colors (Overrides)</h3>
 
             <div class="control-group">
                 <label
@@ -314,146 +328,3 @@
         </section>
     </div>
 </div>
-
-<style>
-    .settings-container {
-        padding: 24px;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        color: var(--vanta-text);
-    }
-
-    header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 24px;
-    }
-
-    h2 {
-        font-size: 20px;
-        font-weight: 600;
-        margin: 0;
-    }
-
-    h3 {
-        font-size: 14px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--vanta-text-dim);
-        margin: 24px 0 12px 0;
-        border-bottom: 1px solid var(--vanta-border);
-        padding-bottom: 8px;
-    }
-
-    .sections {
-        flex: 1;
-        overflow-y: auto;
-        padding-right: 8px;
-    }
-
-    /* Hide scrollbar in settings too */
-    .sections::-webkit-scrollbar {
-        display: none;
-    }
-    .sections {
-        scrollbar-width: none;
-    }
-
-    .control-group {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
-
-    label {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 14px;
-    }
-
-    input[type="text"],
-    input[type="number"] {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid var(--vanta-border);
-        color: var(--vanta-text);
-        padding: 4px 8px;
-        border-radius: 6px;
-        width: 150px;
-        text-align: right;
-    }
-
-    .vanta-select {
-        background: var(--vanta-bg); /* Black background */
-        border: 1px solid var(--vanta-border);
-        color: var(--vanta-text);
-        padding: 4px 8px;
-        border-radius: 6px;
-        width: 150px;
-        text-align: left;
-        color-scheme: dark; /* Force dark mode dropdown rendering */
-    }
-
-    .vanta-select option {
-        background: var(--vanta-bg);
-        color: var(--vanta-text);
-    }
-
-    input[type="checkbox"] {
-        appearance: none;
-        width: 18px;
-        height: 18px;
-        border: 2px solid rgba(255, 255, 255, 0.4);
-        border-radius: 4px;
-        background: transparent;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
-    }
-
-    input[type="checkbox"]:checked {
-        background: var(--vanta-accent);
-        border-color: var(--vanta-accent);
-    }
-
-    input[type="checkbox"]:checked::after {
-        content: "✓";
-        color: var(--vanta-bg);
-        font-size: 14px;
-        font-weight: bold;
-    }
-
-    input[type="color"] {
-        background: none;
-        border: none;
-        width: 40px;
-        height: 24px;
-        cursor: pointer;
-    }
-
-    input[type="range"] {
-        width: 150px;
-        accent-color: var(--vanta-accent);
-    }
-
-    .close-btn {
-        background: var(--vanta-surface);
-        border: 1px solid var(--vanta-border);
-        color: var(--vanta-text);
-        padding: 6px 12px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 13px;
-        transition: all 0.2s;
-    }
-
-    .close-btn:hover {
-        background: rgba(255, 255, 255, 0.1);
-        border-color: var(--vanta-accent);
-    }
-</style>

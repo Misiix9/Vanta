@@ -36,6 +36,10 @@ fn default_opener() -> String {
     "default".to_string()
 }
 
+fn default_theme() -> String {
+    "default".to_string()
+}
+
 impl Default for FilesConfig {
     fn default() -> Self {
         Self {
@@ -66,6 +70,8 @@ pub struct AppearanceConfig {
     pub blur_radius: u32,
     pub opacity: f64,
     pub border_radius: u32,
+    #[serde(default = "default_theme")]
+    pub theme: String,
     pub colors: ColorsConfig,
 }
 
@@ -102,6 +108,7 @@ impl Default for VantaConfig {
                 blur_radius: 40,
                 opacity: 0.85,
                 border_radius: 24,
+                theme: "default".to_string(),
                 colors: ColorsConfig {
                     background: "#000000".to_string(), // Pure OLED Black
                     surface: "#0A0A0A".to_string(),    // Item BG

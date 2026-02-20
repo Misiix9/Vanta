@@ -10,6 +10,7 @@
     ScriptEntry,
     ScriptItem,
     ScriptOutput,
+    ThemeMeta,
   } from "$lib/types";
   import { applyTheme } from "$lib/theme";
   import SearchInput from "$lib/components/SearchInput.svelte";
@@ -35,6 +36,20 @@
   let isVisible = $state(true);
   let isMouseOver = $state(false);
 
+  let availableThemes: ThemeMeta[] = $state([]);
+
+  function injectThemeCss(css: string) {
+    let styleEl = document.getElementById(
+      "vanta-theme",
+    ) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = "vanta-theme";
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = css;
+  }
+
   // Derived: total item count for navigation
   let totalItems = $derived(
     isScriptMode ? scriptResults.length : results.length,
@@ -47,9 +62,23 @@
   onMount(async () => {
     // ... existing onMount code ...
     try {
+      availableThemes = await invoke<ThemeMeta[]>("get_installed_themes");
+    } catch (e) {
+      console.error("Failed to load themes:", e);
+    }
+
+    try {
       const config = await invoke<VantaConfig>("get_config");
       vantaConfig = config;
       applyTheme(config);
+
+      const themeId = config.appearance.theme || "default";
+      const targetTheme =
+        availableThemes.find((t) => t.id === themeId) ||
+        availableThemes.find((t) => t.id === "default");
+      if (targetTheme) {
+        injectThemeCss(targetTheme.css_content);
+      }
     } catch (e) {
       console.error("Failed to load config:", e);
     }
@@ -67,6 +96,14 @@
       console.log("Config updated:", event.payload);
       vantaConfig = event.payload;
       applyTheme(event.payload);
+
+      const themeId = event.payload.appearance.theme || "default";
+      const targetTheme =
+        availableThemes.find((t) => t.id === themeId) ||
+        availableThemes.find((t) => t.id === "default");
+      if (targetTheme) {
+        injectThemeCss(targetTheme.css_content);
+      }
     });
 
     // Listen for blur status
@@ -328,8 +365,8 @@
 
   async function handleEscape() {
     if (currentMode === "clipboard" && query === "") {
-      currentMode = "launcher";
-      loadSuggestions();
+      // Close the window entirely instead of staying in launcher
+      resetAndHide();
       return;
     }
     resetAndHide();
@@ -410,14 +447,29 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
-  class="vanta-shell vanta-glass"
+  class="vanta-root vanta-glass"
   class:css-blur={blurMode === "fallback"}
   role="application"
 >
   {#if view === "settings" && vantaConfig}
     <SettingsView
       bind:config={vantaConfig}
+      {availableThemes}
       onClose={() => (view = "launcher")}
+    />
+  {:else if currentMode === "clipboard"}
+    <!-- Clipboard mode: full replace, no launcher behind it -->
+    <SearchInput
+      bind:this={searchInputRef}
+      bind:query
+      onSearch={(q) => updateClipboardSuggestions(q)}
+      onEscape={handleEscape}
+    />
+    <ResultsList
+      bind:this={resultsListRef}
+      {results}
+      bind:selectedIndex
+      onActivate={handleActivate}
     />
   {:else}
     <SearchInput
@@ -463,41 +515,3 @@
     />
   {/if}
 </div>
-
-<style>
-  .vanta-shell {
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  .vanta-shell.css-blur {
-    backdrop-filter: blur(var(--vanta-blur));
-    -webkit-backdrop-filter: blur(var(--vanta-blur));
-  }
-
-  .results-container {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 4px 8px;
-  }
-
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 40px 20px;
-    color: var(--vanta-text-dim);
-    font-size: 14px;
-  }
-
-  .empty-icon {
-    font-size: 28px;
-    opacity: 0.5;
-  }
-</style>

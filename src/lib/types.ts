@@ -12,7 +12,16 @@ export interface AppearanceConfig {
     blur_radius: number;
     opacity: number;
     border_radius: number;
+    theme: string;
     colors: VantaColors;
+}
+
+export interface ThemeMeta {
+    id: string;
+    name: string;
+    width: number;
+    height: number;
+    css_content: string;
 }
 
 export interface GeneralConfig {

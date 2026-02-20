@@ -1,0 +1,843 @@
+/* Theme Name: Vanta Default */
+:root {
+    --vanta-width: 680px;
+    --vanta-height: 420px;
+}
+
+@import url('https://fonts.cdnfonts.com/css/sn-pro');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ================================================================
+   Vanta — Liquid Glass Design System
+   ================================================================ */
+
+/* Typography: SN Pro (CDN) & Inter (Fallback) */
+
+:root {
+    /* Monochrome Palette */
+    --vanta-bg: #000000;
+    --vanta-text: #F5F5F5;
+    --vanta-text-dim: #888888;
+    --vanta-accent: #FFFFFF;
+    --result-item-bg: #0A0A0A;
+
+    /* Materials */
+    --vanta-blur: 40px;
+    --vanta-radius: 24px;
+    --vanta-opacity: 0.85;
+
+    /* Layout */
+    --window-padding: 20px;
+}
+
+/* Global Reset */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    font-family: 'SN Pro', 'Inter', sans-serif;
+    color: var(--vanta-text);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* The physical window container (includes padding for shadows) */
+.vanta-window {
+    width: 100%;
+    height: 100%;
+    padding: var(--window-padding);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* The visible glass shell */
+.vanta-glass {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+
+    /* Material */
+    background: rgba(0, 0, 0, var(--vanta-opacity));
+    backdrop-filter: blur(var(--vanta-blur));
+    -webkit-backdrop-filter: blur(var(--vanta-blur));
+
+    /* Shape */
+    border-radius: var(--vanta-radius);
+    border: none;
+    /* Explicitly requested: border: none */
+
+    /* Deep Shadow (Inner Container Strategy) */
+    box-shadow:
+        0 25px 50px -12px rgba(0, 0, 0, 0.5),
+        /* Deep drop shadow */
+        0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    /* Subtle inner highlight ring */
+
+    overflow: hidden;
+    /* Clip content to squircle */
+
+    /* Open Animation */
+    animation: growCenter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+    /* Starts invisible */
+}
+
+/* Keyframes */
+@keyframes growCenter {
+    0% {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1.0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Global Scrollbar Reset */
+::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+}
+
+html,
+body {
+    scrollbar-width: none !important;
+    /* Firefox */
+    -ms-overflow-style: none !important;
+    /* IE */
+}
+
+/* Ensure no scrollbars interfere with our custom solution */
+.results-container,
+[role="listbox"] {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.results-container::-webkit-scrollbar,
+[role="listbox"]::-webkit-scrollbar {
+    display: none !important;
+}
+
+/* --- EXTRACTED COMPONENT STYLES --- */
+
+/* From src/routes/+page.svelte */
+
+.vanta-root {
+    width: 100vw;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    overflow: hidden;
+}
+
+.vanta-root.css-blur {
+    backdrop-filter: blur(var(--vanta-blur));
+    -webkit-backdrop-filter: blur(var(--vanta-blur));
+}
+
+.results-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 8px;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 40px 20px;
+    color: var(--vanta-text-dim);
+    font-size: 14px;
+}
+
+.empty-icon {
+    font-size: 28px;
+    opacity: 0.5;
+}
+
+
+/* From src/lib/components/ScriptResultItem.svelte */
+
+.script-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    width: 100%;
+    text-align: left;
+
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 12px;
+
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    overflow: visible;
+}
+
+.script-item.selected,
+.script-item:hover {
+    background: var(--result-item-bg);
+    transform: scale(1.02) translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    z-index: 10;
+}
+
+.script-item.urgency-critical {
+    border-left: 2px solid #ff4757;
+}
+
+.script-item.urgency-low {
+    opacity: 0.65;
+}
+
+.script-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    background: rgba(255,
+            255,
+            255,
+            0.1) !important;
+    /* Force monochrome bg */
+    box-shadow: none;
+
+    /* Monochrome Icon filter */
+    filter: grayscale(100%) brightness(200%);
+}
+
+.icon-glyph {
+    font-size: 18px;
+    filter: none;
+    color: #fff;
+}
+
+.item-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.item-title {
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--vanta-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.script-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border: none;
+    flex-shrink: 0;
+}
+
+.item-subtitle {
+    font-size: 12px;
+    color: var(--vanta-text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+    font-weight: 300;
+}
+
+.item-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.script-item.selected .item-meta {
+    opacity: 1;
+}
+
+.item-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--vanta-text-dim);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.action-hint {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    color: var(--vanta-text);
+    font-family: inherit;
+}
+
+
+/* From src/lib/components/SearchInput.svelte */
+
+.search-bar {
+    width: 100%;
+    padding: 24px 24px 12px 24px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.vanta-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+
+    /* Typography */
+    font-family: "SN Pro", "Inter", sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--vanta-text);
+
+    /* Custom Caret */
+    caret-color: var(--vanta-accent);
+}
+
+.vanta-input::placeholder {
+    color: var(--vanta-text-dim);
+    opacity: 0.3;
+}
+
+/* Clear button - Keep it, but minimal */
+.clear-btn {
+    background: none;
+    border: none;
+    color: var(--vanta-text-dim);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.search-bar:hover .clear-btn,
+.vanta-input:focus+.clear-btn {
+    opacity: 0.5;
+}
+
+.clear-btn:hover {
+    opacity: 1 !important;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+
+/* From src/lib/components/FileIcon.svelte */
+
+.file-icon {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vanta-text);
+    opacity: 0.8;
+}
+
+svg {
+    width: 24px;
+    height: 24px;
+}
+
+
+/* From src/lib/components/SettingsView.svelte */
+
+.settings-panel {
+    padding: 24px;
+    height: 100%;
+    max-height: 100vh;
+    grid-row: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: var(--vanta-text);
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+}
+
+h3 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--vanta-text-dim);
+    margin: 24px 0 12px 0;
+    border-bottom: 1px solid var(--vanta-border);
+    padding-bottom: 8px;
+}
+
+.sections {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* Hide scrollbar in settings too */
+.sections::-webkit-scrollbar {
+    display: none;
+}
+
+.sections {
+    scrollbar-width: none;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+}
+
+input[type="text"],
+input[type="number"] {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--vanta-border);
+    color: var(--vanta-text);
+    padding: 4px 8px;
+    border-radius: 6px;
+    width: 150px;
+    text-align: right;
+}
+
+.vanta-select {
+    background: var(--vanta-bg);
+    /* Black background */
+    border: 1px solid var(--vanta-border);
+    color: var(--vanta-text);
+    padding: 4px 8px;
+    border-radius: 6px;
+    width: 150px;
+    text-align: left;
+    color-scheme: dark;
+    /* Force dark mode dropdown rendering */
+}
+
+.vanta-select option {
+    background: var(--vanta-bg);
+    color: var(--vanta-text);
+}
+
+input[type="checkbox"] {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+input[type="checkbox"]:checked {
+    background: var(--vanta-accent);
+    border-color: var(--vanta-accent);
+}
+
+input[type="checkbox"]:checked::after {
+    content: "✓";
+    color: var(--vanta-bg);
+    font-size: 14px;
+    font-weight: bold;
+}
+
+input[type="color"] {
+    background: none;
+    border: none;
+    width: 40px;
+    height: 24px;
+    cursor: pointer;
+}
+
+input[type="range"] {
+    width: 150px;
+    accent-color: var(--vanta-accent);
+}
+
+.close-btn {
+    background: var(--vanta-surface);
+    border: 1px solid var(--vanta-border);
+    color: var(--vanta-text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--vanta-accent);
+}
+
+
+/* From src/lib/components/StatusBar.svelte */
+
+.status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-top: 1px solid var(--vanta-border);
+    font-size: 11px;
+}
+
+.status-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-badge {
+    background: var(--vanta-accent);
+    color: white;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-info {
+    color: var(--vanta-text-dim);
+    opacity: 0.6;
+}
+
+.status-download {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    margin-right: 8px;
+}
+
+.status-download.success {
+    color: #10b981;
+}
+
+.status-download.failed {
+    color: #ef4444;
+}
+
+.spinner {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--vanta-text-dim);
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+
+/* From src/lib/components/ResultItem.svelte */
+
+.result-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    width: 100%;
+    text-align: left;
+
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    /* Inner radius */
+
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    overflow: visible;
+    /* Allow shadow/scale to spill */
+}
+
+/* Selected State: Card "Float" */
+.result-item.selected,
+.result-item:hover {
+    background: var(--result-item-bg);
+    transform: scale(1.02) translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    z-index: 10;
+}
+
+.item-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.icon-emoji {
+    font-size: 24px;
+    line-height: 1;
+}
+
+.icon-number {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--vanta-text-dim);
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+}
+
+.icon-fallback {
+    opacity: 0.5;
+}
+
+.icon-img,
+.icon-svg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.icon-svg :global(svg) {
+    width: 100%;
+    height: 100%;
+    color: var(--vanta-text);
+    opacity: 0.8;
+}
+
+.item-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.item-title {
+    font-size: 15px;
+    font-weight: 400;
+    /* Thin/Regular as requested */
+    color: var(--vanta-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.item-title :global(.match-highlight) {
+    color: var(--vanta-accent);
+    font-weight: 600;
+}
+
+.item-subtitle {
+    font-size: 12px;
+    color: var(--vanta-text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+    font-weight: 300;
+}
+
+.item-action-hint {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    opacity: 0;
+    transform: translateX(10px);
+    transition: all 0.2s ease;
+}
+
+.result-item.selected .item-action-hint {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.item-action-hint kbd {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    color: var(--vanta-text);
+    font-family: inherit;
+}
+
+
+/* From src/lib/components/ResultsList.svelte */
+
+.results-wrapper {
+    position: relative;
+    width: 100%;
+    /* Ensure height matches container max-height logic roughly so wrapper contains flex */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Hide anything leaking */
+}
+
+.results-container {
+    padding: 6px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(420px - 70px - 36px);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: relative;
+    scroll-behavior: smooth;
+
+    /* Force hide implementation detail of scrollbar */
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+.results-container::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+}
+
+/* Custom Scrollbar Styles */
+.custom-scrollbar-track {
+    position: absolute;
+    top: 6px;
+    /* Match padding */
+    bottom: 6px;
+    right: 4px;
+    /* Padding from edge */
+    width: 10px;
+    /* Thicker track area */
+    pointer-events: none;
+    z-index: 10;
+}
+
+.custom-scrollbar-thumb {
+    width: 100%;
+    /* Dark semi-transparent thumb for stealth look */
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9999px;
+    transition:
+        opacity 0.3s ease,
+        transform 0.1s linear,
+        background-color 0.2s;
+}
+
+.custom-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.8);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 12px;
+}
+
+.empty-icon {
+    color: var(--vanta-text-dim);
+}
+
+.empty-text {
+    color: var(--vanta-text-dim);
+    font-size: 13px;
+    opacity: 0.5;
+}
