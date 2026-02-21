@@ -12,7 +12,9 @@ pub mod files; // New files module
 pub mod window;
 pub mod windows; // New windows enumeration module
 pub mod themes;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tauri::{Manager, Emitter}; // Added Emitter for .emit()
 
 use config::VantaConfig;
@@ -30,6 +32,60 @@ pub struct AppState {
     pub scripts_cache: Mutex<Vec<ScriptEntry>>,
     pub history: Mutex<History>,
     pub file_index: FileIndex,
+}
+
+static SEARCH_CALLS: AtomicU64 = AtomicU64::new(0);
+static SEARCH_TOTAL_MS: AtomicU64 = AtomicU64::new(0);
+static SEARCH_MAX_MS: AtomicU64 = AtomicU64::new(0);
+
+static SUGGEST_CALLS: AtomicU64 = AtomicU64::new(0);
+static SUGGEST_TOTAL_MS: AtomicU64 = AtomicU64::new(0);
+static SUGGEST_MAX_MS: AtomicU64 = AtomicU64::new(0);
+
+static LAUNCH_CALLS: AtomicU64 = AtomicU64::new(0);
+static LAUNCH_TOTAL_MS: AtomicU64 = AtomicU64::new(0);
+static LAUNCH_MAX_MS: AtomicU64 = AtomicU64::new(0);
+
+fn record_latency(
+    label: &str,
+    elapsed: Duration,
+    calls: &AtomicU64,
+    total_ms: &AtomicU64,
+    max_ms: &AtomicU64,
+) {
+    let elapsed_ms = elapsed.as_millis().min(u64::MAX as u128) as u64;
+    let current_calls = calls.fetch_add(1, Ordering::Relaxed) + 1;
+    total_ms.fetch_add(elapsed_ms, Ordering::Relaxed);
+
+    let mut observed = max_ms.load(Ordering::Relaxed);
+    while elapsed_ms > observed {
+        match max_ms.compare_exchange_weak(
+            observed,
+            elapsed_ms,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => break,
+            Err(next) => observed = next,
+        }
+    }
+
+    if current_calls % 50 == 0 {
+        let total = total_ms.load(Ordering::Relaxed);
+        let max = max_ms.load(Ordering::Relaxed);
+        let avg = if current_calls > 0 {
+            total as f64 / current_calls as f64
+        } else {
+            0.0
+        };
+        log::info!(
+            "perf:{} calls={} avg_ms={:.2} max_ms={}",
+            label,
+            current_calls,
+            avg,
+            max
+        );
+    }
 }
 
 #[tauri::command]
@@ -76,6 +132,7 @@ async fn search(
     query: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<SearchResult>, String> {
+    let search_start = Instant::now();
     let apps = state
         .apps
         .lock()
@@ -164,8 +221,18 @@ async fn search(
 
     // Check for file search - instant in-memory lookup!
     if query.starts_with('/') || query.starts_with("~/") {
-        let index_guard = state.file_index.lock().unwrap();
+        let index_guard = state
+            .file_index
+            .lock()
+            .map_err(|_| "Failed to access file index".to_string())?;
         let file_results = files::search_index(&index_guard, &query, 20);
+        record_latency(
+            "search",
+            search_start.elapsed(),
+            &SEARCH_CALLS,
+            &SEARCH_TOTAL_MS,
+            &SEARCH_MAX_MS,
+        );
         return Ok(file_results);
     }
 
@@ -256,7 +323,10 @@ async fn search(
                 }
             }
         } else if !url.is_empty() && !url.contains("github.com") && !url.starts_with("http") {
-             let index_guard = state.file_index.lock().unwrap();
+             let index_guard = state
+            .file_index
+            .lock()
+            .map_err(|_| "Failed to access file index".to_string())?;
              let file_results = files::search_index(&index_guard, &url, 15);
              for mut res in file_results {
                  let path = std::path::Path::new(&res.exec);
@@ -307,6 +377,13 @@ async fn search(
         }
     }
 
+    record_latency(
+        "search",
+        search_start.elapsed(),
+        &SEARCH_CALLS,
+        &SEARCH_TOTAL_MS,
+        &SEARCH_MAX_MS,
+    );
     Ok(results)
 }
 
@@ -316,17 +393,28 @@ async fn launch_app(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
+    let launch_start = Instant::now();
     // Track usage
     if let Ok(mut history) = state.history.lock() {
         history.increment(&exec);
     }
-    launcher::launch(&exec, Some(&app_handle)).map_err(|e| format!("Failed to launch: {}", e))
+    let result = launcher::launch(&exec, Some(&app_handle))
+        .map_err(|e| format!("Failed to launch: {}", e));
+    record_latency(
+        "launch",
+        launch_start.elapsed(),
+        &LAUNCH_CALLS,
+        &LAUNCH_TOTAL_MS,
+        &LAUNCH_MAX_MS,
+    );
+    result
 }
 
 #[tauri::command]
 async fn get_suggestions(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<SearchResult>, String> {
+    let suggestions_start = Instant::now();
     let apps = state
         .apps
         .lock()
@@ -342,7 +430,7 @@ async fn get_suggestions(
         .lock()
         .map_err(|_| "Failed to access config".to_string())?;
 
-    let _max_results = config.general.max_results;
+    let max_results = config.general.max_results;
 
     // Create a list of apps with their usage count
     let mut scored_apps: Vec<(&AppEntry, u32)> = apps
@@ -353,7 +441,7 @@ async fn get_suggestions(
     // Sort by usage count descending
     scored_apps.sort_by(|a, b| b.1.cmp(&a.1));
 
-    // Convert to SearchResult
+    // Convert to SearchResult without truncating
     let results: Vec<SearchResult> = scored_apps
         .into_iter()
         .map(|(app, _count)| SearchResult {
@@ -367,6 +455,13 @@ async fn get_suggestions(
         })
         .collect();
 
+    record_latency(
+        "suggestions",
+        suggestions_start.elapsed(),
+        &SUGGEST_CALLS,
+        &SUGGEST_TOTAL_MS,
+        &SUGGEST_MAX_MS,
+    );
     Ok(results)
 }
 
@@ -522,12 +617,9 @@ pub fn run() {
     let hotkey_str = vanta_config.general.hotkey.clone();
 
 
-    let apps = scanner::scan_desktop_entries();
-    log::info!("Scanned {} desktop applications", apps.len());
-
-
-    let discovered_scripts = scripts::scan_scripts();
-    log::info!("Discovered {} scripts", discovered_scripts.len());
+    // Keep startup fast: initial scans run in background during setup.
+    let apps: Vec<AppEntry> = Vec::new();
+    let discovered_scripts: Vec<ScriptEntry> = Vec::new();
 
     let history = if let Some(config_dir) = dirs::config_dir() {
         let vanta_dir = config_dir.join("vanta");
@@ -589,9 +681,6 @@ pub fn run() {
             show_window,
             get_scripts,
             execute_script,
-            execute_script,
-            get_suggestions,
-            get_suggestions,
             get_suggestions,
             get_clipboard_history,
             open_path,
@@ -609,8 +698,11 @@ pub fn run() {
                 // Apply window size from config
                 let (width, height) = {
                     let state = app.state::<AppState>();
-                    let config = state.config.lock().unwrap();
-                    (config.window.width, config.window.height)
+                    let dims = match state.config.lock() {
+                        Ok(config) => (config.window.width, config.window.height),
+                        Err(_) => (680.0, 420.0),
+                    };
+                    dims
                 };
                 let _ = win.set_size(tauri::LogicalSize::new(width, height));
             }
@@ -707,13 +799,40 @@ pub fn run() {
                 scripts::watch_scripts(handle_for_scripts);
             });
 
+            // Initial app/script scans in background (startup-critical path stays minimal)
+            {
+                let handle_for_initial_scan = app_handle.clone();
+                std::thread::spawn(move || {
+                    let apps = scanner::scan_desktop_entries();
+                    log::info!("Initial desktop scan complete: {} apps", apps.len());
+                    if let Some(state) = handle_for_initial_scan.try_state::<AppState>() {
+                        if let Ok(mut cached_apps) = state.apps.lock() {
+                            *cached_apps = apps;
+                        }
+                    }
+                    let _ = handle_for_initial_scan.emit("apps-changed", ());
+
+                    let scripts = scripts::scan_scripts();
+                    log::info!("Initial script scan complete: {} scripts", scripts.len());
+                    if let Some(state) = handle_for_initial_scan.try_state::<AppState>() {
+                        if let Ok(mut cached_scripts) = state.scripts_cache.lock() {
+                            *cached_scripts = scripts.clone();
+                        }
+                    }
+                    let _ = handle_for_initial_scan.emit("scripts-changed", &scripts);
+                });
+            }
+
             // Build the file index in the background (so startup is instant)
             {
                 let index_clone = app_handle.state::<AppState>().file_index.clone();
                 let files_config = {
                     let state = app_handle.state::<AppState>();
-                    let cfg = state.config.lock().unwrap();
-                    cfg.files.clone()
+                    let cfg = match state.config.lock() {
+                        Ok(cfg) => cfg.files.clone(),
+                        Err(_) => crate::config::FilesConfig::default(),
+                    };
+                    cfg
                 };
                 std::thread::spawn(move || {
                     log::info!("Building file index...");

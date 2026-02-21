@@ -2,7 +2,8 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
+  import { fade } from "svelte/transition";
   import type {
     VantaConfig,
     SearchResult,
@@ -37,6 +38,18 @@
   let isMouseOver = $state(false);
 
   let availableThemes: ThemeMeta[] = $state([]);
+  let searchRequestId = 0;
+  const unlisteners: Array<() => void> = [];
+
+  onDestroy(() => {
+    for (const unlisten of unlisteners) {
+      try {
+        unlisten();
+      } catch {
+        // no-op
+      }
+    }
+  });
 
   function injectThemeCss(css: string) {
     let styleEl = document.getElementById(
@@ -92,61 +105,82 @@
     }
 
     // Listen for config hot-reload events
-    await listen<VantaConfig>("config-updated", (event) => {
-      console.log("Config updated:", event.payload);
-      vantaConfig = event.payload;
-      applyTheme(event.payload);
+    unlisteners.push(
+      await listen<VantaConfig>("config-updated", (event) => {
+        console.log("Config updated:", event.payload);
+        vantaConfig = event.payload;
+        applyTheme(event.payload);
 
-      const themeId = event.payload.appearance.theme || "default";
-      const targetTheme =
-        availableThemes.find((t) => t.id === themeId) ||
-        availableThemes.find((t) => t.id === "default");
-      if (targetTheme) {
-        injectThemeCss(targetTheme.css_content);
-      }
-    });
+        const themeId = event.payload.appearance.theme || "default";
+        const targetTheme =
+          availableThemes.find((t) => t.id === themeId) ||
+          availableThemes.find((t) => t.id === "default");
+        if (targetTheme) {
+          injectThemeCss(targetTheme.css_content);
+        }
+      }),
+    );
 
     // Listen for blur status
-    await listen<BlurStatus>("blur-status", (event) => {
-      blurMode = event.payload.mode;
-    });
+    unlisteners.push(
+      await listen<BlurStatus>("blur-status", (event) => {
+        blurMode = event.payload.mode;
+      }),
+    );
 
     // Listen for script changes (hot-reload)
-    await listen<ScriptEntry[]>("scripts-changed", (event) => {
-      availableScripts = event.payload;
-      console.log("Scripts updated:", availableScripts.length);
-    });
+    unlisteners.push(
+      await listen<ScriptEntry[]>("scripts-changed", (event) => {
+        availableScripts = event.payload;
+        console.log("Scripts updated:", availableScripts.length);
+      }),
+    );
+
+    // Listen for app cache refresh events and update suggestions when idle.
+    unlisteners.push(
+      await listen("apps-changed", () => {
+        if (currentMode === "launcher" && query.trim() === "") {
+          loadSuggestions();
+        }
+      }),
+    );
 
     // Listen for Clipboard Shortcut
-    await listen("open_clipboard", async () => {
-      currentMode = "clipboard";
-      query = "";
-      try {
-        clipboardHistory = await invoke("get_clipboard_history");
-        updateClipboardSuggestions("");
-      } catch (e) {
-        console.error("Failed to fetch history", e);
-      }
-      await invoke("show_window");
-      setTimeout(() => searchInputRef?.focus?.(), 50);
-    });
+    unlisteners.push(
+      await listen("open_clipboard", async () => {
+        currentMode = "clipboard";
+        query = "";
+        try {
+          clipboardHistory = await invoke("get_clipboard_history");
+          updateClipboardSuggestions("");
+        } catch (e) {
+          console.error("Failed to fetch history", e);
+        }
+        await invoke("show_window");
+        setTimeout(() => searchInputRef?.focus?.(), 50);
+      }),
+    );
 
     // ── Click-away dismiss ──
     const appWindow = getCurrentWebviewWindow();
-    await appWindow.onFocusChanged(({ payload: focused }) => {
-      // Focus logic placeholder
-    });
+    unlisteners.push(
+      await appWindow.onFocusChanged(({ payload: focused }) => {
+        // Focus logic placeholder
+      }),
+    );
 
     // Listen for window shown event → refocus the search input and reload suggestions
-    await listen("tauri://focus", () => {
-      isVisible = true;
-      setTimeout(() => {
-        searchInputRef?.focus?.();
-        if (query.trim() === "" && currentMode === "launcher") {
-          loadSuggestions();
-        }
-      }, 50);
-    });
+    unlisteners.push(
+      await listen("tauri://focus", () => {
+        isVisible = true;
+        setTimeout(() => {
+          searchInputRef?.focus?.();
+          if (query.trim() === "" && currentMode === "launcher") {
+            loadSuggestions();
+          }
+        }, 50);
+      }),
+    );
 
     loadSuggestions();
   });
@@ -202,8 +236,10 @@
   }
 
   async function loadSuggestions() {
+    const requestId = ++searchRequestId;
     try {
       const suggestions = await invoke<SearchResult[]>("get_suggestions");
+      if (requestId !== searchRequestId) return;
       results = suggestions;
       // If we have suggestions, select the first one
       if (results.length > 0) {
@@ -215,6 +251,7 @@
   }
 
   async function handleSearch(q: string) {
+    const requestId = ++searchRequestId;
     if (currentMode === "clipboard") {
       updateClipboardSuggestions(q);
       return;
@@ -244,12 +281,14 @@
           keyword,
           args,
         });
+        if (requestId !== searchRequestId) return;
         const elapsed = performance.now() - start;
 
         scriptResults = output.items;
         selectedIndex = 0;
         searchTime = elapsed;
       } catch (e) {
+        if (requestId !== searchRequestId) return;
         console.error("Script execution failed:", e);
         // Show error as a script result
         scriptResults = [
@@ -275,12 +314,14 @@
       const searchResults = await invoke<SearchResult[]>("search", {
         query: q,
       });
+      if (requestId !== searchRequestId) return;
       const elapsed = performance.now() - start;
 
       results = searchResults;
       selectedIndex = 0;
       searchTime = elapsed;
     } catch (e) {
+      if (requestId !== searchRequestId) return;
       console.error("Search failed:", e);
       results = [];
       searchTime = null;
@@ -390,6 +431,18 @@
       return; // Block other keys
     }
 
+    // Ensure search input gets focus if the user types anything
+    // Ignore modifiers (ctrl/meta/alt) unless it's just a single character
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+      if (document.activeElement?.tagName !== "INPUT") {
+        searchInputRef?.focus();
+      }
+    }
+
+    if (e.key === "Backspace" && document.activeElement?.tagName !== "INPUT") {
+      searchInputRef?.focus();
+    }
+
     // Launcher logic
     if (totalItems === 0) return;
 
@@ -439,12 +492,21 @@
         } else {
           selectedIndex = (selectedIndex + 1) % totalItems;
         }
+
+        // Manual scroll trigger to track Tab navigation
+        if (!isScriptMode)
+          setTimeout(() => resultsListRef?.scrollToSelected(), 0);
         break;
     }
   }
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window
+  onkeydown={handleKeydown}
+  onfocus={() => {
+    if (view !== "settings") searchInputRef?.focus();
+  }}
+/>
 
 <div
   class="vanta-root vanta-glass"
@@ -452,66 +514,85 @@
   role="application"
 >
   {#if view === "settings" && vantaConfig}
-    <SettingsView
-      bind:config={vantaConfig}
-      {availableThemes}
-      onClose={() => (view = "launcher")}
-    />
+    <div
+      in:fade={{ duration: 150 }}
+      style="height: 100%; width: 100%; position: relative;"
+    >
+      <SettingsView
+        bind:config={vantaConfig}
+        {availableThemes}
+        onClose={() => (view = "launcher")}
+      />
+    </div>
   {:else if currentMode === "clipboard"}
     <!-- Clipboard mode: full replace, no launcher behind it -->
-    <SearchInput
-      bind:this={searchInputRef}
-      bind:query
-      onSearch={(q) => updateClipboardSuggestions(q)}
-      onEscape={handleEscape}
-    />
-    <ResultsList
-      bind:this={resultsListRef}
-      {results}
-      bind:selectedIndex
-      onActivate={handleActivate}
-    />
-  {:else}
-    <SearchInput
-      bind:this={searchInputRef}
-      bind:query
-      onSearch={handleSearch}
-      onEscape={handleEscape}
-    />
-
-    {#if isScriptMode}
-      <!-- Script results -->
-      <div class="results-container" role="listbox" aria-label="Script results">
-        {#if scriptResults.length === 0}
-          <div class="empty-state">
-            <span class="empty-icon">⚡</span>
-            <span>Running {activeScriptKeyword}...</span>
-          </div>
-        {:else}
-          {#each scriptResults as item, i}
-            <ScriptResultItem
-              {item}
-              index={i}
-              isSelected={i === selectedIndex}
-              onSelect={(idx) => (selectedIndex = idx)}
-              onActivate={handleScriptActivate}
-            />
-          {/each}
-        {/if}
-      </div>
-    {:else}
-      <!-- Normal app results -->
+    <div
+      in:fade={{ duration: 150 }}
+      style="height: 100%; width: 100%; display: grid; grid-template-rows: auto 1fr auto;"
+    >
+      <SearchInput
+        bind:this={searchInputRef}
+        bind:query
+        onSearch={(q) => updateClipboardSuggestions(q)}
+        onEscape={handleEscape}
+      />
       <ResultsList
         bind:this={resultsListRef}
         {results}
         bind:selectedIndex
         onActivate={handleActivate}
       />
-    {/if}
+    </div>
+  {:else}
+    <div
+      in:fade={{ duration: 150 }}
+      style="height: 100%; width: 100%; display: grid; grid-template-rows: auto 1fr auto;"
+    >
+      <SearchInput
+        bind:this={searchInputRef}
+        bind:query
+        onSearch={handleSearch}
+        onEscape={handleEscape}
+      />
 
-    <StatusBar
-      resultCount={isScriptMode ? scriptResults.length : results.length}
-      {searchTime}
-    />
+      {#if isScriptMode}
+        <!-- Script results -->
+        <div
+          class="results-container"
+          role="listbox"
+          aria-label="Script results"
+        >
+          {#if scriptResults.length === 0}
+            <div class="empty-state">
+              <span class="empty-icon">⚡</span>
+              <span>Running {activeScriptKeyword}...</span>
+            </div>
+          {:else}
+            {#each scriptResults as item, i}
+              <ScriptResultItem
+                {item}
+                index={i}
+                isSelected={i === selectedIndex}
+                onSelect={(idx) => (selectedIndex = idx)}
+                onActivate={handleScriptActivate}
+              />
+            {/each}
+          {/if}
+        </div>
+      {:else}
+        <!-- Normal app results -->
+        <ResultsList
+          bind:this={resultsListRef}
+          {results}
+          bind:selectedIndex
+          onActivate={handleActivate}
+        />
+      {/if}
+
+      <StatusBar
+        resultCount={isScriptMode ? scriptResults.length : results.length}
+        {searchTime}
+      />
+    </div>
   {/if}
 </div>

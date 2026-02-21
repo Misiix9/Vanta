@@ -72,11 +72,21 @@ pub fn launch(exec: &str, app_handle: Option<&tauri::AppHandle>) -> Result<(), S
         return Err("Empty exec command after parsing".to_string());
     }
 
-    log::info!("Launching via sh -c: {}", cleaned);
+    let parts = shell_words::split(&cleaned)
+        .map_err(|e| format!("Invalid exec syntax '{}': {}", cleaned, e))?;
 
-    Command::new("sh")
-        .arg("-c")
-        .arg(&cleaned)
+    let program = parts
+        .first()
+        .ok_or_else(|| "Empty exec command after parsing".to_string())?;
+
+    log::info!("Launching program: {}", program);
+
+    let mut command = Command::new(program);
+    if parts.len() > 1 {
+        command.args(&parts[1..]);
+    }
+
+    command
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())

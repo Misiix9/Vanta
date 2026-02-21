@@ -1,10 +1,14 @@
 use std::fs;
 use std::io::copy;
 use std::io::Cursor;
+use std::io::Read;
+use std::time::Duration;
 use zip::ZipArchive;
 
 pub fn download_script(url: &str) -> Result<(), String> {
     log::info!("Fetching script from: {}", url);
+    const MAX_DOWNLOAD_BYTES: u64 = 25 * 1024 * 1024; // 25 MB
+    const DOWNLOAD_TIMEOUT_SECS: u64 = 20;
 
     let config_dir = dirs::config_dir().ok_or("No config dir")?;
     let scripts_dir = config_dir.join("vanta").join("scripts");
@@ -23,7 +27,7 @@ pub fn download_script(url: &str) -> Result<(), String> {
             .unwrap_or("");
 
         // If it's a known archive, extract it
-        if ["zip", "rar", "tar", "gz", "xz"].contains(&ext.to_lowercase().as_str()) {
+        if ext.eq_ignore_ascii_case("zip") {
             // Very basic zip extraction for local files (same logic as remote)
             let file = fs::File::open(local_path).map_err(|e| e.to_string())?;
             let mut archive = ZipArchive::new(file)
@@ -104,13 +108,41 @@ pub fn download_script(url: &str) -> Result<(), String> {
         url.to_string()
     };
 
-    let response = reqwest::blocking::get(&download_url).map_err(|e| e.to_string())?;
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+
+    let response = client
+        .get(&download_url)
+        .send()
+        .map_err(|e| format!("Download failed: {}", e))?;
 
     if !response.status().is_success() {
         return Err(format!("Failed to download: {}", response.status()));
     }
 
-    let bytes = response.bytes().map_err(|e| e.to_string())?;
+    if let Some(content_len) = response.content_length() {
+        if content_len > MAX_DOWNLOAD_BYTES {
+            return Err(format!(
+                "Download too large: {} bytes (max {} bytes)",
+                content_len, MAX_DOWNLOAD_BYTES
+            ));
+        }
+    }
+
+    let mut bytes = Vec::new();
+    response
+        .take(MAX_DOWNLOAD_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("Failed to read download body: {}", e))?;
+
+    if bytes.len() as u64 > MAX_DOWNLOAD_BYTES {
+        return Err(format!(
+            "Download exceeded max size of {} bytes",
+            MAX_DOWNLOAD_BYTES
+        ));
+    }
 
     // If it's a direct CSS file, drop it down immediately
     if is_remote_css {
@@ -120,7 +152,7 @@ pub fn download_script(url: &str) -> Result<(), String> {
         }
         let file_name = url.split('/').last().unwrap_or("theme.css");
         let out_file_path = themes_dir.join(file_name);
-        fs::write(&out_file_path, bytes).map_err(|e| e.to_string())?;
+        fs::write(&out_file_path, &bytes).map_err(|e| e.to_string())?;
         log::info!("Downloaded theme to {:?}", out_file_path);
         return Ok(());
     }

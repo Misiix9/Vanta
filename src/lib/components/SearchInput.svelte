@@ -1,6 +1,4 @@
 <script lang="ts">
-  import type { SearchResult } from "$lib/types";
-  import { createEventDispatcher } from "svelte";
 
   let {
     query = $bindable(""),
@@ -40,19 +38,23 @@
 </script>
 
 <div class="search-bar">
-  <!-- No search icon, purely text based for minimalism -->
-  <input
-    bind:this={inputEl}
-    bind:value={query}
-    oninput={handleInput}
-    onkeydown={handleKeydown}
-    class="vanta-input"
-    type="text"
-    placeholder=" "
-    spellcheck="false"
-    autocomplete="off"
-    autofocus
-  />
+  <div class="vanta-input-wrap">
+    <input
+      bind:this={inputEl}
+      bind:value={query}
+      oninput={handleInput}
+      onkeydown={handleKeydown}
+      class="vanta-input"
+      class:empty={query.length === 0}
+      type="text"
+      placeholder=""
+      spellcheck="false"
+      autocomplete="off"
+    />
+    {#if query.length === 0}
+      <span class="vanta-caret" aria-hidden="true"></span>
+    {/if}
+  </div>
 
   {#if query.length > 0}
     <button

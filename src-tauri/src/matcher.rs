@@ -37,7 +37,32 @@ pub fn fuzzy_search(
     let start = std::time::Instant::now();
 
     if query.is_empty() {
-        return Vec::new();
+        let mut scored: Vec<(u32, &AppEntry)> = apps
+            .iter()
+            .map(|app| {
+                let usage = usage_map.get(&app.exec).copied().unwrap_or(0);
+                (usage, app)
+            })
+            .collect();
+
+        // Sort by usage descending, then by name alphabetically
+        scored.sort_by(|a, b| {
+            b.0.cmp(&a.0)
+                .then_with(|| a.1.name.to_lowercase().cmp(&b.1.name.to_lowercase()))
+        });
+
+        return scored
+            .into_iter()
+            .map(|(score, app)| SearchResult {
+                title: app.name.clone(),
+                subtitle: app.generic_name.clone().or_else(|| app.comment.clone()),
+                icon: app.icon.clone(),
+                exec: app.exec.clone(),
+                score,
+                match_indices: Vec::new(),
+                source: ResultSource::Application,
+            })
+            .collect();
     }
 
     let mut matcher = Matcher::new(Config::DEFAULT);

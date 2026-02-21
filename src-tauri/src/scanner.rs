@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AppEntry {
@@ -248,7 +248,7 @@ pub fn scan_desktop_entries() -> Vec<AppEntry> {
         startup_wm_class: None,
         desktop_file_path: "vanta://store".to_string(),
     });
-    seen_names.insert("Install Script (Vanta Store)".to_string());
+    seen_names.insert("Vanta Store".to_string());
 
     for dir in desktop_dirs() {
         if !dir.exists() {
@@ -271,7 +271,11 @@ pub fn scan_desktop_entries() -> Vec<AppEntry> {
 
             if let Some(app) = parse_desktop_file(&path, &mut cache) {
                 // Deduplicate by name (later dirs override earlier)
-                if !seen_names.contains(&app.name) {
+                if seen_names.contains(&app.name) {
+                    if let Some(existing) = entries.iter_mut().find(|e| e.name == app.name) {
+                        *existing = app;
+                    }
+                } else {
                     seen_names.insert(app.name.clone());
                     entries.push(app);
                 }
@@ -296,7 +300,7 @@ pub fn scan_desktop_entries() -> Vec<AppEntry> {
     );
 
     // Sort alphabetically by name
-    entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    entries.sort_by_cached_key(|a| a.name.to_lowercase());
     entries
 }
 
@@ -328,7 +332,7 @@ pub fn watch_desktop_entries(app_handle: tauri::AppHandle) {
 
     log::info!("Watching desktop entry directories for changes");
 
-    let mut last_scan = std::time::Instant::now();
+    let mut last_scan = std::time::Instant::now() - Duration::from_millis(500);
 
     for event in rx {
         match event {
@@ -345,11 +349,9 @@ pub fn watch_desktop_entries(app_handle: tauri::AppHandle) {
                     EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_)
                 );
 
-                // Debounce: don't rescan more than once per second
-                if is_desktop_change && is_modify && last_scan.elapsed() > Duration::from_secs(1) {
+                // Debounce desktop rescans to avoid event bursts.
+                if is_desktop_change && is_modify && last_scan.elapsed() > Duration::from_millis(500) {
                     last_scan = std::time::Instant::now();
-                    // Brief delay to let the fs settle
-                    std::thread::sleep(Duration::from_millis(200));
 
                     let new_apps = scan_desktop_entries();
                     log::info!("Desktop entries re-scanned: {} apps", new_apps.len());
@@ -360,6 +362,7 @@ pub fn watch_desktop_entries(app_handle: tauri::AppHandle) {
                             *apps = new_apps;
                         }
                     }
+                    let _ = app_handle.emit("apps-changed", ());
                 }
             }
             Err(e) => {

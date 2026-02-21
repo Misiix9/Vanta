@@ -19,6 +19,7 @@
 
     let loadFailed = $state(false);
     let iconUrl = $derived(result.icon ? convertFileSrc(result.icon) : "");
+    let safeInlineSvgUrl = $derived(svgToDataUri(result.icon));
 
     /**
      * Highlight matching characters in the title based on match_indices.
@@ -55,10 +56,27 @@
         );
         loadFailed = true;
     }
+
+    function isTrustedInlineSvg(icon: string | null | undefined): boolean {
+        if (!icon) return false;
+        const trimmed = icon.trim().toLowerCase();
+        return (
+            trimmed.startsWith("<svg") &&
+            !trimmed.includes("<script") &&
+            !trimmed.includes("onload=") &&
+            !trimmed.includes("onerror=") &&
+            !trimmed.includes("javascript:")
+        );
+    }
+
+    function svgToDataUri(icon: string | null | undefined): string {
+        if (!isTrustedInlineSvg(icon)) return "";
+        return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(icon!.trim())}`;
+    }
 </script>
 
 <button
-    class="result-item result-item"
+    class="result-item"
     class:selected={isSelected}
     onmouseenter={() => onSelect(index)}
     onclick={() => onActivate(result)}
@@ -71,10 +89,8 @@
             <span class="icon-emoji">🧮</span>
         {:else if typeof result.source === "object" && "Script" in result.source}
             <span class="icon-emoji">⚡</span>
-        {:else if result.icon && result.icon.startsWith("<svg")}
-            <div class="icon-svg">
-                {@html result.icon}
-            </div>
+        {:else if safeInlineSvgUrl}
+            <img src={safeInlineSvgUrl} alt={result.title} class="icon-img" />
         {:else if result.icon && (result.icon === "dir" || result.icon.startsWith("file"))}
             <FileIcon type={result.icon} />
         {:else if result.icon && !loadFailed}

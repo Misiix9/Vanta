@@ -5,32 +5,56 @@
 }
 
 @import url('https://fonts.cdnfonts.com/css/sn-pro');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600&display=swap');
 
 /* ================================================================
-   Vanta — Liquid Glass Design System
+   Vanta — Default Theme  ·  Black & Purple
    ================================================================ */
 
-/* Typography: SN Pro (CDN) & Inter (Fallback) */
-
 :root {
-    /* Monochrome Palette */
+    /* Palette */
+    --bg: #000000;
+    --surface: #0c0c0c;
+    --surface-hover: rgba(123, 53, 240, 0.07);
+    --text-primary: #ebebeb;
+    --text-secondary: #555555;
+    --text-tertiary: #3a3a3a;
+
+    /* Purple System */
+    --purple: #7B35F0;
+    --purple-bright: #9B5FF8;
+    --purple-dim: rgba(123, 53, 240, 0.50);
+    --purple-faint: rgba(123, 53, 240, 0.12);
+    --purple-ghost: rgba(123, 53, 240, 0.06);
+
+    /* Borders */
+    --border-window: rgba(123, 53, 240, 0.20);
+    --border-separator: rgba(255, 255, 255, 0.05);
+
+    /* Legacy aliases for settings/misc components */
     --vanta-bg: #000000;
-    --vanta-text: #F5F5F5;
-    --vanta-text-dim: #888888;
-    --vanta-accent: #FFFFFF;
-    --result-item-bg: #0A0A0A;
+    --vanta-text: #ebebeb;
+    --vanta-text-dim: #555555;
+    --vanta-accent: #7B35F0;
+    --vanta-purple: #7B35F0;
+    --vanta-purple-bright: #9B5FF8;
+    --vanta-surface: #0c0c0c;
+    --vanta-border: rgba(123, 53, 240, 0.14);
+    --result-item-bg: rgba(123, 53, 240, 0.07);
 
-    /* Materials */
-    --vanta-blur: 40px;
-    --vanta-radius: 24px;
-    --vanta-opacity: 0.85;
+    /* Shape */
+    --radius: 12px;
+    --radius-item: 9px;
+    --radius-icon: 8px;
 
-    /* Layout */
-    --window-padding: 20px;
+    /* Timing */
+    --t-fast: 200ms;
+    --t-med: 300ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-std: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Global Reset */
+/* ── Reset ─────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -45,72 +69,114 @@ body {
     height: 100%;
     overflow: hidden;
     background: transparent;
-    font-family: 'SN Pro', 'Inter', sans-serif;
-    color: var(--vanta-text);
+    font-family: 'SN Pro', 'Inter', system-ui, sans-serif;
+    color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
 }
 
-/* The physical window container (includes padding for shadows) */
+/* ── Scrollbar Kill ─────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+}
+
+::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+}
+
+/* ── Window Shell ───────────────────────────────────────────── */
+.vanta-root {
+    width: 100vw;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    overflow: hidden;
+    background: var(--bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--border-window);
+    position: relative;
+    animation: snapIn var(--t-fast) var(--ease-out) both;
+}
+
+/* Top-edge purple shimmer — the signature detail */
+.vanta-root::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 55%;
+    height: 1px;
+    background: linear-gradient(to right,
+            transparent,
+            rgba(123, 53, 240, 0.8) 30%,
+            rgba(155, 95, 248, 0.9) 50%,
+            rgba(123, 53, 240, 0.8) 70%,
+            transparent);
+    z-index: 2;
+    pointer-events: none;
+    border-radius: 0 0 4px 4px;
+}
+
+/* Subtle purple ambient breath at the top */
+.vanta-root::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70%;
+    height: 80px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(123, 53, 240, 0.08) 0%, transparent 70%);
+    z-index: 0;
+    pointer-events: none;
+}
+
+.vanta-root.css-blur {
+    backdrop-filter: blur(60px) saturate(180%);
+    -webkit-backdrop-filter: blur(60px) saturate(180%);
+}
+
+/* Legacy wrapper compatibility */
 .vanta-window {
     width: 100%;
     height: 100%;
-    padding: var(--window-padding);
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
 }
 
-/* The visible glass shell */
 .vanta-glass {
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     position: relative;
-
-    /* Material */
-    background: rgba(0, 0, 0, var(--vanta-opacity));
-    backdrop-filter: blur(var(--vanta-blur));
-    -webkit-backdrop-filter: blur(var(--vanta-blur));
-
-    /* Shape */
-    border-radius: var(--vanta-radius);
-    border: none;
-    /* Explicitly requested: border: none */
-
-    /* Deep Shadow (Inner Container Strategy) */
-    box-shadow:
-        0 25px 50px -12px rgba(0, 0, 0, 0.5),
-        /* Deep drop shadow */
-        0 0 0 1px rgba(255, 255, 255, 0.03) inset;
-    /* Subtle inner highlight ring */
-
+    background: var(--bg);
+    border-radius: var(--radius);
     overflow: hidden;
-    /* Clip content to squircle */
-
-    /* Open Animation */
-    animation: growCenter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    opacity: 0;
-    /* Starts invisible */
 }
 
-/* Keyframes */
-@keyframes growCenter {
-    0% {
+@keyframes snapIn {
+    from {
         opacity: 0;
-        transform: scale(0.95);
+        transform: scale(0.96) translateY(4px);
     }
 
-    100% {
+    to {
         opacity: 1;
-        transform: scale(1.0);
+        transform: scale(1) translateY(0);
     }
 }
 
 @keyframes fadeInUp {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(6px);
     }
 
     to {
@@ -119,187 +185,428 @@ body {
     }
 }
 
-/* Global Scrollbar Reset */
-::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── Search Bar ─────────────────────────────────────────────── */
+.search-bar {
+    width: 100%;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    /* Minimal padding so input spans edge to edge */
+    padding: 5px 0px 10px 0px;
+    /* Single hairline separator from results */
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.vanta-input-wrap {
+    flex: 1;
+    width: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.vanta-input {
+    width: 100% !important;
+    margin-right: 10px !important;
+    margin-left: 10px !important;
     background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    font-family: 'SN Pro', 'Inter', system-ui, sans-serif;
+    font-size: 28px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.3px;
+    color: var(--text-primary);
+    caret-color: var(--purple-bright);
+    text-align: left !important;
+    direction: ltr !important;
 }
 
-html,
-body {
-    scrollbar-width: none !important;
-    /* Firefox */
-    -ms-overflow-style: none !important;
-    /* IE */
+/* Hide native caret when input is empty — fake caret takes over */
+.vanta-input.empty {
+    caret-color: transparent;
 }
 
-/* Ensure no scrollbars interfere with our custom solution */
-.results-container,
-[role="listbox"] {
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
+/* Smooth slow blinking fake caret shown only when query is empty */
+.vanta-caret {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 26px;
+    border-radius: 2px;
+    background: var(--purple-bright);
+    pointer-events: none;
+    animation: caretPulse 1.8s ease-in-out infinite;
 }
 
-.results-container::-webkit-scrollbar,
-[role="listbox"]::-webkit-scrollbar {
-    display: none !important;
+@keyframes caretPulse {
+    0% {
+        opacity: 1;
+    }
+
+    40% {
+        opacity: 1;
+    }
+
+    60% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 0;
+    }
 }
 
-/* --- EXTRACTED COMPONENT STYLES --- */
+.vanta-input::placeholder {
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
 
-/* From src/routes/+page.svelte */
+.clear-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity var(--t-med) var(--ease-std), background var(--t-fast);
+}
 
-.vanta-root {
-    width: 100vw;
-    height: 100vh;
-    display: grid;
-    grid-template-rows: auto 1fr auto;
+.search-bar:focus-within .clear-btn {
+    opacity: 0.6;
+}
+
+.clear-btn:hover {
+    opacity: 1 !important;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Results Wrapper ────────────────────────────────────────── */
+.results-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
-}
-
-.vanta-root.css-blur {
-    backdrop-filter: blur(var(--vanta-blur));
-    -webkit-backdrop-filter: blur(var(--vanta-blur));
+    min-height: 0;
+    height: 100%;
 }
 
 .results-container {
-    flex: 1;
+    padding: 6px 6px;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 4px 8px;
-}
-
-.empty-state {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 40px 20px;
-    color: var(--vanta-text-dim);
-    font-size: 14px;
+    gap: 1px;
+    scroll-behavior: smooth;
+    flex: 1;
+    height: 100%;
 }
 
-.empty-icon {
-    font-size: 28px;
-    opacity: 0.5;
-}
-
-
-/* From src/lib/components/ScriptResultItem.svelte */
-
-.script-item {
+/* ── Result Item ────────────────────────────────────────────── */
+.result-item {
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 12px 16px;
+    gap: 12px;
+    padding: 9px 12px 9px 10px;
     width: 100%;
     text-align: left;
-
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 12px;
-
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: var(--radius-item);
+    transition:
+        background var(--t-fast) var(--ease-std),
+        box-shadow var(--t-fast) var(--ease-std),
+        transform var(--t-fast) var(--ease-std),
+        border-color var(--t-fast) var(--ease-std);
     cursor: pointer;
     position: relative;
     overflow: visible;
 }
 
-.script-item.selected,
-.script-item:hover {
-    background: var(--result-item-bg);
-    transform: scale(1.02) translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+/* The left accent rail that appears on selection */
+.result-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 20%;
+    bottom: 20%;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--purple);
+    opacity: 0;
+    transition: opacity var(--t-fast) var(--ease-std);
+}
+
+.result-item.selected,
+.result-item:hover {
+    background: var(--surface-hover);
+    border-color: rgba(123, 53, 240, 0.22);
+    box-shadow:
+        0 0 0 0px transparent,
+        0 2px 12px rgba(123, 53, 240, 0.10);
+    transform: translateY(-1px);
     z-index: 10;
 }
 
-.script-item.urgency-critical {
-    border-left: 2px solid #ff4757;
+.result-item.selected::before,
+.result-item:hover::before {
+    opacity: 1;
 }
 
-.script-item.urgency-low {
-    opacity: 0.65;
-}
-
-.script-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+/* ── Item Icon ──────────────────────────────────────────────── */
+.item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-icon);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-
-    background: rgba(255,
-            255,
-            255,
-            0.1) !important;
-    /* Force monochrome bg */
-    box-shadow: none;
-
-    /* Monochrome Icon filter */
-    filter: grayscale(100%) brightness(200%);
+    font-size: 16px;
+    font-weight: 600;
+    overflow: hidden;
+    /* Subtle neutral container — lets colored icons breathe */
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.icon-glyph {
-    font-size: 18px;
-    filter: none;
-    color: #fff;
+.icon-emoji {
+    font-size: 20px;
+    line-height: 1;
 }
 
+.icon-number {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.icon-fallback {
+    opacity: 0.35;
+}
+
+.icon-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: calc(var(--radius-icon) - 1px);
+}
+
+.icon-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.icon-svg :global(svg) {
+    width: 100%;
+    height: 100%;
+    color: var(--text-primary);
+    opacity: 0.75;
+}
+
+/* FileIcon */
+.file-icon {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    opacity: 0.7;
+}
+
+.file-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ── Item Content ───────────────────────────────────────────── */
 .item-content {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    gap: 1px;
 }
 
 .item-title {
-    font-size: 15px;
-    font-weight: 400;
-    color: var(--vanta-text);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.1px;
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: flex;
-    align-items: center;
-    gap: 8px;
 }
 
-.script-badge {
-    font-size: 9px;
+.item-title :global(.match-highlight) {
+    color: var(--purple-bright);
     font-weight: 700;
-    letter-spacing: 0.5px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.15);
-    color: #fff;
-    border: none;
-    flex-shrink: 0;
 }
 
 .item-subtitle {
-    font-size: 12px;
-    color: var(--vanta-text-dim);
+    font-size: 11.5px;
+    font-weight: 400;
+    color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-top: 2px;
-    font-weight: 300;
+}
+
+/* ── Action Hint ────────────────────────────────────────────── */
+.item-action-hint {
+    flex-shrink: 0;
+    opacity: 0;
+    transform: translateX(6px);
+    transition:
+        opacity var(--t-med) var(--ease-std),
+        transform var(--t-med) var(--ease-std);
+}
+
+.result-item.selected .item-action-hint,
+.result-item:hover .item-action-hint {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.item-action-hint kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 20px;
+    padding: 0 5px;
+    background: var(--purple-faint);
+    border: 1px solid var(--purple-dim);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--purple-bright);
+    font-family: inherit;
+    letter-spacing: 0.3px;
+}
+
+/* ── Script Result Item ─────────────────────────────────────── */
+.script-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px 9px 10px;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-item);
+    transition:
+        background var(--t-fast) var(--ease-std),
+        box-shadow var(--t-fast) var(--ease-std),
+        transform var(--t-fast) var(--ease-std),
+        border-color var(--t-fast) var(--ease-std);
+    cursor: pointer;
+    position: relative;
+    overflow: visible;
+}
+
+.script-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 20%;
+    bottom: 20%;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--purple);
+    opacity: 0;
+    transition: opacity var(--t-fast) var(--ease-std);
+}
+
+.script-item.selected,
+.script-item:hover {
+    background: var(--surface-hover);
+    border-color: rgba(123, 53, 240, 0.22);
+    box-shadow: 0 2px 12px rgba(123, 53, 240, 0.10);
+    transform: translateY(-1px);
+    z-index: 10;
+}
+
+.script-item.selected::before,
+.script-item:hover::before {
+    opacity: 1;
+}
+
+.script-item.urgency-critical {
+    border-left: 2px solid rgba(255, 71, 87, 0.7) !important;
+}
+
+.script-item.urgency-low {
+    opacity: 0.55;
+}
+
+/* Script icon — uses colorful inline bg from JS hash */
+.script-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-icon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    /* Background color set inline by Svelte; no !important here */
+    border: none;
+}
+
+.icon-glyph {
+    font-size: 16px;
+    filter: none;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.script-badge {
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--purple-faint);
+    color: var(--purple-bright);
+    border: 1px solid rgba(123, 53, 240, 0.25);
+    flex-shrink: 0;
+    line-height: 1.6;
 }
 
 .item-meta {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
-    opacity: 0.7;
-    transition: opacity 0.2s ease;
+    opacity: 0.6;
+    transition: opacity var(--t-med) var(--ease-std);
 }
 
 .script-item.selected .item-meta {
@@ -309,132 +616,202 @@ body {
 .item-badge {
     font-size: 10px;
     font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--vanta-text-dim);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1px 7px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .action-hint {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    padding: 0 5px;
+    background: var(--purple-faint);
+    border: 1px solid var(--purple-dim);
+    border-bottom-width: 2px;
     border-radius: 4px;
-    padding: 2px 6px;
     font-size: 11px;
-    color: var(--vanta-text);
+    font-weight: 600;
+    color: var(--purple-bright);
     font-family: inherit;
 }
 
-
-/* From src/lib/components/SearchInput.svelte */
-
-.search-bar {
-    width: 100%;
-    padding: 24px 24px 12px 24px;
-    position: relative;
+/* ── Empty State ────────────────────────────────────────────── */
+.empty-state {
     display: flex;
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 36px 20px;
+    color: var(--text-secondary);
+    font-size: 13px;
 }
 
-.vanta-input {
-    width: 100%;
-    background: transparent;
-    border: none;
-    outline: none;
-
-    /* Typography */
-    font-family: "SN Pro", "Inter", sans-serif;
+.empty-icon {
     font-size: 24px;
-    font-weight: 700;
-    color: var(--vanta-text);
-
-    /* Custom Caret */
-    caret-color: var(--vanta-accent);
-}
-
-.vanta-input::placeholder {
-    color: var(--vanta-text-dim);
     opacity: 0.3;
 }
 
-/* Clear button - Keep it, but minimal */
-.clear-btn {
-    background: none;
-    border: none;
-    color: var(--vanta-text-dim);
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s ease;
+.empty-text {
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    opacity: 0.45;
 }
 
-.search-bar:hover .clear-btn,
-.vanta-input:focus+.clear-btn {
+/* ── Custom Scrollbar ───────────────────────────────────────── */
+.custom-scrollbar-track {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    right: 3px;
+    width: 8px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.custom-scrollbar-thumb {
+    width: 3px;
+    margin: 0 auto;
+    background: rgba(123, 53, 240, 0.35);
+    border-radius: 9999px;
+    transition:
+        opacity 0.3s ease,
+        background 0.15s ease;
+}
+
+.custom-scrollbar-thumb:hover {
+    background: rgba(123, 53, 240, 0.6);
+}
+
+/* ── Status Bar ─────────────────────────────────────────────── */
+.status-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    padding: 0px 14px;
+    height: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 11px;
+    position: relative;
+    z-index: 1;
+}
+
+.status-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-self: end;
+}
+
+.status-version {
+    color: var(--text-secondary);
+    font-size: 9px;
+    font-weight: 500;
     opacity: 0.5;
+    letter-spacing: 0.3px;
 }
 
-.clear-btn:hover {
-    opacity: 1 !important;
-    background: rgba(255, 255, 255, 0.1);
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--purple-faint);
+    border: 1px solid rgba(123, 53, 240, 0.22);
+    color: var(--purple-bright);
+    padding: 0px 6px;
+    border-radius: 100px;
+    font-weight: 700;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
 }
 
+.status-badge-logo {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    object-fit: contain;
+    display: block;
+}
 
-/* From src/lib/components/FileIcon.svelte */
+.status-info {
+    color: var(--text-secondary);
+    opacity: 0.5;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.1px;
+}
 
-.file-icon {
-    width: 100%;
-    height: 100%;
+.status-download {
     display: flex;
     align-items: center;
-    justify-content: center;
-    color: var(--vanta-text);
-    opacity: 0.8;
+    gap: 5px;
+    font-weight: 500;
+    font-size: 11px;
+    margin-right: 6px;
 }
 
-svg {
-    width: 24px;
-    height: 24px;
+.status-download.success {
+    color: #22c55e;
 }
 
+.status-download.failed {
+    color: #ef4444;
+}
 
-/* From src/lib/components/SettingsView.svelte */
+.spinner {
+    width: 9px;
+    height: 9px;
+    border: 1.5px solid var(--text-secondary);
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
 
+/* ── Settings Panel ─────────────────────────────────────────── */
 .settings-panel {
-    padding: 24px;
+    padding: 20px 24px;
     height: 100%;
     max-height: 100vh;
     grid-row: 1 / -1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    color: var(--vanta-text);
+    color: var(--text-primary);
 }
 
 header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 }
 
 h2 {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 600;
+    letter-spacing: -0.2px;
     margin: 0;
 }
 
 h3 {
-    font-size: 14px;
+    font-size: 10.5px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--vanta-text-dim);
-    margin: 24px 0 12px 0;
-    border-bottom: 1px solid var(--vanta-border);
+    letter-spacing: 0.8px;
+    color: var(--text-secondary);
+    margin: 20px 0 10px 0;
+    border-bottom: 1px solid var(--border-separator);
     padding-bottom: 8px;
 }
 
@@ -442,85 +819,92 @@ h3 {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding-right: 8px;
+    padding-right: 6px;
+    scrollbar-width: none;
 }
 
-/* Hide scrollbar in settings too */
 .sections::-webkit-scrollbar {
     display: none;
-}
-
-.sections {
-    scrollbar-width: none;
 }
 
 .control-group {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 14px;
 }
 
 label {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 14px;
+    font-size: 13px;
+    color: var(--text-primary);
 }
 
 input[type="text"],
 input[type="number"] {
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--vanta-border);
-    color: var(--vanta-text);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
     padding: 4px 8px;
     border-radius: 6px;
     width: 150px;
     text-align: right;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color var(--t-fast);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus {
+    border-color: rgba(123, 53, 240, 0.4);
 }
 
 .vanta-select {
-    background: var(--vanta-bg);
-    /* Black background */
-    border: 1px solid var(--vanta-border);
-    color: var(--vanta-text);
+    background: var(--bg);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
     padding: 4px 8px;
     border-radius: 6px;
     width: 150px;
-    text-align: left;
+    font-family: inherit;
+    font-size: 13px;
     color-scheme: dark;
-    /* Force dark mode dropdown rendering */
+    outline: none;
 }
 
 .vanta-select option {
-    background: var(--vanta-bg);
-    color: var(--vanta-text);
+    background: #111;
+    color: var(--text-primary);
 }
 
 input[type="checkbox"] {
     appearance: none;
-    width: 18px;
-    height: 18px;
-    border: 2px solid rgba(255, 255, 255, 0.4);
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
     border-radius: 4px;
     background: transparent;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    transition: all var(--t-fast);
+    flex-shrink: 0;
 }
 
 input[type="checkbox"]:checked {
-    background: var(--vanta-accent);
-    border-color: var(--vanta-accent);
+    background: var(--purple);
+    border-color: var(--purple);
 }
 
 input[type="checkbox"]:checked::after {
     content: "✓";
-    color: var(--vanta-bg);
-    font-size: 14px;
-    font-weight: bold;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
 }
 
 input[type="color"] {
@@ -533,311 +917,23 @@ input[type="color"] {
 
 input[type="range"] {
     width: 150px;
-    accent-color: var(--vanta-accent);
+    accent-color: var(--purple);
 }
 
 .close-btn {
-    background: var(--vanta-surface);
-    border: 1px solid var(--vanta-border);
-    color: var(--vanta-text);
-    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    padding: 5px 12px;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 13px;
-    transition: all 0.2s;
+    font-size: 12.5px;
+    font-family: inherit;
+    transition: all var(--t-fast) var(--ease-std);
 }
 
 .close-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: var(--vanta-accent);
-}
-
-
-/* From src/lib/components/StatusBar.svelte */
-
-.status-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 16px;
-    border-top: 1px solid var(--vanta-border);
-    font-size: 11px;
-}
-
-.status-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.status-badge {
-    background: var(--vanta-accent);
-    color: white;
-    padding: 1px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.status-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.status-info {
-    color: var(--vanta-text-dim);
-    opacity: 0.6;
-}
-
-.status-download {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 500;
-    margin-right: 8px;
-}
-
-.status-download.success {
-    color: #10b981;
-}
-
-.status-download.failed {
-    color: #ef4444;
-}
-
-.spinner {
-    width: 10px;
-    height: 10px;
-    border: 2px solid var(--vanta-text-dim);
-    border-right-color: transparent;
-    border-radius: 50%;
-    animation: spin 0.75s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-
-/* From src/lib/components/ResultItem.svelte */
-
-.result-item {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 12px 16px;
-    width: 100%;
-    text-align: left;
-
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 12px;
-    /* Inner radius */
-
-    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: pointer;
-    position: relative;
-    overflow: visible;
-    /* Allow shadow/scale to spill */
-}
-
-/* Selected State: Card "Float" */
-.result-item.selected,
-.result-item:hover {
-    background: var(--result-item-bg);
-    transform: scale(1.02) translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    z-index: 10;
-}
-
-.item-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-weight: 600;
-    font-size: 16px;
-}
-
-.icon-emoji {
-    font-size: 24px;
-    line-height: 1;
-}
-
-.icon-number {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--vanta-text-dim);
-    font-variant-numeric: tabular-nums;
-    opacity: 0.8;
-}
-
-.icon-fallback {
-    opacity: 0.5;
-}
-
-.icon-img,
-.icon-svg {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-
-.icon-svg :global(svg) {
-    width: 100%;
-    height: 100%;
-    color: var(--vanta-text);
-    opacity: 0.8;
-}
-
-.item-content {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-
-.item-title {
-    font-size: 15px;
-    font-weight: 400;
-    /* Thin/Regular as requested */
-    color: var(--vanta-text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.item-title :global(.match-highlight) {
-    color: var(--vanta-accent);
-    font-weight: 600;
-}
-
-.item-subtitle {
-    font-size: 12px;
-    color: var(--vanta-text-dim);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 2px;
-    font-weight: 300;
-}
-
-.item-action-hint {
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    opacity: 0;
-    transform: translateX(10px);
-    transition: all 0.2s ease;
-}
-
-.result-item.selected .item-action-hint {
-    opacity: 1;
-    transform: translateX(0);
-}
-
-.item-action-hint kbd {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    border-radius: 4px;
-    padding: 2px 6px;
-    font-size: 11px;
-    color: var(--vanta-text);
-    font-family: inherit;
-}
-
-
-/* From src/lib/components/ResultsList.svelte */
-
-.results-wrapper {
-    position: relative;
-    width: 100%;
-    /* Ensure height matches container max-height logic roughly so wrapper contains flex */
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    /* Hide anything leaking */
-}
-
-.results-container {
-    padding: 6px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    max-height: calc(420px - 70px - 36px);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    position: relative;
-    scroll-behavior: smooth;
-
-    /* Force hide implementation detail of scrollbar */
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
-}
-
-.results-container::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
-    background: transparent !important;
-}
-
-/* Custom Scrollbar Styles */
-.custom-scrollbar-track {
-    position: absolute;
-    top: 6px;
-    /* Match padding */
-    bottom: 6px;
-    right: 4px;
-    /* Padding from edge */
-    width: 10px;
-    /* Thicker track area */
-    pointer-events: none;
-    z-index: 10;
-}
-
-.custom-scrollbar-thumb {
-    width: 100%;
-    /* Dark semi-transparent thumb for stealth look */
-    background: rgba(0, 0, 0, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 9999px;
-    transition:
-        opacity 0.3s ease,
-        transform 0.1s linear,
-        background-color 0.2s;
-}
-
-.custom-scrollbar-thumb:hover {
-    background: rgba(0, 0, 0, 0.8);
-    border-color: rgba(255, 255, 255, 0.2);
-}
-
-.empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 40px 20px;
-    gap: 12px;
-}
-
-.empty-icon {
-    color: var(--vanta-text-dim);
-}
-
-.empty-text {
-    color: var(--vanta-text-dim);
-    font-size: 13px;
-    opacity: 0.5;
+    background: var(--purple-ghost);
+    border-color: rgba(123, 53, 240, 0.35);
+    color: var(--purple-bright);
 }

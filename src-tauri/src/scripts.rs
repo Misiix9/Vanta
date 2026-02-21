@@ -196,7 +196,9 @@ pub fn execute_script(keyword: &str, args: &str, timeout_ms: u64) -> Result<Scri
     // Build the command
     let mut cmd = Command::new(&script_path);
     if !args.is_empty() {
-        for arg in args.split_whitespace() {
+        let parsed_args = shell_words::split(args)
+            .map_err(|e| format!("Invalid script args for '{}': {}", keyword, e))?;
+        for arg in parsed_args {
             cmd.arg(arg);
         }
     }
@@ -208,6 +210,23 @@ pub fn execute_script(keyword: &str, args: &str, timeout_ms: u64) -> Result<Scri
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to execute script '{}': {}", keyword, e))?;
+
+    // Drain stdout/stderr concurrently to avoid child blocking on full pipes.
+    let stdout_reader = child.stdout.take().map(|mut s| {
+        std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = std::io::Read::take(&mut s, 1_048_576).read_to_end(&mut buf);
+            buf
+        })
+    });
+
+    let stderr_reader = child.stderr.take().map(|mut s| {
+        std::thread::spawn(move || {
+            let mut buf = Vec::new();
+            let _ = std::io::Read::take(&mut s, 1_048_576).read_to_end(&mut buf);
+            buf
+        })
+    });
 
     // Wait with timeout
     let timeout = Duration::from_millis(timeout_ms);
@@ -229,17 +248,17 @@ pub fn execute_script(keyword: &str, args: &str, timeout_ms: u64) -> Result<Scri
         }
     };
 
-    if !status.success() {
-        let stderr = child
-            .stderr
-            .take()
-            .map(|mut s| {
-                let mut buf = String::new();
-                std::io::Read::read_to_string(&mut s, &mut buf).ok();
-                buf
-            })
-            .unwrap_or_default();
+    let stdout = stdout_reader
+        .and_then(|h| h.join().ok())
+        .map(|buf| String::from_utf8_lossy(&buf).to_string())
+        .unwrap_or_default();
 
+    let stderr = stderr_reader
+        .and_then(|h| h.join().ok())
+        .map(|buf| String::from_utf8_lossy(&buf).to_string())
+        .unwrap_or_default();
+
+    if !status.success() {
         let msg = if stderr.is_empty() {
             format!("Script '{}' exited with code {:?}", keyword, status.code())
         } else {
@@ -251,20 +270,6 @@ pub fn execute_script(keyword: &str, args: &str, timeout_ms: u64) -> Result<Scri
         };
         return Err(msg);
     }
-
-    // Capture stdout (capped to prevent memory issues)
-    let stdout = child
-        .stdout
-        .take()
-        .map(|mut s| {
-            let mut buf = Vec::new();
-            let max_bytes = 1_048_576; // 1MB cap
-            std::io::Read::take(&mut s, max_bytes)
-                .read_to_end(&mut buf)
-                .ok();
-            String::from_utf8_lossy(&buf).to_string()
-        })
-        .unwrap_or_default();
 
     if stdout.trim().is_empty() {
         return Err(format!("Script '{}' produced no output", keyword));
@@ -348,7 +353,7 @@ pub fn watch_scripts(app_handle: tauri::AppHandle) {
 
     log::info!("Watching scripts directory: {}", dir.display());
 
-    let mut last_scan = std::time::Instant::now();
+    let mut last_scan = std::time::Instant::now() - Duration::from_millis(600);
 
     for event in rx {
         match event {
@@ -358,10 +363,9 @@ pub fn watch_scripts(app_handle: tauri::AppHandle) {
                     EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_)
                 );
 
-                // Debounce: max once per 2 seconds
-                if is_modify && last_scan.elapsed() > Duration::from_secs(2) {
+                // Debounce: coalesce event bursts while keeping updates responsive.
+                if is_modify && last_scan.elapsed() > Duration::from_millis(600) {
                     last_scan = std::time::Instant::now();
-                    std::thread::sleep(Duration::from_millis(200));
 
                     let scripts = scan_scripts();
                     log::info!("Scripts re-scanned: {} scripts", scripts.len());

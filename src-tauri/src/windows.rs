@@ -1,5 +1,7 @@
 use serde::Deserialize;
 use std::process::Command;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WindowEntry {
@@ -43,7 +45,7 @@ struct SwayWindowProperties {
 }
 
 /// Detects the running environment and lists open windows.
-pub fn list_windows() -> Vec<WindowEntry> {
+fn list_windows_uncached() -> Vec<WindowEntry> {
     // 1. Try Hyprland
     if let Ok(output) = Command::new("hyprctl").arg("clients").arg("-j").output() {
         if output.status.success() {
@@ -75,6 +77,35 @@ pub fn list_windows() -> Vec<WindowEntry> {
 
     // Default: Return empty if neither is found
     Vec::new()
+}
+
+struct WindowsCache {
+    updated_at: Instant,
+    entries: Vec<WindowEntry>,
+}
+
+static WINDOWS_CACHE: OnceLock<Mutex<WindowsCache>> = OnceLock::new();
+
+/// Cached window list for faster search. Cache TTL is short to keep UX fresh.
+pub fn list_windows() -> Vec<WindowEntry> {
+    const TTL: Duration = Duration::from_millis(400);
+
+    let cache = WINDOWS_CACHE.get_or_init(|| {
+        Mutex::new(WindowsCache {
+            updated_at: Instant::now() - TTL,
+            entries: Vec::new(),
+        })
+    });
+
+    if let Ok(mut guard) = cache.lock() {
+        if guard.updated_at.elapsed() >= TTL {
+            guard.entries = list_windows_uncached();
+            guard.updated_at = Instant::now();
+        }
+        return guard.entries.clone();
+    }
+
+    list_windows_uncached()
 }
 
 fn collect_sway_windows(node: &SwayNode, windows: &mut Vec<WindowEntry>) {

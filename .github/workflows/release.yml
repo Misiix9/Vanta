@@ -69,30 +69,24 @@ jobs:
             src-tauri/target/**/bundle/deb/*.deb
             src-tauri/target/**/bundle/rpm/*.rpm
           draft: true
-          prerelease: true
-          name: Vanta ${{ steps.get_version.outputs.VERSION }} (Pre-release)
+          prerelease: false
+          name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## ⚠️ Pre-release — Proceed with caution
-            This is an early release of the **Ultimate Theme Engine**. The default bundled theme is not fully polished yet. Expect rough edges in the default visual style. Custom themes work correctly — you are encouraged to create your own `.css` file in `~/.config/vanta/themes/` and select it from the Settings screen.
-
-            ---
-
             ## What's New in ${{ steps.get_version.outputs.VERSION }}
 
-            ### Ultimate Theme Engine
-            - **Borderless Transparent Window**: The app window is now fully undecorated and transparent, acting as a pure canvas for CSS-driven designs.
-            - **External CSS Theming**: All visual styles have been moved out of the app binary. Themes live in `~/.config/vanta/themes/*.css` and are loaded at runtime — no rebuilds required.
-            - **Theme Parser**: The Rust backend parses `/* Theme Name: */`, `--vanta-width`, and `--vanta-height` directly from your CSS files, enabling per-theme window sizing.
-            - **Hot-Swap in Settings**: A new **Theme Profile** dropdown in Settings lets you switch themes live without restarting. The window resizes automatically.
-            - **Smart Installer**: The `install` command now routes `.css` files into `~/.config/vanta/themes/` automatically (local paths and remote URLs both work).
-            - **Bundled Default Theme**: A default theme is seeded to `~/.config/vanta/themes/default.css` on first launch so the app always looks correct out of the box.
+            ### ✨ UI Polish & Animations
+            - **Fluid Animations**: Completely rebuilt the CSS transition engine. Navigating search results with arrows or `Tab` now features buttery smooth, sliding accent highlights.
+            - **Smooth View Toggling**: Opening Settings or Clipboard history now uses a silky crossfade transition.
+            - **Refined Status Bar**: Squeezed the bottom status bar to be as thin and unobtrusive as structurally possible. Embedded the Vanta logo directly inside the minimal pill badge.
+            - **Fixed Spacing Bugs**: Matched characters in fuzzy search now render with correct typography tracking instead of awkward flex gaps.
 
-            ### Bug Fixes & Improvements
-            - Fixed settings panel bleed-through: settings and clipboard views now fully cover the launcher.
-            - Fixed Escape in clipboard mode: now closes the window instead of returning to launcher.
-            - Removed TailwindCSS build dependency — the frontend is now a pure unstyled Svelte bundle.
-            - Clipboard history and settings views no longer render the launcher behind them.
+            ### 🚀 Performance & Core Engine
+            - **Unlimited App Browsing**: Removed the hardcoded `max_results` limit when your search query is empty. Vanta now instantly displays every single application on your system ordered by your usage history the moment you open it.
+            - **Tab Navigation Scroll Tracking**: Hitting `Tab` now correctly triggers the auto-scroll observer, ensuring your selected item always stays perfectly in view.
 
+            ### 🎨 Ultimate Theme Engine (v1.8.0 Carry-Over)
+            - Full CSS theming out of `~/.config/vanta/themes/`.
+            - Total transparency and borderless window capabilities.
             ---
 
             ## ⚠️ Known Issues

@@ -47,16 +47,23 @@ pub fn get_installed_themes() -> Result<Vec<ThemeMeta>, String> {
     let dir = get_themes_dir();
     let mut themes = Vec::new();
 
-    let name_regex = Regex::new(r"/\* Theme Name: (.*?) \*/").unwrap();
-    let width_regex = Regex::new(r"--vanta-width:\s*([0-9]+)px").unwrap();
-    let height_regex = Regex::new(r"--vanta-height:\s*([0-9]+)px").unwrap();
+    let name_regex = Regex::new(r"/\* Theme Name: (.*?) \*/")
+        .map_err(|e| format!("Invalid theme name regex: {}", e))?;
+    let width_regex = Regex::new(r"--vanta-width:\s*([0-9]+)px")
+        .map_err(|e| format!("Invalid theme width regex: {}", e))?;
+    let height_regex = Regex::new(r"--vanta-height:\s*([0-9]+)px")
+        .map_err(|e| format!("Invalid theme height regex: {}", e))?;
 
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("css") {
                 if let Ok(content) = fs::read_to_string(&path) {
-                    let id = path.file_stem().unwrap().to_string_lossy().to_string();
+                    let id = path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("theme")
+                        .to_string();
 
                     // Fallbacks
                     let mut name = id.clone();
@@ -64,16 +71,22 @@ pub fn get_installed_themes() -> Result<Vec<ThemeMeta>, String> {
                     let mut height = 420.0;
 
                     if let Some(caps) = name_regex.captures(&content) {
-                        name = caps.get(1).unwrap().as_str().trim().to_string();
+                        if let Some(name_cap) = caps.get(1) {
+                            name = name_cap.as_str().trim().to_string();
+                        }
                     }
                     if let Some(caps) = width_regex.captures(&content) {
-                        if let Ok(w) = caps.get(1).unwrap().as_str().parse::<f64>() {
-                            width = w;
+                        if let Some(width_cap) = caps.get(1) {
+                            if let Ok(w) = width_cap.as_str().parse::<f64>() {
+                                width = w;
+                            }
                         }
                     }
                     if let Some(caps) = height_regex.captures(&content) {
-                        if let Ok(h) = caps.get(1).unwrap().as_str().parse::<f64>() {
-                            height = h;
+                        if let Some(height_cap) = caps.get(1) {
+                            if let Ok(h) = height_cap.as_str().parse::<f64>() {
+                                height = h;
+                            }
                         }
                     }
 
@@ -82,7 +95,7 @@ pub fn get_installed_themes() -> Result<Vec<ThemeMeta>, String> {
                         name,
                         width,
                         height,
-                        css_content: content.clone(),
+                        css_content: content,
                     });
                 }
             }

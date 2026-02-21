@@ -122,6 +122,7 @@ mod tests {
         let config = FilesConfig {
             include_hidden: false,
             max_depth: 2,
+            ..Default::default()
         };
         let index = build_index(&config);
         println!("Indexed {} entries", index.len());

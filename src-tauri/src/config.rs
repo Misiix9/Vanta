@@ -247,15 +247,19 @@ pub fn watch_config(app_handle: tauri::AppHandle) {
 
     log::info!("Watching config at {}", path.display());
 
+    let mut last_emit = std::time::Instant::now() - Duration::from_millis(250);
+
     for event in rx {
         match event {
             Ok(ev) => {
                 let dominated_by_config = ev.paths.iter().any(|p| p.ends_with("config.json"));
                 let is_modify = matches!(ev.kind, EventKind::Modify(_) | EventKind::Create(_));
 
-                if dominated_by_config && is_modify {
-                    // Brief delay to let the file finish writing
-                    std::thread::sleep(Duration::from_millis(100));
+                if dominated_by_config
+                    && is_modify
+                    && last_emit.elapsed() >= Duration::from_millis(250)
+                {
+                    last_emit = std::time::Instant::now();
 
                     match fs::read_to_string(&path) {
                         Ok(contents) => match serde_json::from_str::<VantaConfig>(&contents) {

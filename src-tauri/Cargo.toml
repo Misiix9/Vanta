@@ -1,6 +1,6 @@
 [package]
 name = "vanta"
-version = "1.8.0"
+version = "1.9.0"
 description = "Liquid Glass command palette for Linux"
 authors = ["onxy"]
 edition = "2021"
@@ -35,3 +35,4 @@ walkdir = "2"
 reqwest = { version = "0.12", features = ["blocking", "rustls-tls"], default-features = false }
 zip = "0.6"
 regex = "1"
+shell-words = "1.1"
