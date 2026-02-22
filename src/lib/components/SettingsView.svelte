@@ -19,6 +19,10 @@
     let saveTimeout: any = null;
     let availableApps: { name: string; exec: string }[] = $state([]);
     let diagnostics: SearchDiagnostics | null = $state(null);
+    let includeGlobsText = $state("");
+    let excludeGlobsText = $state("");
+    let allowedExtsText = $state("");
+    let rebuilding = $state(false);
 
     async function loadApps() {
         try {
@@ -81,6 +85,64 @@
         loadApps();
         loadDiagnostics();
     });
+
+    $effect(() => {
+        includeGlobsText = config.files.include_globs.join("\n");
+        excludeGlobsText = config.files.exclude_globs.join("\n");
+        allowedExtsText = config.files.allowed_extensions.join(", ");
+    });
+
+    function parseList(val: string): string[] {
+        return val
+            .split(/[\n,]/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+    }
+
+    function formatIndexedAt(): string {
+        const ts = config.files.indexed_at;
+        if (!ts) return "Not indexed yet";
+        const date = new Date(ts);
+        if (Number.isNaN(date.getTime())) return "Not indexed yet";
+        const diffMs = Date.now() - date.getTime();
+        const mins = Math.max(0, Math.floor(diffMs / 60000));
+        if (mins < 1) return "Indexed just now";
+        if (mins === 1) return "Indexed 1 minute ago";
+        if (mins < 60) return `Indexed ${mins} minutes ago`;
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return `Indexed ${hours} hours ago`;
+        return `Indexed on ${date.toLocaleString()}`;
+    }
+
+    function onIncludeGlobsChange(val: string) {
+        includeGlobsText = val;
+        config.files.include_globs = parseList(val);
+        debouncedSave();
+    }
+
+    function onExcludeGlobsChange(val: string) {
+        excludeGlobsText = val;
+        config.files.exclude_globs = parseList(val);
+        debouncedSave();
+    }
+
+    function onAllowedExtsChange(val: string) {
+        allowedExtsText = val;
+        config.files.allowed_extensions = parseList(val.toLowerCase());
+        debouncedSave();
+    }
+
+    async function rebuildIndex() {
+        rebuilding = true;
+        try {
+            const ts = await invoke<number | null>("rebuild_file_index");
+            config.files.indexed_at = ts ?? null;
+        } catch (e) {
+            console.error("Failed to rebuild file index", e);
+        } finally {
+            rebuilding = false;
+        }
+    }
 
     function handleKeydown(e: KeyboardEvent) {
         if (e.key === "Escape") {
@@ -310,6 +372,57 @@
 
             <div class="control-group">
                 <label>
+                    Include Globs
+                    <textarea
+                        rows="3"
+                        bind:value={includeGlobsText}
+                        oninput={(e) => onIncludeGlobsChange((e.target as HTMLTextAreaElement).value)}
+                        placeholder="e.g. **/*.md"
+                    ></textarea>
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Exclude Globs
+                    <textarea
+                        rows="3"
+                        bind:value={excludeGlobsText}
+                        oninput={(e) => onExcludeGlobsChange((e.target as HTMLTextAreaElement).value)}
+                        placeholder="e.g. **/node_modules/**"
+                    ></textarea>
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Allowed Extensions (comma or newline)
+                    <textarea
+                        rows="2"
+                        bind:value={allowedExtsText}
+                        oninput={(e) => onAllowedExtsChange((e.target as HTMLTextAreaElement).value)}
+                        placeholder="e.g. md, txt, rs"
+                    ></textarea>
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Type Filter
+                    <select
+                        class="vanta-select"
+                        bind:value={config.files.type_filter}
+                        onchange={debouncedSave}
+                    >
+                        <option value="any">Any</option>
+                        <option value="file">Files Only</option>
+                        <option value="dir">Directories Only</option>
+                    </select>
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
                     Default File Manager
                     <select
                         class="vanta-select"
@@ -363,6 +476,13 @@
                         onchange={debouncedSave}
                     />
                 </label>
+            </div>
+
+            <div class="control-group" style="gap: 12px; align-items: center;">
+                <div>{formatIndexedAt()}</div>
+                <button class="link-btn" onclick={rebuildIndex} disabled={rebuilding}>
+                    {rebuilding ? "Rebuilding..." : "Rebuild Index"}
+                </button>
             </div>
         </section>
 

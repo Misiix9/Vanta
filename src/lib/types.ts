@@ -47,6 +47,11 @@ export interface FilesConfig {
     file_manager: string;
     file_editor: string;
     open_docs_in_manager: boolean;
+    include_globs: string[];
+    exclude_globs: string[];
+    allowed_extensions: string[];
+    type_filter: string;
+    indexed_at?: number | null;
 }
 
 export interface SourcePreference {

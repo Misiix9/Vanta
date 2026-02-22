@@ -33,19 +33,19 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_1.12.0_amd64.deb
+sudo dpkg -i vanta_1.13.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-1.12.0-1.x86_64.rpm
+sudo rpm -i vanta-1.13.0-1.x86_64.rpm
 ```
 
 ### AppImage (Universal)
 ```bash
-chmod +x Vanta_1.12.0_amd64.AppImage
-./Vanta_1.12.0_amd64.AppImage
+chmod +x Vanta_1.13.0_amd64.AppImage
+./Vanta_1.13.0_amd64.AppImage
 ```
 
 ---
@@ -56,7 +56,7 @@ chmod +x Vanta_1.12.0_amd64.AppImage
 - **Fully Themeable**: All styles live in `~/.config/vanta/themes/`. Drop in any `.css` file, select it in Settings, and the app resizes and reskins instantly — no restart required.
 - **Scriptable**: Write plugins in Python, Bash, Node.js, or any language. If it outputs JSON, Vanta can run it.
 - **Clipboard History**: Press `Super+V` to open a searchable clipboard history.
-- **File Search**: Search and open files from your home directory.
+- **File Search with filters**: Search your home directory with include/exclude globs, extension allowlist, and type filter (files-only / dirs-only). Manual rebuild button shows index freshness.
 - **Math**: Type an expression like `2^10 + 5` and get the result instantly.
 - **Script Store**: Install community scripts with `install <GitHub-URL>` or `install /path/to/script.sh`.
 - **Borderless Glass Window**: Fully transparent and undecorated window — the OS frame is replaced entirely by your CSS.
@@ -165,6 +165,18 @@ Configuration lives at `~/.config/vanta/config.json`, created automatically on f
     "directory": "~/.config/vanta/scripts",
     "timeout_ms": 5000,
     "strict_json": false
+  },
+  "files": {
+    "include_hidden": false,
+    "max_depth": 3,
+    "file_manager": "default",
+    "file_editor": "default",
+    "open_docs_in_manager": false,
+    "include_globs": [],
+    "exclude_globs": [],
+    "allowed_extensions": [],
+    "type_filter": "any",
+    "indexed_at": null
   }
 }
 ```

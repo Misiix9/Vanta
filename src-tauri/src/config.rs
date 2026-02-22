@@ -76,6 +76,16 @@ pub struct FilesConfig {
     pub file_editor: String,
     #[serde(default)]
     pub open_docs_in_manager: bool,
+    #[serde(default)]
+    pub include_globs: Vec<String>,
+    #[serde(default)]
+    pub exclude_globs: Vec<String>,
+    #[serde(default)]
+    pub allowed_extensions: Vec<String>,
+    #[serde(default = "default_type_filter")]
+    pub type_filter: String, // "any" | "file" | "dir"
+    #[serde(default)]
+    pub indexed_at: Option<u64>, // epoch millis, informational freshness marker
 }
 
 fn default_max_depth() -> usize {
@@ -84,6 +94,10 @@ fn default_max_depth() -> usize {
 
 fn default_opener() -> String {
     "default".to_string()
+}
+
+fn default_type_filter() -> String {
+    "any".to_string()
 }
 
 fn default_theme() -> String {
@@ -98,6 +112,11 @@ impl Default for FilesConfig {
             file_manager: "default".to_string(),
             file_editor: "default".to_string(),
             open_docs_in_manager: false,
+            include_globs: Vec::new(),
+            exclude_globs: Vec::new(),
+            allowed_extensions: Vec::new(),
+            type_filter: default_type_filter(),
+            indexed_at: None,
         }
     }
 }
@@ -182,6 +201,11 @@ impl Default for VantaConfig {
                 file_manager: "default".to_string(),
                 file_editor: "default".to_string(),
                 open_docs_in_manager: false,
+                include_globs: Vec::new(),
+                exclude_globs: Vec::new(),
+                allowed_extensions: Vec::new(),
+                type_filter: default_type_filter(),
+                indexed_at: None,
             },
             search: SearchConfig::default(),
         }
@@ -342,5 +366,40 @@ pub fn watch_config(app_handle: tauri::AppHandle) {
                 log::error!("Config watcher error: {}", e);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn files_config_defaults_and_serde_round_trip() {
+        let cfg = FilesConfig::default();
+
+        assert!(!cfg.include_hidden);
+        assert_eq!(cfg.max_depth, 3);
+        assert_eq!(cfg.file_manager, "default");
+        assert_eq!(cfg.file_editor, "default");
+        assert!(!cfg.open_docs_in_manager);
+        assert!(cfg.include_globs.is_empty());
+        assert!(cfg.exclude_globs.is_empty());
+        assert!(cfg.allowed_extensions.is_empty());
+        assert_eq!(cfg.type_filter, "any");
+        assert!(cfg.indexed_at.is_none());
+
+        let serialized = serde_json::to_string(&cfg).expect("serialize FilesConfig");
+        let deserialized: FilesConfig = serde_json::from_str(&serialized).expect("deserialize FilesConfig");
+
+        assert_eq!(deserialized.include_hidden, cfg.include_hidden);
+        assert_eq!(deserialized.max_depth, cfg.max_depth);
+        assert_eq!(deserialized.file_manager, cfg.file_manager);
+        assert_eq!(deserialized.file_editor, cfg.file_editor);
+        assert_eq!(deserialized.open_docs_in_manager, cfg.open_docs_in_manager);
+        assert_eq!(deserialized.include_globs, cfg.include_globs);
+        assert_eq!(deserialized.exclude_globs, cfg.exclude_globs);
+        assert_eq!(deserialized.allowed_extensions, cfg.allowed_extensions);
+        assert_eq!(deserialized.type_filter, cfg.type_filter);
+        assert_eq!(deserialized.indexed_at, cfg.indexed_at);
     }
 }

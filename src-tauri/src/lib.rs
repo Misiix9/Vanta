@@ -232,13 +232,47 @@ async fn save_config(
     // Re-index in background whenever file settings may have changed
     let index_clone = state.file_index.clone();
     std::thread::spawn(move || {
-        let entries = files::build_index(&new_files_config);
+        let state = files::build_index(&new_files_config);
         if let Ok(mut guard) = index_clone.lock() {
-            *guard = entries;
+            *guard = state;
         }
     });
 
     Ok(())
+}
+
+#[tauri::command]
+async fn rebuild_file_index(
+    state: tauri::State<'_, AppState>,
+) -> Result<Option<u64>, String> {
+    let files_config = {
+        let cfg = state
+            .config
+            .lock()
+            .map_err(|_| "Failed to access config state".to_string())?;
+        cfg.files.clone()
+    };
+
+    let index_state = files::build_index(&files_config);
+
+    {
+        let mut guard = state
+            .file_index
+            .lock()
+            .map_err(|_| "Failed to update file index".to_string())?;
+        *guard = index_state.clone();
+    }
+
+    {
+        let mut cfg = state
+            .config
+            .lock()
+            .map_err(|_| "Failed to update config freshness".to_string())?;
+        cfg.files.indexed_at = index_state.indexed_at;
+        cfg.save()?;
+    }
+
+    Ok(index_state.indexed_at)
 }
 
 #[tauri::command]
@@ -962,7 +996,7 @@ pub fn run() {
     };
 
     // Create an empty file index. Background thread will populate it shortly.
-    let file_index: files::FileIndex = std::sync::Arc::new(Mutex::new(Vec::new()));
+    let file_index: files::FileIndex = std::sync::Arc::new(Mutex::new(files::FileIndexState::default()));
 
     let app_state = AppState {
         apps: Mutex::new(apps),
@@ -1021,6 +1055,7 @@ pub fn run() {
             get_apps,
             themes::get_installed_themes,
             themes::resize_window_for_theme,
+            rebuild_file_index,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
@@ -1160,6 +1195,7 @@ pub fn run() {
             // Build the file index in the background (so startup is instant)
             {
                 let index_clone = app_handle.state::<AppState>().file_index.clone();
+                let handle_for_index = app_handle.clone();
                 let files_config = {
                     let state = app_handle.state::<AppState>();
                     let cfg = match state.config.lock() {
@@ -1170,10 +1206,16 @@ pub fn run() {
                 };
                 std::thread::spawn(move || {
                     log::info!("Building file index...");
-                    let entries = files::build_index(&files_config);
-                    log::info!("File index ready: {} entries", entries.len());
+                    let index_state = files::build_index(&files_config);
+                    log::info!("File index ready: {} entries", index_state.entries.len());
                     if let Ok(mut guard) = index_clone.lock() {
-                        *guard = entries;
+                        *guard = index_state.clone();
+                    }
+                    if let Some(state) = handle_for_index.try_state::<AppState>() {
+                        if let Ok(mut cfg) = state.config.lock() {
+                            cfg.files.indexed_at = index_state.indexed_at;
+                            let _ = cfg.save();
+                        }
                     }
                 });
             }
