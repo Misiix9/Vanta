@@ -72,6 +72,18 @@
   let currentMode: "launcher" | "clipboard" = $state("launcher");
   let clipboardHistory: any[] = [];
 
+  // Keep selection valid when result sets change
+  $effect(() => {
+    const count = isScriptMode ? scriptResults.length : results.length;
+    if (count === 0) {
+      selectedIndex = 0;
+      return;
+    }
+    if (selectedIndex >= count) {
+      selectedIndex = count - 1;
+    }
+  });
+
   onMount(async () => {
     // ... existing onMount code ...
     try {
@@ -329,6 +341,7 @@
   }
 
   async function handleActivate(result: SearchResult) {
+    if (actionInFlight) return;
     actionInFlight = true;
     try {
       if (result.exec.startsWith("fill:")) {
@@ -355,11 +368,12 @@
     } catch (e) {
       console.error("Launch/Copy failed:", e);
     } finally {
-      setTimeout(() => (actionInFlight = false), 200);
+      actionInFlight = false;
     }
   }
 
   async function handleScriptActivate(item: ScriptItem) {
+    if (actionInFlight) return;
     if (!item.action) return;
 
     actionInFlight = true;
@@ -381,7 +395,7 @@
     } catch (e) {
       console.error("Script action failed:", e);
     } finally {
-      setTimeout(() => (actionInFlight = false), 200);
+      actionInFlight = false;
     }
   }
 

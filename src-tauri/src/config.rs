@@ -161,11 +161,21 @@ pub fn load_or_create_default() -> VantaConfig {
                     return config;
                 }
                 Err(e) => {
-                    log::warn!("Invalid config.json, using defaults: {}", e);
+                    log::warn!("Invalid config.json, rewriting defaults: {}", e);
+                    let default_config = VantaConfig::default();
+                    if let Err(write_err) = write_config(&default_config) {
+                        log::error!("Failed to rewrite default config: {}", write_err);
+                    }
+                    return default_config;
                 }
             },
             Err(e) => {
-                log::warn!("Could not read config.json, using defaults: {}", e);
+                log::warn!("Could not read config.json, rewriting defaults: {}", e);
+                let default_config = VantaConfig::default();
+                if let Err(write_err) = write_config(&default_config) {
+                    log::error!("Failed to rewrite default config: {}", write_err);
+                }
+                return default_config;
             }
         }
     }
@@ -185,17 +195,10 @@ pub fn load_or_create_default() -> VantaConfig {
         log::warn!("Could not create scripts directory: {}", e);
     }
 
-    match serde_json::to_string_pretty(&default_config) {
-        Ok(json) => {
-            if let Err(e) = fs::write(&path, &json) {
-                log::error!("Could not write default config: {}", e);
-            } else {
-                log::info!("Created default config at {}", path.display());
-            }
-        }
-        Err(e) => {
-            log::error!("Could not serialize default config: {}", e);
-        }
+    if let Err(e) = write_config(&default_config) {
+        log::error!("Could not write default config: {}", e);
+    } else {
+        log::info!("Created default config at {}", path.display());
     }
 
     default_config
@@ -204,15 +207,19 @@ pub fn load_or_create_default() -> VantaConfig {
 impl VantaConfig {
     /// Save the current configuration to disk.
     pub fn save(&self) -> Result<(), String> {
-        let path = config_path();
-        let json = serde_json::to_string_pretty(self)
-            .map_err(|e| format!("Failed to serialize config: {}", e))?;
-
-        fs::write(&path, json)
-            .map_err(|e| format!("Failed to write config to {}: {}", path.display(), e))?;
-
-        Ok(())
+        write_config(self)
     }
+}
+
+fn write_config(cfg: &VantaConfig) -> Result<(), String> {
+    let path = config_path();
+    let json = serde_json::to_string_pretty(cfg)
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    fs::write(&path, json)
+        .map_err(|e| format!("Failed to write config to {}: {}", path.display(), e))?;
+
+    Ok(())
 }
 pub fn watch_config(app_handle: tauri::AppHandle) {
     use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};

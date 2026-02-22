@@ -1,4 +1,4 @@
-name: Release Vanta v1.0
+name: Release Vanta v1.9.1
 
 on:
   push:
@@ -74,28 +74,12 @@ jobs:
           body: |
             ## What's New in ${{ steps.get_version.outputs.VERSION }}
 
-            ### ✨ UI Polish & Animations
-            - **Fluid Animations**: Completely rebuilt the CSS transition engine. Navigating search results with arrows or `Tab` now features buttery smooth, sliding accent highlights.
-            - **Smooth View Toggling**: Opening Settings or Clipboard history now uses a silky crossfade transition.
-            - **Refined Status Bar**: Squeezed the bottom status bar to be as thin and unobtrusive as structurally possible. Embedded the Vanta logo directly inside the minimal pill badge.
-            - **Fixed Spacing Bugs**: Matched characters in fuzzy search now render with correct typography tracking instead of awkward flex gaps.
+            ### Stability
+            - Added activation guards to prevent double-launch or double-action triggers when actions are already in flight.
+            - Clamped result selection to stay in range when result lists change rapidly.
+            - Improved startup resilience: malformed or unreadable config now rewrites to safe defaults instead of crashing.
 
-            ### 🚀 Performance & Core Engine
-            - **Unlimited App Browsing**: Removed the hardcoded `max_results` limit when your search query is empty. Vanta now instantly displays every single application on your system ordered by your usage history the moment you open it.
-            - **Tab Navigation Scroll Tracking**: Hitting `Tab` now correctly triggers the auto-scroll observer, ensuring your selected item always stays perfectly in view.
-
-            ### 🎨 Ultimate Theme Engine (v1.8.0 Carry-Over)
-            - Full CSS theming out of `~/.config/vanta/themes/`.
-            - Total transparency and borderless window capabilities.
-            ---
-
-            ## ⚠️ Known Issues
-            - The bundled `default.css` is functional but not fully styled — some elements may appear basic or unstyled. This will be addressed in `v1.8.1`.
-            - Theme hot-reload does not force a window re-center if dimensions are unchanged.
-
-            ---
-
-            ## Installation
+            ### Installation
             - **Debian/Ubuntu**: Download `.deb`
             - **Fedora/OpenSUSE**: Download `.rpm`
             - **Universal**: Download and run `.AppImage`
