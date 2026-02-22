@@ -48,12 +48,44 @@ export interface FilesConfig {
     open_docs_in_manager: boolean;
 }
 
+export interface SourcePreference {
+    enabled: boolean;
+    weight: number;
+}
+
+export interface SearchConfig {
+    applications: SourcePreference;
+    windows: SourcePreference;
+    calculator: SourcePreference;
+    files: SourcePreference;
+}
+
 export interface VantaConfig {
     general: GeneralConfig;
     appearance: AppearanceConfig;
     window: WindowConfig;
     scripts: ScriptsConfig;
     files: FilesConfig;
+    search: SearchConfig;
+}
+
+export interface PerfStats {
+    calls: number;
+    total_ms: number;
+    avg_ms: number;
+    max_ms: number;
+}
+
+export interface SearchDiagnostics {
+    search: PerfStats;
+    suggestions: PerfStats;
+    launch: PerfStats;
+}
+
+export interface ResultAction {
+    label: string;
+    exec: string;
+    shortcut?: string;
 }
 
 export interface SearchResult {
@@ -65,6 +97,7 @@ export interface SearchResult {
     match_indices: number[];
     source: ResultSource;
     id?: number | string;
+    actions?: ResultAction[];
 }
 
 export type ResultSource = "Application" | "Calculator" | "Window" | "Clipboard" | "File" | { Script: { keyword: string } };

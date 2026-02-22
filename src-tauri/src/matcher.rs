@@ -14,6 +14,16 @@ pub struct SearchResult {
     pub score: u32,
     pub match_indices: Vec<u32>,
     pub source: ResultSource,
+    #[serde(default)]
+    pub actions: Option<Vec<ActionHint>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ActionHint {
+    pub label: String,
+    pub exec: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shortcut: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -22,6 +32,12 @@ pub enum ResultSource {
     Calculator,
     Window,
     File,
+}
+
+fn apply_weight(score: u32, weight: u32) -> u32 {
+    let clamped = weight.clamp(10, 300);
+    let scaled = (score as u128 * clamped as u128) / 100;
+    scaled.min(u32::MAX as u128) as u32
 }
 
 /// Perform fuzzy search across cached app entries using nucleo-matcher.
@@ -33,6 +49,7 @@ pub fn fuzzy_search(
     apps: &[AppEntry],
     max_results: usize,
     usage_map: &std::collections::HashMap<String, u32>,
+    app_weight: u32,
 ) -> Vec<SearchResult> {
     let start = std::time::Instant::now();
 
@@ -58,9 +75,10 @@ pub fn fuzzy_search(
                 subtitle: app.generic_name.clone().or_else(|| app.comment.clone()),
                 icon: app.icon.clone(),
                 exec: app.exec.clone(),
-                score,
+                score: apply_weight(score, app_weight),
                 match_indices: Vec::new(),
                 source: ResultSource::Application,
+                actions: None,
             })
             .collect();
     }
@@ -134,9 +152,10 @@ pub fn fuzzy_search(
             subtitle: app.generic_name.clone().or_else(|| app.comment.clone()),
             icon: app.icon.clone(),
             exec: app.exec.clone(),
-            score: score,
+            score: apply_weight(score, app_weight),
             match_indices: indices,
             source: ResultSource::Application,
+            actions: None,
         })
         .collect();
 

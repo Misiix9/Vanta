@@ -16,6 +16,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::{Manager, Emitter}; // Added Emitter for .emit()
+use serde::Serialize;
 
 use config::VantaConfig;
 use history::History;
@@ -45,6 +46,45 @@ static SUGGEST_MAX_MS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_CALLS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_TOTAL_MS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_MAX_MS: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Clone, Debug, Serialize)]
+struct PerfStats {
+    calls: u64,
+    total_ms: u64,
+    avg_ms: f64,
+    max_ms: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct SearchDiagnostics {
+    search: PerfStats,
+    suggestions: PerfStats,
+    launch: PerfStats,
+}
+
+fn weighted_score(base: u32, weight: u32) -> u32 {
+    let clamped = weight.clamp(10, 300);
+    let scaled = (base as u128 * clamped as u128) / 100;
+    scaled.min(u32::MAX as u128) as u32
+}
+
+fn snapshot_perf(calls: &AtomicU64, total_ms: &AtomicU64, max_ms: &AtomicU64) -> PerfStats {
+    let calls_val = calls.load(Ordering::Relaxed);
+    let total_val = total_ms.load(Ordering::Relaxed);
+    let max_val = max_ms.load(Ordering::Relaxed);
+    let avg = if calls_val > 0 {
+        total_val as f64 / calls_val as f64
+    } else {
+        0.0
+    };
+
+    PerfStats {
+        calls: calls_val,
+        total_ms: total_val,
+        avg_ms: avg,
+        max_ms: max_val,
+    }
+}
 
 fn record_latency(
     label: &str,
@@ -137,12 +177,12 @@ async fn search(
         .apps
         .lock()
         .map_err(|_| "Failed to access application cache".to_string())?;
-    let (max_results, _files_max_depth, _files_include_hidden) = {
+    let (max_results, search_config) = {
         let config = state
             .config
             .lock()
             .map_err(|_| "Failed to access config".to_string())?;
-        (config.general.max_results, config.files.max_depth, config.files.include_hidden)
+        (config.general.max_results, config.search.clone())
     };
 
     // Get usage history for boosting
@@ -154,15 +194,28 @@ async fn search(
         history.usage.clone()
     };
 
-    let mut results = matcher::fuzzy_search(&query, &apps, max_results, &usage_map);
+    let mut results = if search_config.applications.enabled {
+        matcher::fuzzy_search(
+            &query,
+            &apps,
+            max_results,
+            &usage_map,
+            search_config.applications.weight,
+        )
+    } else {
+        Vec::new()
+    };
 
     // Search Open Windows
     let open_windows = windows::list_windows();
     
     // Perform simple substring match for now (or fuzzy if I want to duplicate logic, but simple is faster for now)
     let query_lower = query.to_lowercase();
-    for win in open_windows {
-        if win.title.to_lowercase().contains(&query_lower) || win.class.to_lowercase().contains(&query_lower) {
+    if search_config.windows.enabled {
+        for win in open_windows {
+            if win.title.to_lowercase().contains(&query_lower)
+                || win.class.to_lowercase().contains(&query_lower)
+            {
              
              // Try to find matching app for icon
              let matched_app = apps.iter().find(|app| {
@@ -191,41 +244,60 @@ async fn search(
 
              let icon = matched_app.and_then(|a| a.icon.clone());
 
-             let win_result = SearchResult {
-                title: win.title,
-                subtitle: Some(format!("Switch to Window (Workspace {})", win.workspace)),
-                icon: icon, // Use matched app icon, or None (will fallback to emoji in frontend)
-                exec: format!("focus:{}", win.address), 
-                score: 1000000, // Very high priority
-                match_indices: vec![],
-                source: matcher::ResultSource::Window,
-            };
-            results.insert(0, win_result);
+                let win_result = SearchResult {
+                    title: win.title,
+                    subtitle: Some(format!("Switch to Window (Workspace {})", win.workspace)),
+                    icon: icon,
+                    exec: format!("focus:{}", win.address),
+                    score: weighted_score(950_000, search_config.windows.weight),
+                    match_indices: vec![],
+                    source: matcher::ResultSource::Window,
+                    actions: None,
+                };
+                results.push(win_result);
+            }
         }
     }
 
     // Check for math
-    if let Some(val) = math::evaluate(&query) {
+    if search_config.calculator.enabled {
+        if let Some(val) = math::evaluate(&query) {
         let val_str = format!("{}", val);
         let calc_result = SearchResult {
             title: format!("= {}", val_str),
             subtitle: Some("Click to Copy".to_string()),
             icon: Some("calculator".to_string()), 
             exec: format!("copy:{}", val_str), 
-            score: 999999, // High priority but below explicit window switch? Or above?
+            score: weighted_score(900_000, search_config.calculator.weight),
             match_indices: vec![],
             source: matcher::ResultSource::Calculator,
+            actions: None,
         };
-        results.insert(0, calc_result);
+        results.push(calc_result);
+        }
     }
 
     // Check for file search - instant in-memory lookup!
     if query.starts_with('/') || query.starts_with("~/") {
+        if !search_config.files.enabled {
+            record_latency(
+                "search",
+                search_start.elapsed(),
+                &SEARCH_CALLS,
+                &SEARCH_TOTAL_MS,
+                &SEARCH_MAX_MS,
+            );
+            return Ok(Vec::new());
+        }
+
         let index_guard = state
             .file_index
             .lock()
             .map_err(|_| "Failed to access file index".to_string())?;
-        let file_results = files::search_index(&index_guard, &query, 20);
+        let mut file_results = files::search_index(&index_guard, &query, 20);
+        for file_result in &mut file_results {
+            file_result.score = weighted_score(file_result.score, search_config.files.weight);
+        }
         record_latency(
             "search",
             search_start.elapsed(),
@@ -318,6 +390,7 @@ async fn search(
                             score: if is_dir { 900000 } else { 800000 },
                             match_indices: vec![],
                             source: matcher::ResultSource::File,
+                            actions: None,
                         });
                     }
                 }
@@ -371,11 +444,14 @@ async fn search(
                 score: 1000000, // Top priority
                 match_indices: vec![],
                 source: matcher::ResultSource::Application,
+                actions: None,
             };
             // Put the exact match at the top
             results.insert(0, inst_result);
         }
     }
+
+    results.sort_by(|a, b| b.score.cmp(&a.score));
 
     record_latency(
         "search",
@@ -432,6 +508,17 @@ async fn get_suggestions(
 
     let max_results = config.general.max_results;
 
+    if !config.search.applications.enabled {
+        record_latency(
+            "suggestions",
+            suggestions_start.elapsed(),
+            &SUGGEST_CALLS,
+            &SUGGEST_TOTAL_MS,
+            &SUGGEST_MAX_MS,
+        );
+        return Ok(Vec::new());
+    }
+
     // Create a list of apps with their usage count
     let mut scored_apps: Vec<(&AppEntry, u32)> = apps
         .iter()
@@ -444,14 +531,16 @@ async fn get_suggestions(
     // Convert to SearchResult without truncating
     let results: Vec<SearchResult> = scored_apps
         .into_iter()
+        .take(max_results)
         .map(|(app, _count)| SearchResult {
             title: app.name.clone(),
             subtitle: app.generic_name.clone().or_else(|| app.comment.clone()),
             icon: app.icon.clone(),
             exec: app.exec.clone(),
-            score: 0, // Not relevant for suggestions
+            score: weighted_score(100, config.search.applications.weight),
             match_indices: vec![],
             source: ResultSource::Application,
+            actions: None,
         })
         .collect();
 
@@ -463,6 +552,15 @@ async fn get_suggestions(
         &SUGGEST_MAX_MS,
     );
     Ok(results)
+}
+
+#[tauri::command]
+async fn get_search_diagnostics() -> Result<SearchDiagnostics, String> {
+    Ok(SearchDiagnostics {
+        search: snapshot_perf(&SEARCH_CALLS, &SEARCH_TOTAL_MS, &SEARCH_MAX_MS),
+        suggestions: snapshot_perf(&SUGGEST_CALLS, &SUGGEST_TOTAL_MS, &SUGGEST_MAX_MS),
+        launch: snapshot_perf(&LAUNCH_CALLS, &LAUNCH_TOTAL_MS, &LAUNCH_MAX_MS),
+    })
 }
 
 #[tauri::command]
@@ -600,6 +698,138 @@ async fn open_path(
     Ok(())
 }
 
+#[tauri::command]
+async fn reveal_in_file_manager(
+    path: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let target = std::path::Path::new(&path);
+    if !target.exists() {
+        return Err("Path does not exist".to_string());
+    }
+
+    let dir = if target.is_dir() {
+        target.to_path_buf()
+    } else {
+        target
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::path::PathBuf::from("/"))
+    };
+
+    let config = {
+        state
+            .config
+            .lock()
+            .map_err(|_| "Failed to access config".to_string())?
+            .files
+            .clone()
+    };
+
+    if config.file_manager == "default" {
+        open::that(&dir).map_err(|e| format!("Failed to open directory: {}", e))?;
+        return Ok(());
+    }
+
+    let matched_app = {
+        let apps = state
+            .apps
+            .lock()
+            .map_err(|_| "Failed to access apps cache".to_string())?;
+        apps
+            .iter()
+            .find(|a| a.exec == config.file_manager)
+            .cloned()
+    };
+
+    if let Some(app) = matched_app {
+        let mut final_exec = app.exec.clone();
+        if final_exec.contains("%u")
+            || final_exec.contains("%U")
+            || final_exec.contains("%f")
+            || final_exec.contains("%F")
+        {
+            final_exec = final_exec.replace("%u", &format!("\"{}\"", dir.display()));
+            final_exec = final_exec.replace("%U", &format!("\"{}\"", dir.display()));
+            final_exec = final_exec.replace("%f", &format!("\"{}\"", dir.display()));
+            final_exec = final_exec.replace("%F", &format!("\"{}\"", dir.display()));
+        } else {
+            final_exec = format!("{} \"{}\"", final_exec, dir.display());
+        }
+
+        launcher::launch(&final_exec, Some(&app_handle))
+            .map_err(|e| format!("Failed to launch file manager: {}", e))?;
+    } else {
+        log::warn!("Custom file manager '{}' not found, falling back to default.", config.file_manager);
+        open::that(&dir).map_err(|e| format!("Failed to open directory: {}", e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn open_with_editor(
+    path: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    let path_obj = std::path::Path::new(&path);
+    if !path_obj.exists() {
+        return Err("Path does not exist".to_string());
+    }
+    if path_obj.is_dir() {
+        return Err("Cannot open directory with editor".to_string());
+    }
+
+    let editor_id = {
+        state
+            .config
+            .lock()
+            .map_err(|_| "Failed to access config".to_string())?
+            .files
+            .file_editor
+            .clone()
+    };
+
+    if editor_id == "default" {
+        open::that(&path).map_err(|e| format!("Failed to open path: {}", e))?;
+        return Ok(());
+    }
+
+    let matched_app = {
+        let apps = state
+            .apps
+            .lock()
+            .map_err(|_| "Failed to access apps cache".to_string())?;
+        apps.iter().find(|a| a.exec == editor_id).cloned()
+    };
+
+    if let Some(app) = matched_app {
+        let mut final_exec = app.exec.clone();
+        if final_exec.contains("%u")
+            || final_exec.contains("%U")
+            || final_exec.contains("%f")
+            || final_exec.contains("%F")
+        {
+            final_exec = final_exec.replace("%u", &format!("\"{}\"", path));
+            final_exec = final_exec.replace("%U", &format!("\"{}\"", path));
+            final_exec = final_exec.replace("%f", &format!("\"{}\"", path));
+            final_exec = final_exec.replace("%F", &format!("\"{}\"", path));
+        } else {
+            final_exec = format!("{} \"{}\"", final_exec, path);
+        }
+
+        launcher::launch(&final_exec, Some(&app_handle))
+            .map_err(|e| format!("Failed to launch editor: {}", e))?;
+    } else {
+        log::warn!("Custom editor '{}' not found, falling back to default.", editor_id);
+        open::that(&path).map_err(|e| format!("Failed to open path: {}", e))?;
+    }
+
+    Ok(())
+}
+
 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -682,8 +912,11 @@ pub fn run() {
             get_scripts,
             execute_script,
             get_suggestions,
+            get_search_diagnostics,
             get_clipboard_history,
             open_path,
+            reveal_in_file_manager,
+            open_with_editor,
             get_apps,
             themes::get_installed_themes,
             themes::resize_window_for_theme,

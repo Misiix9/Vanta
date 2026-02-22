@@ -351,11 +351,28 @@
           document.querySelector("input")?.focus();
         }, 10);
         return;
+      } else if (result.exec.startsWith("copy-path:")) {
+        const value = result.exec.slice(10);
+        await navigator.clipboard.writeText(value);
+        resetAndHide();
+      } else if (result.exec.startsWith("reveal:")) {
+        const target = result.exec.slice(7);
+        await invoke("reveal_in_file_manager", { path: target });
+        resetAndHide();
+      } else if (result.exec.startsWith("open-with:")) {
+        const target = result.exec.slice(10);
+        await invoke("open_with_editor", { path: target });
+        resetAndHide();
       } else if (result.exec.startsWith("copy:")) {
         const value = result.exec.slice(5);
         await navigator.clipboard.writeText(value);
         resetAndHide();
       } else if (result.exec.startsWith("install:")) {
+        const target = result.exec.slice(8);
+        const ok = window.confirm(
+          `Install this script or package?\n${target}`,
+        );
+        if (!ok) return;
         await invoke("launch_app", { exec: result.exec });
         // deliberately leaving window open to view progress
       } else if (result.source === "File") {
@@ -459,6 +476,41 @@
 
     // Launcher logic
     if (totalItems === 0) return;
+
+    const activeResult = !isScriptMode ? results[selectedIndex] : undefined;
+
+    // Secondary action shortcuts for normal results
+    if (!isScriptMode && activeResult && activeResult.actions?.length) {
+      const findAction = (prefix: string) =>
+        activeResult.actions?.find((a) => a.exec.startsWith(prefix));
+
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "c") {
+        const action = findAction("copy-path:");
+        if (action) {
+          e.preventDefault();
+          handleActivate({ ...activeResult, exec: action.exec });
+          return;
+        }
+      }
+
+      if (e.key === "Enter" && e.shiftKey) {
+        const action = findAction("reveal:") || activeResult.actions[0];
+        if (action) {
+          e.preventDefault();
+          handleActivate({ ...activeResult, exec: action.exec });
+          return;
+        }
+      }
+
+      if (e.key === "Enter" && e.altKey) {
+        const action = findAction("open-with:") || activeResult.actions[0];
+        if (action) {
+          e.preventDefault();
+          handleActivate({ ...activeResult, exec: action.exec });
+          return;
+        }
+      }
+    }
 
     switch (e.key) {
       case "ArrowDown":

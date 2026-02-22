@@ -1,6 +1,5 @@
 use crate::config::FilesConfig;
-use crate::matcher::ResultSource;
-use crate::matcher::SearchResult;
+use crate::matcher::{ActionHint, ResultSource, SearchResult};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use walkdir::WalkDir;
@@ -77,6 +76,29 @@ pub fn search_index(index: &[FileEntry], query: &str, limit: usize) -> Vec<Searc
     for entry in index {
         // Empty term = list everything (up to limit)
         if term.is_empty() || entry.name.contains(&term) {
+            let is_dir = entry.icon == "dir";
+            let mut actions: Vec<ActionHint> = Vec::new();
+
+            // File/dir secondary actions
+            actions.push(ActionHint {
+                label: "Copy Path".to_string(),
+                exec: format!("copy-path:{}", entry.path),
+                shortcut: Some("Ctrl+Shift+C".to_string()),
+            });
+
+            if !is_dir {
+                actions.push(ActionHint {
+                    label: "Reveal".to_string(),
+                    exec: format!("reveal:{}", entry.path),
+                    shortcut: Some("Shift+Enter".to_string()),
+                });
+                actions.push(ActionHint {
+                    label: "Open with Editor".to_string(),
+                    exec: format!("open-with:{}", entry.path),
+                    shortcut: Some("Alt+Enter".to_string()),
+                });
+            }
+
             results.push(SearchResult {
                 title: entry.name_display.clone(),
                 subtitle: Some(entry.path.clone()),
@@ -85,6 +107,7 @@ pub fn search_index(index: &[FileEntry], query: &str, limit: usize) -> Vec<Searc
                 score: 50,
                 match_indices: vec![],
                 source: ResultSource::File,
+                actions: Some(actions),
             });
 
             if results.len() >= limit {

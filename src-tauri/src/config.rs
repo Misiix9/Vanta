@@ -12,6 +12,56 @@ pub struct VantaConfig {
     pub scripts: ScriptsConfig,
     #[serde(default)]
     pub files: FilesConfig,
+    #[serde(default)]
+    pub search: SearchConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SearchConfig {
+    #[serde(default)]
+    pub applications: SourcePreference,
+    #[serde(default)]
+    pub windows: SourcePreference,
+    #[serde(default)]
+    pub calculator: SourcePreference,
+    #[serde(default)]
+    pub files: SourcePreference,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SourcePreference {
+    #[serde(default = "default_source_enabled")]
+    pub enabled: bool,
+    #[serde(default = "default_source_weight")]
+    pub weight: u32,
+}
+
+fn default_source_enabled() -> bool {
+    true
+}
+
+fn default_source_weight() -> u32 {
+    100
+}
+
+impl Default for SourcePreference {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            weight: 100,
+        }
+    }
+}
+
+impl Default for SearchConfig {
+    fn default() -> Self {
+        Self {
+            applications: SourcePreference::default(),
+            windows: SourcePreference::default(),
+            calculator: SourcePreference::default(),
+            files: SourcePreference::default(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -130,6 +180,7 @@ impl Default for VantaConfig {
                 file_editor: "default".to_string(),
                 open_docs_in_manager: false,
             },
+            search: SearchConfig::default(),
         }
     }
 }

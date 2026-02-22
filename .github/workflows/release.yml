@@ -1,4 +1,4 @@
-name: Release Vanta v1.9.1
+name: Release Vanta v1.11.0
 
 on:
   push:
@@ -74,10 +74,10 @@ jobs:
           body: |
             ## What's New in ${{ steps.get_version.outputs.VERSION }}
 
-            ### Stability
-            - Added activation guards to prevent double-launch or double-action triggers when actions are already in flight.
-            - Clamped result selection to stay in range when result lists change rapidly.
-            - Improved startup resilience: malformed or unreadable config now rewrites to safe defaults instead of crashing.
+            ### Action Shortcuts & Guardrails
+            - File results now expose secondary actions: reveal in file manager, copy path, and open with configured editor, with visible keyboard shortcuts.
+            - Shift+Enter / Alt+Enter / Ctrl+Shift+C trigger the secondary actions without leaving the launcher.
+            - Install actions now prompt for confirmation before executing.
 
             ### Installation
             - **Debian/Ubuntu**: Download `.deb`

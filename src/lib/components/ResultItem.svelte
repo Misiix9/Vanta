@@ -73,6 +73,25 @@
         if (!isTrustedInlineSvg(icon)) return "";
         return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(icon!.trim())}`;
     }
+
+    function primaryActionLabel(): string {
+        if (typeof result.source === "object" && "Script" in result.source) {
+            return "Run";
+        }
+
+        switch (result.source) {
+            case "Calculator":
+                return "Copy Result";
+            case "Window":
+                return "Focus";
+            case "Clipboard":
+                return "Copy";
+            case "File":
+                return "Open";
+            default:
+                return "Launch";
+        }
+    }
 </script>
 
 <button
@@ -82,7 +101,7 @@
     onclick={() => onActivate(result)}
     role="option"
     aria-selected={isSelected}
-    style="animation-delay: {index * 30}ms"
+    style="transition: opacity 140ms ease, transform 140ms ease"
 >
     <div class="item-icon">
         {#if result.source === "Calculator"}
@@ -122,11 +141,38 @@
         {/if}
     </div>
 
-    <div class="item-action-hint">
-        {#if isSelected}
-            <kbd>↵</kbd>
-        {/if}
-    </div>
+    {#if isSelected}
+        <div
+            class="action-hints"
+            style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap;justify-content:flex-end;"
+        >
+            <span
+                class="action-chip"
+                style="display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:12px;"
+            >
+                <kbd style="padding:2px 6px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.08);">
+                    Enter
+                </kbd>
+                <span>{primaryActionLabel()}</span>
+            </span>
+
+            {#if result.actions}
+                {#each result.actions as action}
+                    <span
+                        class="action-chip"
+                        style="display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:12px;"
+                    >
+                        {#if action.shortcut}
+                            <kbd style="padding:2px 6px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.08);">
+                                {action.shortcut}
+                            </kbd>
+                        {/if}
+                        <span>{action.label}</span>
+                    </span>
+                {/each}
+            {/if}
+        </div>
+    {/if}
 </button>
 
 

@@ -40,7 +40,7 @@
     onclick={() => onActivate(item)}
     role="option"
     aria-selected={isSelected}
-    style="animation-delay: {index * 30}ms"
+    style="transition: opacity 140ms ease, transform 140ms ease"
 >
     <div
         class="item-icon script-icon"

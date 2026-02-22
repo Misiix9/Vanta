@@ -3,7 +3,7 @@
     import { invoke } from "@tauri-apps/api/core";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { LogicalSize } from "@tauri-apps/api/dpi";
-    import type { VantaConfig, ThemeMeta } from "$lib/types";
+    import type { VantaConfig, ThemeMeta, SearchDiagnostics } from "$lib/types";
     import { applyTheme } from "$lib/theme";
 
     let {
@@ -18,6 +18,7 @@
 
     let saveTimeout: any = null;
     let availableApps: { name: string; exec: string }[] = $state([]);
+    let diagnostics: SearchDiagnostics | null = $state(null);
 
     async function loadApps() {
         try {
@@ -25,6 +26,14 @@
             availableApps = apps.map((a) => ({ name: a.name, exec: a.exec }));
         } catch (e) {
             console.error("Failed to fetch apps for settings:", e);
+        }
+    }
+
+    async function loadDiagnostics() {
+        try {
+            diagnostics = await invoke<SearchDiagnostics>("get_search_diagnostics");
+        } catch (e) {
+            console.error("Failed to load diagnostics:", e);
         }
     }
 
@@ -70,6 +79,7 @@
     onMount(() => {
         applyTheme(config);
         loadApps();
+        loadDiagnostics();
     });
 
     function handleKeydown(e: KeyboardEvent) {
@@ -325,6 +335,137 @@
                     />
                 </label>
             </div>
+        </section>
+
+        <!-- Search Ranking Section -->
+        <section>
+            <h3>Search Ranking</h3>
+
+            <div class="control-group">
+                <label>
+                    Applications Enabled
+                    <input
+                        type="checkbox"
+                        bind:checked={config.search.applications.enabled}
+                        onchange={debouncedSave}
+                    />
+                </label>
+                <label>
+                    Application Weight ({config.search.applications.weight}%)
+                    <input
+                        type="range"
+                        min="10"
+                        max="300"
+                        step="5"
+                        bind:value={config.search.applications.weight}
+                        onchange={debouncedSave}
+                    />
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Windows Enabled
+                    <input
+                        type="checkbox"
+                        bind:checked={config.search.windows.enabled}
+                        onchange={debouncedSave}
+                    />
+                </label>
+                <label>
+                    Window Weight ({config.search.windows.weight}%)
+                    <input
+                        type="range"
+                        min="10"
+                        max="300"
+                        step="5"
+                        bind:value={config.search.windows.weight}
+                        onchange={debouncedSave}
+                    />
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Calculator Enabled
+                    <input
+                        type="checkbox"
+                        bind:checked={config.search.calculator.enabled}
+                        onchange={debouncedSave}
+                    />
+                </label>
+                <label>
+                    Calculator Weight ({config.search.calculator.weight}%)
+                    <input
+                        type="range"
+                        min="10"
+                        max="300"
+                        step="5"
+                        bind:value={config.search.calculator.weight}
+                        onchange={debouncedSave}
+                    />
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    File Search Enabled
+                    <input
+                        type="checkbox"
+                        bind:checked={config.search.files.enabled}
+                        onchange={debouncedSave}
+                    />
+                </label>
+                <label>
+                    File Weight ({config.search.files.weight}%)
+                    <input
+                        type="range"
+                        min="10"
+                        max="300"
+                        step="5"
+                        bind:value={config.search.files.weight}
+                        onchange={debouncedSave}
+                    />
+                </label>
+            </div>
+        </section>
+
+        <!-- Diagnostics Section -->
+        <section>
+            <h3>Diagnostics</h3>
+            <div class="control-group">
+                <button class="close-btn" onclick={loadDiagnostics}>Refresh Metrics</button>
+            </div>
+            {#if diagnostics}
+                <div class="control-group">
+                    <label>
+                        Search Calls
+                        <input type="text" value={`${diagnostics.search.calls}`} readonly />
+                    </label>
+                    <label>
+                        Search Avg (ms)
+                        <input type="text" value={diagnostics.search.avg_ms.toFixed(2)} readonly />
+                    </label>
+                    <label>
+                        Search Max (ms)
+                        <input type="text" value={`${diagnostics.search.max_ms}`} readonly />
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label>
+                        Suggestion Calls
+                        <input type="text" value={`${diagnostics.suggestions.calls}`} readonly />
+                    </label>
+                    <label>
+                        Suggestion Avg (ms)
+                        <input type="text" value={diagnostics.suggestions.avg_ms.toFixed(2)} readonly />
+                    </label>
+                    <label>
+                        Launch Avg (ms)
+                        <input type="text" value={diagnostics.launch.avg_ms.toFixed(2)} readonly />
+                    </label>
+                </div>
+            {/if}
         </section>
     </div>
 </div>
