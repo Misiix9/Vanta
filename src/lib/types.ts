@@ -33,6 +33,7 @@ export interface GeneralConfig {
 export interface ScriptsConfig {
     directory: string;
     timeout_ms: number;
+    strict_json: boolean;
 }
 
 export interface WindowConfig {

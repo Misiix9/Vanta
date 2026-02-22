@@ -363,6 +363,9 @@
         const target = result.exec.slice(10);
         await invoke("open_with_editor", { path: target });
         resetAndHide();
+      } else if (result.exec === "doctor:run") {
+        await invoke("run_doctor_terminal");
+        resetAndHide();
       } else if (result.exec.startsWith("copy:")) {
         const value = result.exec.slice(5);
         await navigator.clipboard.writeText(value);

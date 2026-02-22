@@ -33,19 +33,19 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_1.8.0_amd64.deb
+sudo dpkg -i vanta_1.12.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-1.8.0-1.x86_64.rpm
+sudo rpm -i vanta-1.12.0-1.x86_64.rpm
 ```
 
 ### AppImage (Universal)
 ```bash
-chmod +x Vanta_1.8.0_amd64.AppImage
-./Vanta_1.8.0_amd64.AppImage
+chmod +x Vanta_1.12.0_amd64.AppImage
+./Vanta_1.12.0_amd64.AppImage
 ```
 
 ---
@@ -126,6 +126,10 @@ To install a script from GitHub:
 install https://github.com/user/vanta-scripts
 ```
 
+### Script validation
+
+Run `vanta doctor` to lint installed scripts (metadata, executable bit, JSON schema). You can also type “vanta doctor” in the launcher to open a terminal and run it. Enable strict JSON validation at runtime in **Settings → Scripts**.
+
 ---
 
 ## Configuration
@@ -159,7 +163,8 @@ Configuration lives at `~/.config/vanta/config.json`, created automatically on f
   },
   "scripts": {
     "directory": "~/.config/vanta/scripts",
-    "timeout_ms": 2000
+    "timeout_ms": 5000,
+    "strict_json": false
   }
 }
 ```

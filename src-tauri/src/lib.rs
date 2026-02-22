@@ -7,6 +7,7 @@ pub mod matcher;
 pub mod math; // New math module
 pub mod scanner;
 pub mod scripts;
+pub mod doctor;
 pub mod store; // Script download module
 pub mod files; // New files module
 pub mod window;
@@ -17,6 +18,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::{Manager, Emitter}; // Added Emitter for .emit()
 use serde::Serialize;
+use clap::{Parser, Subcommand, Args};
 
 use config::VantaConfig;
 use history::History;
@@ -46,6 +48,45 @@ static SUGGEST_MAX_MS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_CALLS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_TOTAL_MS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_MAX_MS: AtomicU64 = AtomicU64::new(0);
+
+// -----------------------
+// CLI entrypoint
+// -----------------------
+
+#[derive(Parser, Debug)]
+#[command(name = "vanta", about = "Vanta launcher and CLI toolkit")]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Option<CliCommand>,
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum CliCommand {
+    /// Run script validator and simulator
+    Doctor(DoctorArgs),
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct DoctorArgs {
+    /// Enforce strict JSON schema validation for script output
+    #[arg(long, default_value_t = false)]
+    pub strict: bool,
+
+    /// Simulate a timeout for a target script (ms)
+    #[arg(long, value_name = "MS")]
+    pub simulate_timeout: Option<u64>,
+
+    /// Simulate an error for a target script keyword
+    #[arg(long, value_name = "KEYWORD")]
+    pub simulate_error: Option<String>,
+}
+
+/// Dispatch CLI subcommands. Returns Ok on success or a descriptive error.
+pub fn run_cli(command: CliCommand) -> Result<(), String> {
+    match command {
+        CliCommand::Doctor(args) => doctor::run(args),
+    }
+}
 
 #[derive(Clone, Debug, Serialize)]
 struct PerfStats {
@@ -125,6 +166,39 @@ fn record_latency(
             avg,
             max
         );
+    }
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn parse_defaults_to_gui() {
+        let cli = Cli::parse_from(["vanta"]);
+        assert!(cli.command.is_none());
+    }
+
+    #[test]
+    fn parse_doctor_with_flags() {
+        let cli = Cli::parse_from([
+            "vanta",
+            "doctor",
+            "--strict",
+            "--simulate-timeout",
+            "1500",
+            "--simulate-error",
+            "cpu",
+        ]);
+
+        match cli.command {
+            Some(CliCommand::Doctor(args)) => {
+                assert!(args.strict);
+                assert_eq!(args.simulate_timeout, Some(1500));
+                assert_eq!(args.simulate_error.as_deref(), Some("cpu"));
+            }
+            other => panic!("Unexpected command: {:?}", other),
+        }
     }
 }
 
@@ -451,6 +525,20 @@ async fn search(
         }
     }
 
+    let trimmed = query.trim().to_lowercase();
+    if trimmed.starts_with("vanta doctor") {
+        results.push(matcher::SearchResult {
+            title: "Run vanta doctor".to_string(),
+            subtitle: Some("Open terminal and run the script validator".to_string()),
+            icon: None,
+            exec: "doctor:run".to_string(),
+            score: 1_050_000,
+            match_indices: Vec::new(),
+            source: matcher::ResultSource::Application,
+            actions: None,
+        });
+    }
+
     results.sort_by(|a, b| b.score.cmp(&a.score));
 
     record_latency(
@@ -615,16 +703,23 @@ async fn execute_script(
     args: String,
     state: tauri::State<'_, AppState>,
 ) -> Result<ScriptOutput, String> {
-    let timeout_ms = {
+    let (timeout_ms, strict_json) = {
         let config = state
             .config
             .lock()
             .map_err(|_| "Failed to access config".to_string())?;
-        config.scripts.timeout_ms
+        (config.scripts.timeout_ms, config.scripts.strict_json)
     };
-    // Run script off the main thread via tokio
+
     tokio::task::spawn_blocking(move || {
-        scripts::execute_script(&keyword, &args, timeout_ms)
+        let output = scripts::execute_script(&keyword, &args, timeout_ms)?;
+
+        if strict_json {
+            scripts::validate_script_output(&output)
+                .map_err(|e| format!("Script output failed validation: {}", e))?;
+        }
+
+        Ok(output)
     })
     .await
     .map_err(|e| format!("Script task failed: {}", e))?
@@ -830,6 +925,11 @@ async fn open_with_editor(
     Ok(())
 }
 
+#[tauri::command]
+async fn run_doctor_terminal() -> Result<(), String> {
+    launcher::launch_terminal_command("vanta doctor")
+}
+
 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -917,6 +1017,7 @@ pub fn run() {
             open_path,
             reveal_in_file_manager,
             open_with_editor,
+            run_doctor_terminal,
             get_apps,
             themes::get_installed_themes,
             themes::resize_window_for_theme,

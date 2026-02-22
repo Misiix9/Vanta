@@ -1,4 +1,5 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::env;
 use tauri::Emitter;
 
 // Handles .desktop Exec placeholders (like %u, %F) so we don't pass garbage to the shell.
@@ -129,6 +130,62 @@ fn strip_field_codes(exec: &str) -> String {
         cleaned = cleaned.replace("  ", " ");
     }
     cleaned
+}
+
+/// Launches a terminal emulator and runs the provided shell command.
+/// Tries common terminals plus $TERMINAL; falls back to an error if none spawn.
+pub fn launch_terminal_command(command: &str) -> Result<(), String> {
+    let wrapped = format!(
+        "{}; echo \"\\nPress Enter to close\"; read -r _",
+        command
+    );
+
+    let mut candidates: Vec<(String, Vec<String>)> = Vec::new();
+
+    if let Ok(term_raw) = env::var("TERMINAL") {
+        let parsed = shell_words::split(&term_raw).unwrap_or_else(|_| vec![term_raw.clone()]);
+        if let Some((bin, rest)) = parsed.split_first() {
+            let mut args: Vec<String> = rest.iter().map(|s| s.to_string()).collect();
+            args.extend([
+                "-e".to_string(),
+                "bash".to_string(),
+                "-lc".to_string(),
+                wrapped.clone(),
+            ]);
+            candidates.push((bin.to_string(), args));
+        }
+    }
+
+    let presets: [(&str, &[&str]); 7] = [
+        ("kitty", &["sh", "-c"]),
+        ("alacritty", &["-e", "bash", "-lc"]),
+        ("wezterm", &["start", "--", "bash", "-lc"]),
+        ("gnome-terminal", &["--", "bash", "-lc"]),
+        ("konsole", &["-e", "bash", "-lc"]),
+        ("xterm", &["-e", "bash", "-lc"]),
+        ("foot", &["-e", "sh", "-c"]),
+    ];
+
+    for (bin, base_args) in presets {
+        let mut args: Vec<String> = base_args.iter().map(|s| s.to_string()).collect();
+        args.push(wrapped.clone());
+        candidates.push((bin.to_string(), args));
+    }
+
+    for (bin, args) in candidates {
+        let spawn_result = Command::new(&bin)
+            .args(&args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+
+        if spawn_result.is_ok() {
+            return Ok(());
+        }
+    }
+
+    Err("No terminal emulator found to run 'vanta doctor'".to_string())
 }
 
 #[cfg(test)]

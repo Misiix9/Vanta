@@ -203,6 +203,35 @@
             </div>
         </section>
 
+        <!-- Scripts Section -->
+        <section>
+            <h3>Scripts</h3>
+            <div class="control-group">
+                <label>
+                    Timeout (ms)
+                    <input
+                        type="number"
+                        min="500"
+                        max="60000"
+                        step="100"
+                        bind:value={config.scripts.timeout_ms}
+                        oninput={debouncedSave}
+                    />
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Strict JSON Validation
+                    <input
+                        type="checkbox"
+                        bind:checked={config.scripts.strict_json}
+                        onchange={debouncedSave}
+                    />
+                </label>
+            </div>
+        </section>
+
         <!-- Window Section -->
         <section>
             <h3>Window</h3>

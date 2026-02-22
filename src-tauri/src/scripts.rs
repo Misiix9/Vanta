@@ -4,6 +4,10 @@ use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
+use std::env;
+use jsonschema::{Draft, JSONSchema};
+use serde_json::json;
+use std::sync::OnceLock;
 
 use crate::config;
 
@@ -53,6 +57,8 @@ pub enum Urgency {
 pub struct ScriptOutput {
     pub items: Vec<ScriptItem>,
 }
+
+static SCRIPT_OUTPUT_SCHEMA: OnceLock<Result<JSONSchema, String>> = OnceLock::new();
 
 // Metadata scraped from script file headers.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -188,6 +194,19 @@ pub fn execute_script(keyword: &str, args: &str, timeout_ms: u64) -> Result<Scri
     let start = std::time::Instant::now();
     let dir = scripts_dir();
 
+    if let Some(ms) = simulate_timeout_ms() {
+        log::warn!("Simulating timeout for '{}' after {}ms", keyword, ms);
+        std::thread::sleep(Duration::from_millis(ms));
+        return Err(format!("Simulated timeout after {}ms", ms));
+    }
+
+    if let Some(target) = simulate_error_keyword() {
+        if target == keyword {
+            log::warn!("Simulating error for '{}'", keyword);
+            return Err("Simulated script error".to_string());
+        }
+    }
+
     // Find the script file by keyword
     let script_path = find_script_by_keyword(&dir, keyword)?;
 
@@ -300,6 +319,69 @@ pub fn execute_script(keyword: &str, args: &str, timeout_ms: u64) -> Result<Scri
     Ok(output)
 }
 
+fn build_schema_validator() -> Result<JSONSchema, String> {
+    let schema = script_output_schema();
+
+    JSONSchema::options()
+        .with_draft(Draft::Draft7)
+        .compile(&schema)
+        .map_err(|e| e.to_string())
+}
+
+fn script_output_schema() -> serde_json::Value {
+    json!({
+        "type": "object",
+        "required": ["items"],
+        "properties": {
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["title", "urgency"],
+                    "properties": {
+                        "title": {"type": "string", "minLength": 1},
+                        "subtitle": {"type": "string"},
+                        "icon": {"type": "string"},
+                        "badge": {"type": "string"},
+                        "urgency": {"type": "string", "enum": ["low", "normal", "critical"]},
+                        "action": {
+                            "type": "object",
+                            "required": ["type", "value"],
+                            "properties": {
+                                "type": {"type": "string", "enum": ["copy", "open", "run"]},
+                                "value": {"type": "string", "minLength": 1}
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            }
+        },
+        "additionalProperties": false
+    })
+}
+
+pub fn validate_script_output(output: &ScriptOutput) -> Result<(), String> {
+    let validator = SCRIPT_OUTPUT_SCHEMA
+        .get_or_init(|| build_schema_validator())
+        .as_ref()
+        .map_err(|e| format!("Failed to prepare script schema: {}", e))?;
+
+    let value = serde_json::to_value(output)
+        .map_err(|e| format!("Could not serialize script output: {}", e))?;
+
+    let result = validator.validate(&value);
+
+    match result {
+        Ok(()) => Ok(()),
+        Err(errors) => {
+            let msgs: Vec<String> = errors.map(|err| err.to_string()).collect();
+            Err(msgs.join("; "))
+        }
+    }
+}
+
 /// Find a script file by its keyword (filename without extension).
 fn find_script_by_keyword(dir: &Path, keyword: &str) -> Result<PathBuf, String> {
     if !dir.exists() {
@@ -387,6 +469,16 @@ trait ChildExt {
     ) -> Result<Option<std::process::ExitStatus>, std::io::Error>;
 }
 
+fn simulate_timeout_ms() -> Option<u64> {
+    env::var("VANTA_SIMULATE_TIMEOUT")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+}
+
+fn simulate_error_keyword() -> Option<String> {
+    env::var("VANTA_SIMULATE_ERROR").ok()
+}
+
 impl ChildExt for std::process::Child {
     fn wait_timeout(
         &mut self,
@@ -441,8 +533,57 @@ mod tests {
     }
 
     #[test]
+    fn validate_script_output_accepts_minimal() {
+        let output = ScriptOutput {
+            items: vec![ScriptItem {
+                title: "Hello".to_string(),
+                subtitle: None,
+                icon: None,
+                action: None,
+                badge: None,
+                urgency: Urgency::Normal,
+            }],
+        };
+
+        assert!(validate_script_output(&output).is_ok());
+    }
+
+    #[test]
+    fn validate_script_output_rejects_empty_title() {
+        let output = ScriptOutput {
+            items: vec![ScriptItem {
+                title: "".to_string(),
+                subtitle: None,
+                icon: None,
+                action: Some(ScriptAction {
+                    action_type: ActionType::Copy,
+                    value: "value".to_string(),
+                }),
+                badge: None,
+                urgency: Urgency::Normal,
+            }],
+        };
+
+        assert!(validate_script_output(&output).is_err());
+    }
+
+    #[test]
     fn test_invalid_json_errors() {
         let result = serde_json::from_str::<ScriptOutput>("not json");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn simulate_timeout_env_parses_number() {
+        env::set_var("VANTA_SIMULATE_TIMEOUT", "250");
+        assert_eq!(simulate_timeout_ms(), Some(250));
+        env::remove_var("VANTA_SIMULATE_TIMEOUT");
+    }
+
+    #[test]
+    fn simulate_error_env_reads_keyword() {
+        env::set_var("VANTA_SIMULATE_ERROR", "demo");
+        assert_eq!(simulate_error_keyword().as_deref(), Some("demo"));
+        env::remove_var("VANTA_SIMULATE_ERROR");
     }
 }

@@ -5,6 +5,7 @@ src-tauri/gen/
 .agent/
 examples/
 PLAN.md
+docs/
 dist/
 *.log
 .DS_Store

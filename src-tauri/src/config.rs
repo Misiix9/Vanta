@@ -140,6 +140,8 @@ pub struct ColorsConfig {
 pub struct ScriptsConfig {
     pub directory: String,
     pub timeout_ms: u64,
+    #[serde(default)]
+    pub strict_json: bool,
 }
 
 impl Default for VantaConfig {
@@ -172,6 +174,7 @@ impl Default for VantaConfig {
             scripts: ScriptsConfig {
                 directory: "~/.config/vanta/scripts".to_string(),
                 timeout_ms: 5000,
+                strict_json: false,
             },
             files: FilesConfig {
                 include_hidden: false,
