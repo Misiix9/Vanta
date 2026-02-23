@@ -26,8 +26,11 @@ use matcher::{ResultSource, SearchResult};
 use scanner::AppEntry;
 use scripts::{ScriptEntry, ScriptOutput};
 use windows::{list_windows_grouped, WindowGroup};
+use config::clamp_window_size;
 
 use files::FileIndex;
+use tokio::time::sleep;
+use tauri::WebviewWindow;
 
 // Everything is Mutex'd because Tauri commands are async.
 pub struct AppState {
@@ -50,6 +53,31 @@ static LAUNCH_CALLS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_TOTAL_MS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_MAX_MS: AtomicU64 = AtomicU64::new(0);
 
+/// Fetch the persisted window size (clamped) from state.
+fn current_window_dims(app: &tauri::AppHandle) -> (f64, f64) {
+    let state = app.state::<AppState>();
+    let (w, h) = match state.config.lock() {
+        Ok(cfg) => (cfg.window.width, cfg.window.height),
+        Err(_) => (680.0, 420.0),
+    };
+
+    let mut wc = config::WindowConfig { width: w, height: h };
+    let _ = clamp_window_size(&mut wc);
+    (wc.width, wc.height)
+}
+
+/// Emit the clipboard-open event with a couple of retries to ensure the frontend listener is attached.
+fn emit_clipboard_with_retries(win: &WebviewWindow) {
+    let w1 = win.clone();
+    let w2 = win.clone();
+    tauri::async_runtime::spawn(async move {
+        sleep(Duration::from_millis(120)).await;
+        let _ = w1.emit("open_clipboard", ());
+        sleep(Duration::from_millis(300)).await;
+        let _ = w2.emit("open_clipboard", ());
+    });
+}
+
 // -----------------------
 // CLI entrypoint
 // -----------------------
@@ -57,6 +85,14 @@ static LAUNCH_MAX_MS: AtomicU64 = AtomicU64::new(0);
 #[derive(Parser, Debug)]
 #[command(name = "vanta", about = "Vanta launcher and CLI toolkit")]
 pub struct Cli {
+    /// Start Vanta hidden (no window shown at launch)
+    #[arg(long, default_value_t = false)]
+    pub hidden: bool,
+
+    /// Launch directly into clipboard mode
+    #[arg(long, short = 'c', default_value_t = false)]
+    pub clipboard: bool,
+
     #[command(subcommand)]
     pub command: Option<CliCommand>,
 }
@@ -185,8 +221,37 @@ where
     if !query_lower.is_empty() {
         for g in &mut window_groups {
             g.entries.retain(|w| {
-                w.title.to_lowercase().contains(query_lower)
-                    || w.class.to_lowercase().contains(query_lower)
+                let title_match = w.title.to_lowercase().contains(query_lower);
+                let class_match = w.class.to_lowercase().contains(query_lower);
+                if title_match || class_match {
+                    return true;
+                }
+
+                // Also match against the associated application name/generic name so windows are discoverable by app name.
+                if let Some(app) = apps.iter().find(|app| {
+                    app.startup_wm_class
+                        .as_deref()
+                        .map(|c| c.eq_ignore_ascii_case(&w.class))
+                        .unwrap_or(false)
+                        || app
+                            .exec
+                            .split_whitespace()
+                            .next()
+                            .map(|cmd| cmd.eq_ignore_ascii_case(&w.class))
+                            .unwrap_or(false)
+                        || app.name.eq_ignore_ascii_case(&w.class)
+                }) {
+                    let name_lower = app.name.to_lowercase();
+                    let generic_lower = app
+                        .generic_name
+                        .as_ref()
+                        .map(|s| s.to_lowercase())
+                        .unwrap_or_default();
+                    return name_lower.contains(query_lower)
+                        || (!generic_lower.is_empty() && generic_lower.contains(query_lower));
+                }
+
+                false
             });
         }
         window_groups.retain(|g| !g.entries.is_empty());
@@ -239,7 +304,7 @@ where
                 actions: Some(actions),
                 id: Some(win.address.clone()),
                 group: Some(app_class.clone()),
-                section: Some("Windows".to_string()),
+                section: Some("Running".to_string()),
             });
         }
     }
@@ -396,10 +461,13 @@ async fn get_config(
 
 #[tauri::command]
 async fn save_config(
-    new_config: VantaConfig,
+    mut new_config: VantaConfig,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let new_files_config = new_config.files.clone();
+
+    // Enforce sane window bounds on save.
+    let _ = clamp_window_size(&mut new_config.window);
 
     {
         let mut config = state
@@ -483,43 +551,38 @@ async fn search(
         history.usage.clone()
     };
 
-    let mut results = if search_config.applications.enabled {
-        // Show all apps when the query is empty; otherwise cap by configured max_results.
-        let app_limit = if query.trim().is_empty() {
-            apps.len()
-        } else {
-            max_results
-        };
-
-        matcher::fuzzy_search(
-            &query,
-            &apps,
-            app_limit,
-            &usage_map,
-            search_config.applications.weight,
-        )
+    // Always include applications and running windows; config toggles only affect weighting.
+    let app_limit = if query.trim().is_empty() {
+        apps.len()
     } else {
-        Vec::new()
+        max_results
     };
+
+    let mut results = matcher::fuzzy_search(
+        &query,
+        &apps,
+        app_limit,
+        &usage_map,
+        search_config.applications.weight,
+    );
 
     // Search Open Windows (grouped and capped)
     let query_lower = query.to_lowercase();
-    if search_config.windows.enabled {
-        let derived_cap = std::cmp::max(1, max_results / 2);
-        let window_cap = if search_config.windows_max_results > 0 {
-            search_config.windows_max_results
-        } else {
-            derived_cap
-        };
-        let window_results = build_window_results(
-            &query_lower,
-            window_cap,
-            &apps,
-            search_config.windows.weight,
-            |cap| list_windows_grouped(cap),
-        );
-        results.extend(window_results);
-    }
+    let derived_cap = std::cmp::max(1, max_results / 2);
+    let window_cap = if search_config.windows_max_results > 0 {
+        search_config.windows_max_results
+    } else {
+        derived_cap
+    };
+    let window_results = build_window_results(
+        &query_lower,
+        window_cap,
+        &apps,
+        search_config.windows.weight,
+        |cap| list_windows_grouped(cap),
+    );
+    eprintln!("[vanta][search] windows={} cap={} query={}", window_results.len(), window_cap, query);
+    results.extend(window_results);
 
     // Check for math
     if search_config.calculator.enabled {
@@ -802,21 +865,33 @@ async fn get_suggestions(
         .lock()
         .map_err(|_| "Failed to access config".to_string())?;
 
+    let search_config = config.search.clone();
+    let max_results = config.general.max_results;
+
     let file_index = state
         .file_index
         .lock()
         .map_err(|_| "Failed to access file index".to_string())?;
 
-    if !config.search.applications.enabled {
-        record_latency(
-            "suggestions",
-            suggestions_start.elapsed(),
-            &SUGGEST_CALLS,
-            &SUGGEST_TOTAL_MS,
-            &SUGGEST_MAX_MS,
-        );
-        return Ok(Vec::new());
-    }
+    let mut results: Vec<SearchResult> = Vec::new();
+
+    // Running windows first (so the section appears at the top in UI ordering). Always include, even if windows were disabled in config.
+    let derived_cap = std::cmp::max(3, max_results / 2);
+    let window_cap = if search_config.windows_max_results > 0 {
+        search_config.windows_max_results
+    } else {
+        derived_cap
+    };
+
+    let window_results = build_window_results(
+        "",
+        window_cap,
+        &apps,
+        search_config.windows.weight,
+        |cap| list_windows_grouped(cap),
+    );
+    eprintln!("[vanta][suggestions] windows={} cap={}", window_results.len(), window_cap);
+    results.extend(window_results);
 
     // Create a list of apps with their usage count
     let mut scored_apps: Vec<(&AppEntry, u32)> = apps
@@ -827,14 +902,14 @@ async fn get_suggestions(
     // Sort by usage count descending
     scored_apps.sort_by(|a, b| b.1.cmp(&a.1));
 
-    let mut results: Vec<SearchResult> = scored_apps
+    let app_results: Vec<SearchResult> = scored_apps
         .into_iter()
         .map(|(app, _count)| SearchResult {
             title: app.name.clone(),
             subtitle: app.generic_name.clone().or_else(|| app.comment.clone()),
             icon: app.icon.clone(),
             exec: app.exec.clone(),
-            score: weighted_score(100, config.search.applications.weight),
+            score: weighted_score(100, search_config.applications.weight),
             match_indices: vec![],
             source: ResultSource::Application,
             actions: None,
@@ -843,6 +918,8 @@ async fn get_suggestions(
             section: Some("Apps".to_string()),
         })
         .collect();
+
+    results.extend(app_results);
 
     // Documents: pull a handful of indexed entries (dirs first) for smart suggestions
     let mut doc_results = files::search_index(&file_index, "", 12);
@@ -1172,7 +1249,7 @@ async fn run_doctor_terminal() -> Result<(), String> {
 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+pub fn run(start_hidden: bool, open_clipboard: bool) {
     env_logger::init();
 
     // Init clipboard
@@ -1182,7 +1259,30 @@ pub fn run() {
     clipboard::start_watcher();
 
 
-    let vanta_config = config::load_or_create_default();
+    let mut vanta_config = config::load_or_create_default();
+
+    // Migrate legacy default (800x600) to the intended compact default (680x420)
+    // unless the user has explicitly customized the window size.
+    if (vanta_config.window.width - 800.0).abs() < f64::EPSILON
+        && (vanta_config.window.height - 600.0).abs() < f64::EPSILON
+    {
+        vanta_config.window.width = 680.0;
+        vanta_config.window.height = 420.0;
+        let _ = vanta_config.save();
+    }
+
+    // Clamp to sane bounds in case a previous config set extreme values.
+    if clamp_window_size(&mut vanta_config.window) {
+        let _ = vanta_config.save();
+    }
+
+    log::info!(
+        "Using config at {:?} with window size {}x{}",
+        config::config_path(),
+        vanta_config.window.width,
+        vanta_config.window.height
+    );
+
     let hotkey_str = vanta_config.general.hotkey.clone();
 
 
@@ -1213,6 +1313,15 @@ pub fn run() {
 
     let mut builder = tauri::Builder::default();
 
+    // Ensure clipboard mode fires after the frontend loads if requested.
+    let start_clipboard_flag = open_clipboard;
+    if start_clipboard_flag {
+        builder = builder.on_page_load(|window, _payload| {
+            println!("[vanta][clipboard] on_page_load emit");
+            let _ = window.emit("open_clipboard", ());
+        });
+    }
+
 
     #[cfg(desktop)]
     {
@@ -1221,16 +1330,20 @@ pub fn run() {
                 println!("Single instance triggered with args: {:?}", args);
                 let lower_args: Vec<String> = args.iter().map(|s| s.to_lowercase()).collect();
                 if lower_args.contains(&"--clipboard".to_string()) || lower_args.contains(&"-c".to_string()) {
-                    println!("Opening clipboard mode");
+                    println!("Opening clipboard mode (single instance)");
                     if let Some(win) = app.get_webview_window("main") {
+                        let dims = current_window_dims(app);
+                        let _ = win.set_size(tauri::LogicalSize::new(dims.0, dims.1));
                         let _ = win.set_always_on_top(true);
                         let _ = win.center();
                         let _ = window::show_window(&win);
-                        let _ = win.emit("open_clipboard", ());
+                        println!("[vanta][clipboard] single-instance emit");
+                        emit_clipboard_with_retries(&win);
                     }
                 } else {
                     println!("Toggling window");
-                    let _ = window::toggle_window(app);
+                    let dims = current_window_dims(app);
+                    let _ = window::toggle_window(app, Some(dims));
                 }
             },
         ));
@@ -1268,17 +1381,40 @@ pub fn run() {
             // Initialize window (apply blur/transparency/size)
             if let Some(win) = app.get_webview_window("main") {
                 let _ = window::init_window(&win, &app_handle);
-                
-                // Apply window size from config
-                let (width, height) = {
-                    let state = app.state::<AppState>();
-                    let dims = match state.config.lock() {
-                        Ok(config) => (config.window.width, config.window.height),
-                        Err(_) => (680.0, 420.0),
-                    };
-                    dims
-                };
+
+                // Apply window size from config (clamped)
+                let (width, height) = current_window_dims(&app_handle);
+                println!(
+                    "[vanta][window] applying size {}x{} from {:?}",
+                    width,
+                    height,
+                    config::config_path()
+                );
                 let _ = win.set_size(tauri::LogicalSize::new(width, height));
+                let _ = win.center();
+
+                if open_clipboard {
+                    let _ = win.set_always_on_top(true);
+                    let _ = window::show_window(&win);
+                    println!("[vanta][clipboard] startup emit");
+                    emit_clipboard_with_retries(&win);
+                } else if start_hidden {
+                    let _ = window::hide_window(&win);
+                } else {
+                    let _ = window::show_window(&win);
+                }
+            }
+
+            // Fire another clipboard emit shortly after startup to ensure the frontend listener is mounted.
+            if open_clipboard {
+                let handle_clone = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    sleep(Duration::from_millis(450)).await;
+                    if let Some(win) = handle_clone.get_webview_window("main") {
+                        println!("[vanta][clipboard] delayed emit");
+                        let _ = win.emit("open_clipboard", ());
+                    }
+                });
             }
 
             // Seed the default theme on first run
@@ -1322,7 +1458,8 @@ pub fn run() {
                         if event.state() == ShortcutState::Pressed {
                             if let Some(ref cfg) = cfg_sc {
                                 if sc == cfg {
-                                    let _ = window::toggle_window(app);
+                                    let dims = current_window_dims(app);
+                                    let _ = window::toggle_window(app, Some(dims));
                                     return;
                                 }
                             }
@@ -1330,11 +1467,14 @@ pub fn run() {
                                 if sc == clip {
                                     // Open window
                                     if let Some(win) = app.get_webview_window("main") {
+                                        let dims = current_window_dims(app);
+                                        let _ = win.set_size(tauri::LogicalSize::new(dims.0, dims.1));
                                         let _ = win.set_always_on_top(true);
                                         let _ = win.center();
                                         let _ = window::show_window(&win);
-                                        // Emit event for clipboard mode
-                                        let _ = win.emit("open_clipboard", ());
+                                        // Emit event for clipboard mode with retries
+                                        println!("[vanta][clipboard] hotkey emit");
+                                        emit_clipboard_with_retries(&win);
                                     }
                                 }
                             }

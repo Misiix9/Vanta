@@ -33,19 +33,19 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_1.14.0_amd64.deb
+sudo dpkg -i vanta_1.14.1_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-1.14.0-1.x86_64.rpm
+sudo rpm -i vanta-1.14.1-1.x86_64.rpm
 ```
 
 ### AppImage (Universal)
 ```bash
-chmod +x Vanta_1.14.0_amd64.AppImage
-./Vanta_1.14.0_amd64.AppImage
+chmod +x Vanta_1.14.1_amd64.AppImage
+./Vanta_1.14.1_amd64.AppImage
 ```
 
 ---
@@ -53,7 +53,9 @@ chmod +x Vanta_1.14.0_amd64.AppImage
 ## Features
 
 - **Blazing Fast**: Powered by Rust and `nucleo-matcher` for sub-millisecond fuzzy search.
+- **Clipboard-First**: `--clipboard` launch and `Super+V` always open the clipboard view with retry and delayed emits; history loads instantly and refocuses the input.
 - **Fully Themeable**: All styles live in `~/.config/vanta/themes/`. Drop in any `.css` file, select it in Settings, and the app resizes and reskins instantly — no restart required.
+- **Resilient Startup**: Honors config window size, clamps to sane bounds, recenters before show, and respects `--hidden`/`VANTA_HIDDEN` for background launches.
 - **Scriptable**: Write plugins in Python, Bash, Node.js, or any language. If it outputs JSON, Vanta can run it.
 - **Clipboard History**: Press `Super+V` to open a searchable clipboard history.
 - **File Search with filters**: Search your home directory with include/exclude globs, extension allowlist, and type filter (files-only / dirs-only). Manual rebuild button shows index freshness.
@@ -61,6 +63,24 @@ chmod +x Vanta_1.14.0_amd64.AppImage
 - **Math**: Type an expression like `2^10 + 5` and get the result instantly.
 - **Script Store**: Install community scripts with `install <GitHub-URL>` or `install /path/to/script.sh`.
 - **Borderless Glass Window**: Fully transparent and undecorated window — the OS frame is replaced entirely by your CSS.
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/Misiix9/vanta.git
+cd vanta
+npm install
+cargo tauri dev
+```
+
+**Flags:**
+- `--hidden` or `VANTA_HIDDEN=1`: start minimized/hidden.
+- `--clipboard` or `-c`: open directly to clipboard mode on launch.
+- Hotkeys: `Alt+Space` (toggle), `Super+V` (clipboard).
+
+**Fresh installs:** If config or theme files are missing, Vanta seeds `~/.config/vanta/config.json` and `~/.config/vanta/themes/default.css` automatically.
 
 ---
 
@@ -202,5 +222,5 @@ Window search cap can be tuned with `search.windows_max_results` (0 uses half of
 ---
 
 <div align="center">
-  <sub>Built by <a href="https://github.com/Misiix9">onxy</a></sub>
+  <sub>Made with ♥️ by <a href="https://github.com/Misiix9">onxy</a></sub>
 </div>

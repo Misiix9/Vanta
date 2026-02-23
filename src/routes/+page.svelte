@@ -90,6 +90,27 @@
 
   onMount(async () => {
     // ... existing onMount code ...
+
+    // Register clipboard listener ASAP so startup emits aren't missed.
+    try {
+      unlisteners.push(
+        await listen("open_clipboard", async () => {
+          currentMode = "clipboard";
+          query = "";
+          try {
+            clipboardHistory = await invoke("get_clipboard_history");
+            updateClipboardSuggestions("");
+          } catch (e) {
+            console.error("Failed to fetch history", e);
+          }
+          await invoke("show_window");
+          setTimeout(() => searchInputRef?.focus?.(), 50);
+        }),
+      );
+    } catch (e) {
+      console.error("Failed to bind clipboard listener", e);
+    }
+
     try {
       availableThemes = await invoke<ThemeMeta[]>("get_installed_themes");
     } catch (e) {
@@ -158,22 +179,6 @@
         if (currentMode === "launcher" && query.trim() === "") {
           loadSuggestions();
         }
-      }),
-    );
-
-    // Listen for Clipboard Shortcut
-    unlisteners.push(
-      await listen("open_clipboard", async () => {
-        currentMode = "clipboard";
-        query = "";
-        try {
-          clipboardHistory = await invoke("get_clipboard_history");
-          updateClipboardSuggestions("");
-        } catch (e) {
-          console.error("Failed to fetch history", e);
-        }
-        await invoke("show_window");
-        setTimeout(() => searchInputRef?.focus?.(), 50);
       }),
     );
 

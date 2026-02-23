@@ -1,0 +1,50 @@
+{
+  "general": {
+    "hotkey": "Alt+Space",
+    "max_results": 8,
+    "launch_on_login": false
+  },
+  "appearance": {
+    "blur_radius": 40,
+    "opacity": 0.85,
+    "border_radius": 24,
+    "theme": "default",
+    "colors": {
+      "background": "#000000",
+      "surface": "#0A0A0A",
+      "accent": "#FFFFFF",
+      "accent_glow": "rgba(255, 255, 255, 0.25)",
+      "text_primary": "#F5F5F5",
+      "text_secondary": "#888888",
+      "border": "rgba(255, 255, 255, 0.08)"
+    }
+  },
+  "window": {
+    "width": 680.0,
+    "height": 420.0
+  },
+  "scripts": {
+    "directory": "~/.config/vanta/scripts",
+    "timeout_ms": 5000,
+    "strict_json": false
+  },
+  "files": {
+    "include_hidden": false,
+    "max_depth": 3,
+    "file_manager": "default",
+    "file_editor": "default",
+    "open_docs_in_manager": false,
+    "include_globs": [],
+    "exclude_globs": [],
+    "allowed_extensions": [],
+    "type_filter": "any",
+    "indexed_at": null
+  },
+  "search": {
+    "applications": { "enabled": true, "weight": 100 },
+    "windows": { "enabled": true, "weight": 100 },
+    "calculator": { "enabled": true, "weight": 100 },
+    "files": { "enabled": true, "weight": 100 },
+    "windows_max_results": 0
+  }
+}

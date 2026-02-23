@@ -141,7 +141,7 @@ fn focus_window(address: &str) -> Result<(), String> {
     let mut ok = false;
 
     if let Err(e) = spawn_cmd(
-        "hyprctl",
+        crate::windows::hyprctl_path().as_str(),
         &["dispatch".into(), "focuswindow".into(), format!("address:{}", address)],
     ) {
         log::warn!("Hyprland focus failed: {}", e);
@@ -151,6 +151,13 @@ fn focus_window(address: &str) -> Result<(), String> {
 
     if let Err(e) = spawn_cmd("swaymsg", &[format!("[con_id={}] focus", address)]) {
         log::warn!("Sway focus failed: {}", e);
+    } else {
+        ok = true;
+    }
+
+    // X11 fallback (wmctrl). Requires window id (hex) as address.
+    if let Err(e) = spawn_cmd("wmctrl", &["-i".into(), "-a".into(), address.to_string()]) {
+        log::warn!("wmctrl focus failed: {}", e);
     } else {
         ok = true;
     }

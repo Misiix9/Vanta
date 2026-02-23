@@ -3,7 +3,7 @@
 use std::time::Instant;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow, LogicalSize};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct BlurStatus {
@@ -62,8 +62,8 @@ pub fn hide_window(window: &WebviewWindow) -> Result<(), String> {
         .map_err(|e| format!("Failed to hide window: {}", e))
 }
 
-/// Toggle window visibility (for hotkey/CLI).
-pub fn toggle_window(app: &AppHandle) -> Result<(), String> {
+/// Toggle window visibility (for hotkey/CLI). Optional size enforces current config.
+pub fn toggle_window(app: &AppHandle, size: Option<(f64, f64)>) -> Result<(), String> {
     let window = app
         .get_webview_window("main")
         .ok_or("Failed to get main window")?;
@@ -75,6 +75,9 @@ pub fn toggle_window(app: &AppHandle) -> Result<(), String> {
     if visible {
         hide_window(&window)
     } else {
+        if let Some((w, h)) = size {
+            let _ = window.set_size(LogicalSize::new(w, h));
+        }
         // Critical for Wayland/Hyprland: Force always on top when showing
         // to ensure it floats above tiled windows.
         window

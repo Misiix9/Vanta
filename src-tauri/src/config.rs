@@ -3,6 +3,9 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Emitter;
 
+// Embedded default config for fallback writes.
+const DEFAULT_CONFIG_JSON: &str = include_str!("../resources/config.json");
+
 //
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VantaConfig {
@@ -141,6 +144,34 @@ pub struct WindowConfig {
     pub height: f64,
 }
 
+/// Clamp window dimensions to reasonable bounds to avoid oversized popups.
+/// Returns true if values were adjusted.
+pub fn clamp_window_size(cfg: &mut WindowConfig) -> bool {
+    let mut changed = false;
+    let min_w = 400.0;
+    let max_w = 1920.0;
+    let min_h = 300.0;
+    let max_h = 1080.0;
+
+    if cfg.width < min_w {
+        cfg.width = min_w;
+        changed = true;
+    } else if cfg.width > max_w {
+        cfg.width = max_w;
+        changed = true;
+    }
+
+    if cfg.height < min_h {
+        cfg.height = min_h;
+        changed = true;
+    } else if cfg.height > max_h {
+        cfg.height = max_h;
+        changed = true;
+    }
+
+    changed
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AppearanceConfig {
     pub blur_radius: u32,
@@ -179,8 +210,8 @@ impl Default for VantaConfig {
                 launch_on_login: false,
             },
             window: WindowConfig {
-                width: 800.0,
-                height: 600.0,
+                width: 680.0,
+                height: 420.0,
             },
             appearance: AppearanceConfig {
                 blur_radius: 40,
@@ -241,52 +272,45 @@ pub fn load_or_create_default() -> VantaConfig {
     if path.exists() {
         match fs::read_to_string(&path) {
             Ok(contents) => match serde_json::from_str::<VantaConfig>(&contents) {
-                Ok(config) => {
+                Ok(mut config) => {
                     log::info!("Loaded config from {}", path.display());
+                    // Clamp window bounds eagerly and persist if adjusted.
+                    if clamp_window_size(&mut config.window) {
+                        let _ = write_config(&config);
+                    }
+                    println!(
+                        "[vanta][config] loaded {:?} window={}x{}",
+                        path,
+                        config.window.width,
+                        config.window.height
+                    );
                     return config;
                 }
                 Err(e) => {
                     log::warn!("Invalid config.json, rewriting defaults: {}", e);
-                    let default_config = VantaConfig::default();
-                    if let Err(write_err) = write_config(&default_config) {
-                        log::error!("Failed to rewrite default config: {}", write_err);
-                    }
-                    return default_config;
+                    return rewrite_default_config();
                 }
             },
             Err(e) => {
                 log::warn!("Could not read config.json, rewriting defaults: {}", e);
-                let default_config = VantaConfig::default();
-                if let Err(write_err) = write_config(&default_config) {
-                    log::error!("Failed to rewrite default config: {}", write_err);
-                }
-                return default_config;
+                return rewrite_default_config();
             }
         }
     }
 
-    // Create default config
-    let default_config = VantaConfig::default();
+    // No config exists: create dir, seed scripts dir, and write default.
     let dir = config_dir();
-
     if let Err(e) = fs::create_dir_all(&dir) {
         log::error!("Could not create config directory {}: {}", dir.display(), e);
-        return default_config;
+        return VantaConfig::default();
     }
 
-    // Also create the scripts directory
     let scripts_dir = dir.join("scripts");
     if let Err(e) = fs::create_dir_all(&scripts_dir) {
         log::warn!("Could not create scripts directory: {}", e);
     }
 
-    if let Err(e) = write_config(&default_config) {
-        log::error!("Could not write default config: {}", e);
-    } else {
-        log::info!("Created default config at {}", path.display());
-    }
-
-    default_config
+    rewrite_default_config()
 }
 
 impl VantaConfig {
@@ -305,6 +329,29 @@ fn write_config(cfg: &VantaConfig) -> Result<(), String> {
         .map_err(|e| format!("Failed to write config to {}: {}", path.display(), e))?;
 
     Ok(())
+}
+
+/// Attempt to rewrite the default config using serialized defaults, falling back
+/// to an embedded copy if serialization or write fails.
+fn rewrite_default_config() -> VantaConfig {
+    let mut default_config = VantaConfig::default();
+
+    // Clamp before writing defaults.
+    let _ = clamp_window_size(&mut default_config.window);
+
+    // First try normal serialization+write.
+    if let Err(write_err) = write_config(&default_config) {
+        log::warn!("Primary default write failed: {}. Trying embedded copy...", write_err);
+        // Fallback: write embedded JSON blob.
+        let path = config_path();
+        if let Err(e) = fs::write(&path, DEFAULT_CONFIG_JSON) {
+            log::error!("Could not write embedded default config to {}: {}", path.display(), e);
+        } else {
+            log::info!("Wrote embedded default config to {}", path.display());
+        }
+    }
+
+    default_config
 }
 pub fn watch_config(app_handle: tauri::AppHandle) {
     use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};

@@ -1,4 +1,4 @@
-name: Release Vanta v1.14.0
+name: Release Vanta v1.14.1
 
 on:
   push:
@@ -21,6 +21,7 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev \
             build-essential \
             curl \
+            jq \
             wget \
             file \
             libssl-dev \
@@ -51,9 +52,17 @@ jobs:
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli
 
-      - name: Build Vanta (AppImage, Deb, RPM)
-        run: npm run tauri -- build --target x86_64-unknown-linux-gnu
+      - name: Verify version
+        run: |
+          node -p "require('./package.json').version"
+          jq -r '.version' src-tauri/tauri.conf.json
+          grep '^version' src-tauri/Cargo.toml
+
+      - name: Build Vanta (release AppImage, Deb, RPM)
+        run: npm run tauri -- build --target x86_64-unknown-linux-gnu --bundles appimage deb rpm
         env:
+          NODE_ENV: production
+          TAURI_ENVIRONMENT: production
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get Version
@@ -74,20 +83,16 @@ jobs:
           body: |
             ## What's New in ${{ steps.get_version.outputs.VERSION }}
 
-            ### Window Switcher v2
-            - Grouped window results by application with collapsible headers and subheaders.
-            - Configurable windows max results cap; honors defaults across config/UI.
-            - Polished headers and list styling centralized in `default.css` for theming.
+            ### Clipboard Mode Reliability
+            - `--clipboard` launch and hotkey now open the clipboard view consistently via startup retries and delayed emits.
+            - Clipboard history loads immediately and focuses the search input after the window shows.
 
-            ### Launcher & Settings UX
-            - Resilient suggestions: empty suggestions fall back to search to avoid blank UI.
-            - Settings accessibility: accordion headers are keyboard/ARIA friendly.
-            - Theme seeding: `~/.config/vanta/themes/default.css` is created on first run.
+            ### Startup & Defaults
+            - Window size honors config, clamps to sane bounds, and recenters before showing.
+            - `--hidden`/env start hidden respected; window shown only when requested.
+            - Config and theme defaults are auto-created if missing to avoid blank launches.
 
-            ### Installation
-            - **Debian/Ubuntu**: Download `.deb`
-            - **Fedora/OpenSUSE**: Download `.rpm`
-            - **Universal**: Download and run `.AppImage`
-            - **Arch Linux**: Install `vanta-bin` from AUR (`yay -S vanta-bin`)
+            ### Packaging
+            - Release builds run in production mode; AppImage/Deb/RPM artifacts are produced for x86_64 and uploaded as draft assets.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

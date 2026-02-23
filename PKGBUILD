@@ -1,6 +1,6 @@
 # Maintainer: onxy <onxy@dev.vanta.app>
 pkgname=vanta
-pkgver=1.0.0
+pkgver=1.14.1
 pkgrel=1
 pkgdesc="Liquid Glass command palette for Linux (Tauri v2 + Svelte 5)"
 arch=('x86_64')

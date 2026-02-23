@@ -1,5 +1,8 @@
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
+use std::env;
+use std::fs;
+use std::path::Path;
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -14,13 +17,14 @@ pub struct WindowEntry {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct HyprlandClient {
     address: String,
     class: String,
     title: String,
     workspace: HyprlandWorkspace,
     #[serde(default)]
-    monitor: Option<String>,
+    monitor: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -61,30 +65,29 @@ struct SwayRect {
 
 /// Detects the running environment and lists open windows.
 fn list_windows_uncached(recency: &RecencyStore) -> Vec<WindowEntry> {
-    // 1. Try Hyprland
-    if let Ok(output) = Command::new("hyprctl").arg("clients").arg("-j").output() {
-        if output.status.success() {
-            if let Ok(clients) = serde_json::from_slice::<Vec<HyprlandClient>>(&output.stdout) {
-                recency.bump_active_hyprland();
-                let mut seen = HashSet::new();
-                let windows = clients
-                    .into_iter()
-                    .filter(|c| !c.title.is_empty()) // Filter out empty titles (e.g. overlays)
-                    .map(|c| {
-                        let addr = c.address;
-                        seen.insert(addr.clone());
-                        WindowEntry {
-                            title: c.title,
-                            class: c.class,
-                            address: addr.clone(),
-                            workspace: c.workspace.name,
-                            last_active: recency.stamp(&addr),
-                        }
-                    })
-                    .collect();
-                recency.prune(&seen);
-                return windows;
-            }
+    // 1. Try Hyprland (explicitly resolving signature and binary path)
+    if let Some(output) = run_hyprctl_json::<HyprlandClient>(&["clients", "-j"]) {
+        recency.bump_active_hyprland();
+        let mut seen = HashSet::new();
+        let windows: Vec<WindowEntry> = output
+            .into_iter()
+            .filter(|c| !c.title.is_empty()) // Filter out empty titles (e.g. overlays)
+            .map(|c| {
+                let addr = c.address;
+                seen.insert(addr.clone());
+                WindowEntry {
+                    title: c.title,
+                    class: c.class,
+                    address: addr.clone(),
+                    workspace: c.workspace.name,
+                    last_active: recency.stamp(&addr),
+                }
+            })
+            .collect();
+        recency.prune(&seen);
+        eprintln!("[vanta][hyprctl] clients parsed windows={}", windows.len());
+        if !windows.is_empty() {
+            return windows;
         }
     }
 
@@ -102,8 +105,73 @@ fn list_windows_uncached(recency: &RecencyStore) -> Vec<WindowEntry> {
         }
     }
 
+    // 3. Fallback: X11 via wmctrl
+    if let Ok(output) = Command::new("wmctrl").arg("-lp").output() {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut windows = Vec::new();
+
+            for line in stdout.lines() {
+                // Format: 0x01200003  0 pid host title...
+                let mut parts = line.split_whitespace();
+                let id_hex = parts.next();
+                let workspace = parts.next();
+                let pid_str = parts.next();
+                // skip host
+                let _host = parts.next();
+                let title = parts.collect::<Vec<&str>>().join(" ");
+
+                if let (Some(id_hex), Some(ws), Some(pid_str)) = (id_hex, workspace, pid_str) {
+                    let pid = pid_str.parse::<i32>().unwrap_or_default();
+                    let class = proc_name_from_pid(pid).unwrap_or_else(|| "Window".to_string());
+
+                    // wmctrl gives hex window id like 0x04600007; use as address
+                    let address = id_hex.to_string();
+                    windows.push(WindowEntry {
+                        title: title.clone(),
+                        class,
+                        address: address.clone(),
+                        workspace: ws.to_string(),
+                        last_active: recency.stamp(&address),
+                    });
+                }
+            }
+
+            let seen: HashSet<String> = windows.iter().map(|w| w.address.clone()).collect();
+            recency.prune(&seen);
+            if !windows.is_empty() {
+                return windows;
+            }
+        }
+    }
+
     // Default: Return empty if neither is found
     Vec::new()
+}
+
+fn proc_name_from_pid(pid: i32) -> Option<String> {
+    if pid <= 0 {
+        return None;
+    }
+    let comm_path = format!("/proc/{}/comm", pid);
+    if let Ok(name) = std::fs::read_to_string(&comm_path) {
+        let trimmed = name.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+    let cmdline_path = format!("/proc/{}/cmdline", pid);
+    if let Ok(cmdline) = std::fs::read(cmdline_path) {
+        let parts: Vec<&str> = cmdline.split(|b| *b == 0).filter_map(|s| std::str::from_utf8(s).ok()).collect();
+        if let Some(first) = parts.first() {
+            if let Some(bin) = first.split('/').last() {
+                if !bin.is_empty() {
+                    return Some(bin.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 struct WindowsCache {
@@ -166,11 +234,9 @@ impl RecencyStore {
     }
 
     fn bump_active_hyprland(&self) {
-        if let Ok(output) = Command::new("hyprctl").arg("activewindow").arg("-j").output() {
-            if output.status.success() {
-                if let Ok(active) = serde_json::from_slice::<HyprlandClient>(&output.stdout) {
-                    self.set_active(&active.address);
-                }
+        if let Some(mut wins) = run_hyprctl_json::<HyprlandClient>(&["activewindow", "-j"]) {
+            if let Some(active) = wins.pop() {
+                self.set_active(&active.address);
             }
         }
     }
@@ -450,5 +516,99 @@ fn collect_sway_windows(
     }
     for child in &node.floating_nodes {
         collect_sway_windows(child, current_ws.as_deref(), windows, recency);
+    }
+}
+
+// ----- Hyprland helpers -----
+
+fn hypr_signature() -> Option<String> {
+    if let Ok(sig) = env::var("HYPRLAND_INSTANCE_SIGNATURE") {
+        if !sig.is_empty() {
+            return Some(sig);
+        }
+    }
+    if let Ok(entries) = fs::read_dir("/tmp/hypr") {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                if let Some(name) = entry.file_name().to_str() {
+                    if !name.is_empty() {
+                        return Some(name.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn hyprctl_path() -> String {
+    if let Ok(p) = env::var("HYPRCTL_PATH") {
+        if !p.is_empty() {
+            return p;
+        }
+    }
+    if Path::new("/usr/bin/hyprctl").exists() {
+        return "/usr/bin/hyprctl".to_string();
+    }
+    if Path::new("/usr/local/bin/hyprctl").exists() {
+        return "/usr/local/bin/hyprctl".to_string();
+    }
+    "hyprctl".to_string()
+}
+
+fn run_hyprctl_json<T: serde::de::DeserializeOwned>(args: &[&str]) -> Option<Vec<T>> {
+    let sig_opt = hypr_signature();
+    let sig_log = sig_opt.clone();
+    let bin = hyprctl_path();
+    let mut cmd = Command::new(&bin);
+    cmd.args(args);
+    if let Some(ref sig) = sig_opt {
+        cmd.env("HYPRLAND_INSTANCE_SIGNATURE", sig);
+    }
+
+    eprintln!("[vanta][hyprctl] invoking {:?} sig={:?}", cmd, sig_log);
+
+    match cmd.output() {
+        Ok(output) if output.status.success() => {
+            // Hyprland may return either an array (clients) or a single object (activewindow).
+            if let Ok(vec) = serde_json::from_slice::<Vec<T>>(&output.stdout) {
+                eprintln!(
+                    "[vanta][hyprctl] {:?} ok array len={} stderr={}",
+                    args,
+                    vec.len(),
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                return Some(vec);
+            }
+            if let Ok(single) = serde_json::from_slice::<T>(&output.stdout) {
+                eprintln!(
+                    "[vanta][hyprctl] {:?} ok single stderr={}",
+                    args,
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                return Some(vec![single]);
+            }
+            eprintln!(
+                "[vanta][hyprctl] parse failed for {:?}; raw={} stderr={}",
+                args,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            None
+        }
+        Ok(output) => {
+            eprintln!(
+                "[vanta][hyprctl] exited {:?} for {:?}; stdout={} stderr={}",
+                output.status.code(),
+                args,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            None
+        }
+        Err(e) => {
+            eprintln!("[vanta][hyprctl] failed to run {}: {}", bin, e);
+            None
+        }
     }
 }

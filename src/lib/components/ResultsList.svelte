@@ -40,6 +40,8 @@
   let itemElements: (HTMLDivElement | null)[] = $state([]);
   const dispatch = createEventDispatcher<{ visiblecount: { count: number } }>();
   let collapsedGroups = $state(new Set<string>());
+  // Remember if the user explicitly toggled Running so we don't auto-collapse it again.
+  let runningOverride: boolean | null = $state(null);
 
   let scrollTop = $state(0);
   let scrollHeight = $state(0);
@@ -92,8 +94,8 @@
   let showScrollbar = $derived(scrollHeight > clientHeight);
 
   const sectionOrder = [
+    "Running",
     "Apps",
-    "Windows",
     "Documents",
     "Scripts",
     "Calculator",
@@ -113,7 +115,7 @@
       case "Application":
         return "Apps";
       case "Window":
-        return "Windows";
+        return "Running";
       case "File":
         return "Documents";
       case "Calculator":
@@ -140,26 +142,28 @@
       group.items.push(res);
     }
 
+    // Always surface a Running group so the header is visible even if no window rows are present.
+    if (!seen.has("Running")) {
+      const placeholder = { label: "Running", items: [] };
+      seen.set("Running", placeholder);
+      order.push(placeholder);
+    }
+
     order.sort((a, b) => {
-      // When requested (e.g., empty query), honor the static priority.
-      if (preferDefaultOrder) {
-        const ai = sectionOrder.indexOf(a.label);
-        const bi = sectionOrder.indexOf(b.label);
-        const aIdx = ai === -1 ? sectionOrder.length : ai;
-        const bIdx = bi === -1 ? sectionOrder.length : bi;
-        return aIdx - bIdx;
-      }
-
-      const aTop = a.items.reduce((max, item) => Math.max(max, item.score ?? 0), -Infinity);
-      const bTop = b.items.reduce((max, item) => Math.max(max, item.score ?? 0), -Infinity);
-
-      if (aTop !== bTop) return bTop - aTop;
-
       const ai = sectionOrder.indexOf(a.label);
       const bi = sectionOrder.indexOf(b.label);
       const aIdx = ai === -1 ? sectionOrder.length : ai;
       const bIdx = bi === -1 ? sectionOrder.length : bi;
-      return aIdx - bIdx;
+
+      // Always enforce the explicit section priority so Apps and Documents stay on top.
+      if (aIdx !== bIdx) return aIdx - bIdx;
+
+      // Within the same priority bucket, fall back to the highest scored item for stability.
+      const aTop = a.items.reduce((max, item) => Math.max(max, item.score ?? 0), -Infinity);
+      const bTop = b.items.reduce((max, item) => Math.max(max, item.score ?? 0), -Infinity);
+      if (aTop !== bTop) return bTop - aTop;
+
+      return a.label.localeCompare(b.label);
     });
 
     return order;
@@ -180,31 +184,15 @@
       });
 
       if (!isCollapsed) {
-        if (group.label === "Windows") {
-          const byApp = new Map<string, SearchResult[]>();
-          for (const item of group.items) {
-            const key = item.group ?? "Windows";
-            const bucket = byApp.get(key) ?? [];
-            bucket.push(item);
-            byApp.set(key, bucket);
-          }
-
-          Array.from(byApp.entries()).forEach(([sub, items], subIndex) => {
+        if (group.label === "Running") {
+          group.items.forEach((result, itemIndex) => {
+            const keyBase = result.id ?? `${result.exec}-${groupIndex}-${itemIndex}`;
             rows.push({
-              type: "subheader",
-              label: sub,
-              key: `sub-${groupIndex}-${subIndex}-${sub}`,
-            });
-
-            items.forEach((result, itemIndex) => {
-              const keyBase = result.id ?? `${result.exec}-${groupIndex}-${subIndex}-${itemIndex}`;
-              rows.push({
-                type: "item",
-                result,
-                groupLabel: group.label,
-                itemIndex: flatItemIndex++,
-                key: `item-${groupIndex}-${subIndex}-${itemIndex}-${keyBase}`,
-              });
+              type: "item",
+              result,
+              groupLabel: group.label,
+              itemIndex: flatItemIndex++,
+              key: `item-${groupIndex}-${itemIndex}-${keyBase}`,
             });
           });
         } else {
@@ -233,6 +221,29 @@
     dispatch("visiblecount", { count: visibleRows.length });
   });
 
+  // Keep the selected row anchored in view as selection changes via keys or hover.
+  $effect(() => {
+    scrollToSelected();
+  });
+
+  // Default-collapse Running when showing idle suggestions, expand when actively searching.
+  // If the user toggles it, respect their override until they toggle again.
+  $effect(() => {
+    const next = new Set(collapsedGroups);
+    const desiredCollapsed =
+      runningOverride !== null ? runningOverride : preferDefaultOrder;
+
+    if (desiredCollapsed && !next.has("Running")) {
+      next.add("Running");
+      collapsedGroups = next;
+    }
+
+    if (!desiredCollapsed && next.has("Running")) {
+      next.delete("Running");
+      collapsedGroups = next;
+    }
+  });
+
   function handleSelect(index: number) {
     if (index < 0 || index >= visibleRows.length) return;
     selectedIndex = index;
@@ -245,8 +256,10 @@
     const next = new Set(collapsedGroups);
     if (next.has(row.label)) {
       next.delete(row.label);
+      if (row.label === "Running") runningOverride = false;
     } else {
       next.add(row.label);
+      if (row.label === "Running") runningOverride = true;
     }
     collapsedGroups = next;
   }
