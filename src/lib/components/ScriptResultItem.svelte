@@ -59,16 +59,23 @@
         {/if}
     </div>
 
-    <div class="item-meta">
+    <div class="item-meta" style="display:flex;gap:8px;align-items:center;">
         {#if item.badge}
             <span class="item-badge">{item.badge}</span>
         {/if}
         {#if isSelected && item.action}
-            <kbd class="action-hint">
-                {item.action.type === "copy" ? "⌘C" : "↵"}
-            </kbd>
+            <span
+                class="action-chip"
+                style="display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:12px;color:#ffffff;"
+            >
+                <span>{item.action.type === "copy" ? "Copy" : "Run"}</span>
+                <kbd
+                    class="action-hint"
+                    style="padding:2px 6px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.08);color:#ffffff;font-family:inherit;margin:0;"
+                >
+                    {item.action.type === "copy" ? "Ctrl C" : "↵"}
+                </kbd>
+            </span>
         {/if}
     </div>
 </button>
-
-

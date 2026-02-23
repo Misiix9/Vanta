@@ -29,6 +29,7 @@
   let activeScriptKeyword = $state("");
   let selectedIndex = $state(0);
   let searchTime: number | null = $state(null);
+  let visibleRowCount = $state(0);
   let blurMode: string = $state("fallback");
   let searchInputRef: SearchInput | undefined = $state();
   let resultsListRef: ResultsList | undefined = $state();
@@ -65,7 +66,7 @@
 
   // Derived: total item count for navigation
   let totalItems = $derived(
-    isScriptMode ? scriptResults.length : results.length,
+    isScriptMode ? scriptResults.length : visibleRowCount,
   );
 
   // Clipboard State
@@ -74,7 +75,7 @@
 
   // Keep selection valid when result sets change
   $effect(() => {
-    const count = isScriptMode ? scriptResults.length : results.length;
+    const count = isScriptMode ? scriptResults.length : visibleRowCount;
     if (count === 0) {
       selectedIndex = 0;
       return;
@@ -480,7 +481,11 @@
     // Launcher logic
     if (totalItems === 0) return;
 
-    const activeResult = !isScriptMode ? results[selectedIndex] : undefined;
+    const activeRow = !isScriptMode
+      ? resultsListRef?.getVisibleRow(selectedIndex)
+      : undefined;
+    const activeResult =
+      activeRow && activeRow.type === "item" ? activeRow.result : undefined;
 
     // Secondary action shortcuts for normal results
     if (!isScriptMode && activeResult && activeResult.actions?.length) {
@@ -534,8 +539,10 @@
         e.preventDefault();
         if (isScriptMode && scriptResults[selectedIndex]) {
           handleScriptActivate(scriptResults[selectedIndex]);
-        } else if (results[selectedIndex]) {
-          handleActivate(results[selectedIndex]);
+        } else if (activeRow?.type === "header") {
+          resultsListRef?.toggleHeaderAt(selectedIndex);
+        } else if (activeResult) {
+          handleActivate(activeResult);
         }
         break;
       case "Tab":
@@ -610,6 +617,7 @@
         {results}
         bind:selectedIndex
         onActivate={handleActivate}
+        on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
       />
     </div>
   {:else}
@@ -655,11 +663,12 @@
           {results}
           bind:selectedIndex
           onActivate={handleActivate}
+          on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
         />
       {/if}
 
       <StatusBar
-        resultCount={isScriptMode ? scriptResults.length : results.length}
+        resultCount={isScriptMode ? scriptResults.length : visibleRowCount}
         {searchTime}
       />
     </div>

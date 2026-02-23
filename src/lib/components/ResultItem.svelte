@@ -6,12 +6,14 @@
     let {
         result,
         index,
+        displayIndex = undefined,
         isSelected = false,
         onSelect,
         onActivate,
     }: {
         result: SearchResult;
         index: number;
+        displayIndex?: number;
         isSelected: boolean;
         onSelect: (index: number) => void;
         onActivate: (result: SearchResult) => void;
@@ -122,7 +124,7 @@
         {:else if result.source === "Window"}
             <span class="icon-emoji">🪟</span>
         {:else if result.source === "Clipboard"}
-            <span class="icon-number">{index + 1}</span>
+            <span class="icon-number">{(displayIndex ?? index) + 1}</span>
         {:else}
             <img
                 src="/package.svg"
@@ -148,31 +150,37 @@
         >
             <span
                 class="action-chip"
-                style="display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:12px;"
+                style="display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:12px;color:#ffffff;"
             >
-                <kbd style="padding:2px 6px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.08);">
-                    Enter
-                </kbd>
                 <span>{primaryActionLabel()}</span>
+                <kbd
+                    style="padding:2px 6px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.08);color:#ffffff;font-family:inherit;"
+                >
+                    ↵
+                </kbd>
             </span>
 
             {#if result.actions}
                 {#each result.actions as action}
                     <span
                         class="action-chip"
-                        style="display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:12px;"
+                        style="display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:12px;color:#ffffff;"
                     >
+                        <span>{action.label}</span>
                         {#if action.shortcut}
-                            <kbd style="padding:2px 6px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.08);">
-                                {action.shortcut}
+                            <kbd
+                                style="padding:2px 6px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.08);color:#ffffff;font-family:inherit;"
+                            >
+                                {action.shortcut
+                                    .replace("Shift+", "⇧ ")
+                                    .replace("Ctrl+", "Ctrl ")
+                                    .replace("Alt+", "Alt ")
+                                    .replace("Enter", "↵")}
                             </kbd>
                         {/if}
-                        <span>{action.label}</span>
                     </span>
                 {/each}
             {/if}
         </div>
     {/if}
 </button>
-
-

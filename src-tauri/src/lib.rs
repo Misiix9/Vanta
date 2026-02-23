@@ -25,6 +25,7 @@ use history::History;
 use matcher::{ResultSource, SearchResult};
 use scanner::AppEntry;
 use scripts::{ScriptEntry, ScriptOutput};
+use windows::{list_windows_grouped, WindowGroup};
 
 use files::FileIndex;
 
@@ -169,6 +170,82 @@ fn record_latency(
     }
 }
 
+fn build_window_results<F>(
+    query_lower: &str,
+    window_cap: usize,
+    apps: &[AppEntry],
+    weight: u32,
+    provider: F,
+) -> Vec<SearchResult>
+where
+    F: Fn(usize) -> Vec<WindowGroup>,
+{
+    let mut window_groups = provider(window_cap);
+
+    if !query_lower.is_empty() {
+        for g in &mut window_groups {
+            g.entries.retain(|w| {
+                w.title.to_lowercase().contains(query_lower)
+                    || w.class.to_lowercase().contains(query_lower)
+            });
+        }
+        window_groups.retain(|g| !g.entries.is_empty());
+    }
+
+    let mut results = Vec::new();
+    let mut count = 0;
+    for group in window_groups {
+        if count >= window_cap {
+            break;
+        }
+        let app_class = group.app_class.clone();
+        let mut entries = group.entries;
+        if count + entries.len() > window_cap {
+            entries.truncate(window_cap - count);
+        }
+        count += entries.len();
+
+        for win in entries {
+            let matched_app = apps.iter().find(|app| {
+                if let Some(ref wm_class) = app.startup_wm_class {
+                    if wm_class.eq_ignore_ascii_case(&win.class) {
+                        return true;
+                    }
+                }
+                if let Some(cmd) = app.exec.split_whitespace().next() {
+                    if cmd.eq_ignore_ascii_case(&win.class) {
+                        return true;
+                    }
+                }
+                app.name.eq_ignore_ascii_case(&win.class)
+            });
+
+            let icon = matched_app.and_then(|a| a.icon.clone());
+
+            let actions = vec![matcher::ActionHint {
+                label: "Close".to_string(),
+                exec: format!("close-window:{}", win.address),
+                shortcut: Some("Alt+Enter".to_string()),
+            }];
+
+            results.push(SearchResult {
+                title: win.title,
+                subtitle: Some(format!("Workspace {}", win.workspace)),
+                icon,
+                exec: format!("focus:{}", win.address),
+                score: weighted_score(950_000, weight),
+                match_indices: vec![],
+                source: matcher::ResultSource::Window,
+                actions: Some(actions),
+                id: Some(win.address.clone()),
+                group: Some(app_class.clone()),
+            });
+        }
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod cli_tests {
     use super::*;
@@ -199,6 +276,109 @@ mod cli_tests {
             }
             other => panic!("Unexpected command: {:?}", other),
         }
+    }
+}
+
+#[cfg(test)]
+mod window_search_tests {
+    use super::*;
+    use crate::windows::{WindowEntry, WindowGroup};
+
+    fn make_app(name: &str, class: &str, icon: &str) -> AppEntry {
+        AppEntry {
+            name: name.to_string(),
+            generic_name: None,
+            comment: None,
+            exec: class.to_lowercase(),
+            icon: Some(icon.to_string()),
+            categories: Vec::new(),
+            terminal: false,
+            startup_wm_class: Some(class.to_string()),
+            desktop_file_path: format!("/usr/share/applications/{}.desktop", name),
+        }
+    }
+
+    fn make_entry(title: &str, class: &str, addr: &str, workspace: &str, last_active: u64) -> WindowEntry {
+        WindowEntry {
+            title: title.to_string(),
+            class: class.to_string(),
+            address: addr.to_string(),
+            workspace: workspace.to_string(),
+            last_active,
+        }
+    }
+
+    fn make_group(app_class: &str, entries: Vec<WindowEntry>) -> WindowGroup {
+        let last_active = entries.iter().map(|w| w.last_active).max().unwrap_or(0);
+        WindowGroup {
+            app_class: app_class.to_string(),
+            entries,
+            last_active,
+        }
+    }
+
+    #[test]
+    fn window_results_cap_and_preserve_order() {
+        let apps = vec![
+            make_app("Alpha", "Alpha", "alpha.png"),
+            make_app("Beta", "Beta", "beta.png"),
+        ];
+
+        let groups = vec![
+            make_group(
+                "Beta",
+                vec![make_entry("Beta Main", "Beta", "b1", "1", 300)],
+            ),
+            make_group(
+                "Alpha",
+                vec![
+                    make_entry("Alpha One", "Alpha", "a1", "2", 250),
+                    make_entry("Alpha Two", "Alpha", "a2", "2", 200),
+                ],
+            ),
+        ];
+
+        let results = build_window_results("", 2, &apps, 100, |_| groups.clone());
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].title, "Beta Main");
+        assert_eq!(results[0].exec, "focus:b1");
+        assert_eq!(results[0].group.as_deref(), Some("Beta"));
+        assert_eq!(results[0].score, weighted_score(950_000, 100));
+        assert_eq!(results[1].title, "Alpha One");
+        assert_eq!(results[1].group.as_deref(), Some("Alpha"));
+    }
+
+    #[test]
+    fn window_results_filter_by_query_and_keep_actions() {
+        let apps = vec![make_app("Alpha", "Alpha", "alpha.png")];
+        let groups = vec![
+            make_group(
+                "Alpha",
+                vec![
+                    make_entry("Terminal", "Alpha", "a1", "1", 30),
+                    make_entry("Notes", "Alpha", "a2", "1", 20),
+                ],
+            ),
+            make_group(
+                "Other",
+                vec![make_entry("Browser", "Other", "o1", "2", 10)],
+            ),
+        ];
+
+        let results = build_window_results("term", 5, &apps, 100, |_| groups.clone());
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Terminal");
+        assert_eq!(results[0].subtitle.as_deref(), Some("Workspace 1"));
+        assert_eq!(results[0].group.as_deref(), Some("Alpha"));
+
+        let actions = results[0]
+            .actions
+            .as_ref()
+            .expect("window result should expose actions");
+        assert_eq!(actions[0].label, "Close");
+        assert_eq!(actions[0].exec, "close-window:a1");
     }
 }
 
@@ -314,57 +494,18 @@ async fn search(
         Vec::new()
     };
 
-    // Search Open Windows
-    let open_windows = windows::list_windows();
-    
-    // Perform simple substring match for now (or fuzzy if I want to duplicate logic, but simple is faster for now)
+    // Search Open Windows (grouped and capped)
     let query_lower = query.to_lowercase();
     if search_config.windows.enabled {
-        for win in open_windows {
-            if win.title.to_lowercase().contains(&query_lower)
-                || win.class.to_lowercase().contains(&query_lower)
-            {
-             
-             // Try to find matching app for icon
-             let matched_app = apps.iter().find(|app| {
-                 // 1. Match StartupWMClass (most accurate)
-                 if let Some(ref wm_class) = app.startup_wm_class {
-                     if wm_class.eq_ignore_ascii_case(&win.class) {
-                         return true;
-                     }
-                 }
-                 // 2. Match Exec (first part)
-                 // e.g. Exec="gnome-terminal --wait" -> "gnome-terminal"
-                 if let Some(cmd) = app.exec.split_whitespace().next() {
-                     // Check against class
-                     if cmd.eq_ignore_ascii_case(&win.class) {
-                         return true;
-                     }
-                     // Some windows have class="Alacritty", exec="alacritty"
-                 }
-                 // 3. Match Name
-                 if app.name.eq_ignore_ascii_case(&win.class) {
-                     return true;
-                 }
-                 
-                 false
-             });
-
-             let icon = matched_app.and_then(|a| a.icon.clone());
-
-                let win_result = SearchResult {
-                    title: win.title,
-                    subtitle: Some(format!("Switch to Window (Workspace {})", win.workspace)),
-                    icon: icon,
-                    exec: format!("focus:{}", win.address),
-                    score: weighted_score(950_000, search_config.windows.weight),
-                    match_indices: vec![],
-                    source: matcher::ResultSource::Window,
-                    actions: None,
-                };
-                results.push(win_result);
-            }
-        }
+        let window_cap = std::cmp::max(1, max_results / 2);
+        let window_results = build_window_results(
+            &query_lower,
+            window_cap,
+            &apps,
+            search_config.windows.weight,
+            |cap| list_windows_grouped(cap),
+        );
+        results.extend(window_results);
     }
 
     // Check for math
@@ -380,6 +521,8 @@ async fn search(
             match_indices: vec![],
             source: matcher::ResultSource::Calculator,
             actions: None,
+            id: None,
+            group: None,
         };
         results.push(calc_result);
         }
@@ -499,6 +642,8 @@ async fn search(
                             match_indices: vec![],
                             source: matcher::ResultSource::File,
                             actions: None,
+                            id: None,
+                            group: None,
                         });
                     }
                 }
@@ -553,6 +698,8 @@ async fn search(
                 match_indices: vec![],
                 source: matcher::ResultSource::Application,
                 actions: None,
+                id: None,
+                group: None,
             };
             // Put the exact match at the top
             results.insert(0, inst_result);
@@ -570,6 +717,8 @@ async fn search(
             match_indices: Vec::new(),
             source: matcher::ResultSource::Application,
             actions: None,
+            id: None,
+            group: None,
         });
     }
 
@@ -663,6 +812,8 @@ async fn get_suggestions(
             match_indices: vec![],
             source: ResultSource::Application,
             actions: None,
+            id: None,
+            group: None,
         })
         .collect();
 

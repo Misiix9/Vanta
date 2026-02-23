@@ -16,6 +16,10 @@ pub struct SearchResult {
     pub source: ResultSource,
     #[serde(default)]
     pub actions: Option<Vec<ActionHint>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -79,6 +83,8 @@ pub fn fuzzy_search(
                 match_indices: Vec::new(),
                 source: ResultSource::Application,
                 actions: None,
+                id: None,
+                group: None,
             })
             .collect();
     }
@@ -156,6 +162,8 @@ pub fn fuzzy_search(
             match_indices: indices,
             source: ResultSource::Application,
             actions: None,
+            id: None,
+            group: None,
         })
         .collect();
 

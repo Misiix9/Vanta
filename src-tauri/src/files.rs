@@ -186,6 +186,8 @@ pub fn search_index(index: &FileIndexState, query: &str, limit: usize) -> Vec<Se
                 match_indices: vec![],
                 source: ResultSource::File,
                 actions: Some(actions),
+                id: None,
+                group: None,
             });
 
             if results.len() >= limit {

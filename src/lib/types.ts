@@ -104,6 +104,7 @@ export interface SearchResult {
     source: ResultSource;
     id?: number | string;
     actions?: ResultAction[];
+    group?: string;
 }
 
 export type ResultSource = "Application" | "Calculator" | "Window" | "Clipboard" | "File" | { Script: { keyword: string } };

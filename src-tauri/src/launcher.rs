@@ -2,6 +2,22 @@ use std::process::{Command, Stdio};
 use std::env;
 use tauri::Emitter;
 
+#[cfg(not(test))]
+fn spawn_cmd(cmd: &str, args: &[String]) -> Result<(), std::io::Error> {
+    Command::new(cmd)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
+}
+
+#[cfg(test)]
+fn spawn_cmd(_cmd: &str, _args: &[String]) -> Result<(), std::io::Error> {
+    Ok(())
+}
+
 // Handles .desktop Exec placeholders (like %u, %F) so we don't pass garbage to the shell.
 pub fn launch(exec: &str, app_handle: Option<&tauri::AppHandle>) -> Result<(), String> {
     let start = std::time::Instant::now();
@@ -43,28 +59,17 @@ pub fn launch(exec: &str, app_handle: Option<&tauri::AppHandle>) -> Result<(), S
         }
     }
 
-    // Check for window focus action
+    // Check for window actions
     if exec.starts_with("focus:") {
-        let address = exec.trim_start_matches("focus:");
-        // Try Hyprland focus
-        if let Err(e) = Command::new("hyprctl")
-            .arg("dispatch")
-            .arg("focuswindow")
-            .arg(format!("address:{}", address))
-            .spawn()
-        {
-            log::warn!("Hyprland focus failed: {}", e);
-        }
+        return focus_window(exec.trim_start_matches("focus:"));
+    }
 
-        // Try Sway focus (address is con_id)
-        if let Err(e) = Command::new("swaymsg")
-            .arg(format!("[con_id={}] focus", address))
-            .spawn()
-        {
-            log::warn!("Sway focus failed: {}", e);
-        }
+    if exec.starts_with("close-window:") {
+        return close_window(exec.trim_start_matches("close-window:"));
+    }
 
-        return Ok(());
+    if exec.starts_with("minimize-window:") {
+        return minimize_window(exec.trim_start_matches("minimize-window:"));
     }
 
     let cleaned = strip_field_codes(exec);
@@ -130,6 +135,62 @@ fn strip_field_codes(exec: &str) -> String {
         cleaned = cleaned.replace("  ", " ");
     }
     cleaned
+}
+
+fn focus_window(address: &str) -> Result<(), String> {
+    let mut ok = false;
+
+    if let Err(e) = spawn_cmd(
+        "hyprctl",
+        &["dispatch".into(), "focuswindow".into(), format!("address:{}", address)],
+    ) {
+        log::warn!("Hyprland focus failed: {}", e);
+    } else {
+        ok = true;
+    }
+
+    if let Err(e) = spawn_cmd("swaymsg", &[format!("[con_id={}] focus", address)]) {
+        log::warn!("Sway focus failed: {}", e);
+    } else {
+        ok = true;
+    }
+
+    if ok {
+        Ok(())
+    } else {
+        Err("Failed to focus window".to_string())
+    }
+}
+
+fn close_window(address: &str) -> Result<(), String> {
+    let mut ok = false;
+
+    if let Err(e) = spawn_cmd(
+        "hyprctl",
+        &["dispatch".into(), "closewindow".into(), format!("address:{}", address)],
+    ) {
+        log::warn!("Hyprland close failed: {}", e);
+    } else {
+        ok = true;
+    }
+
+    if let Err(e) = spawn_cmd("swaymsg", &[format!("[con_id={}] kill", address)]) {
+        log::warn!("Sway close failed: {}", e);
+    } else {
+        ok = true;
+    }
+
+    if ok {
+        Ok(())
+    } else {
+        Err("Failed to close window".to_string())
+    }
+}
+
+fn minimize_window(address: &str) -> Result<(), String> {
+    // Minimize is compositor-specific; not reliably supported on Hyprland/Sway.
+    let _ = address; // unused
+    Err("Minimize not supported on this compositor".to_string())
 }
 
 /// Launches a terminal emulator and runs the provided shell command.
@@ -213,5 +274,13 @@ mod tests {
     #[test]
     fn test_strip_field_codes_multiple() {
         assert_eq!(strip_field_codes("cmd %f --flag %U"), "cmd --flag");
+    }
+
+    #[test]
+    fn routes_focus_close_minimize() {
+        // With test stub, commands won't spawn; ensure routing surfaces as Ok
+        assert!(launch("focus:abc", None).is_ok());
+        assert!(launch("close-window:abc", None).is_ok());
+        assert!(launch("minimize-window:abc", None).is_err());
     }
 }
