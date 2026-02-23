@@ -1,4 +1,4 @@
-name: Release Vanta v1.12.0
+name: Release Vanta v1.14.0
 
 on:
   push:
@@ -74,11 +74,15 @@ jobs:
           body: |
             ## What's New in ${{ steps.get_version.outputs.VERSION }}
 
-            ### Script SDK & Validator
-            - New CLI: `vanta doctor` validates script metadata and JSON output, with schema-backed checks.
-            - Launcher hook: type “vanta doctor” to open a terminal and run the validator automatically.
-            - Strict JSON mode toggle in Settings, plus configurable script timeout.
-            - Simulation flags for doctor (`--simulate-timeout`, `--simulate-error`) to debug scripts safely.
+            ### Window Switcher v2
+            - Grouped window results by application with collapsible headers and subheaders.
+            - Configurable windows max results cap; honors defaults across config/UI.
+            - Polished headers and list styling centralized in `default.css` for theming.
+
+            ### Launcher & Settings UX
+            - Resilient suggestions: empty suggestions fall back to search to avoid blank UI.
+            - Settings accessibility: accordion headers are keyboard/ARIA friendly.
+            - Theme seeding: `~/.config/vanta/themes/default.css` is created on first run.
 
             ### Installation
             - **Debian/Ubuntu**: Download `.deb`

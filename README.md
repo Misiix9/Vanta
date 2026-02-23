@@ -33,19 +33,19 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_1.13.0_amd64.deb
+sudo dpkg -i vanta_1.14.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-1.13.0-1.x86_64.rpm
+sudo rpm -i vanta-1.14.0-1.x86_64.rpm
 ```
 
 ### AppImage (Universal)
 ```bash
-chmod +x Vanta_1.13.0_amd64.AppImage
-./Vanta_1.13.0_amd64.AppImage
+chmod +x Vanta_1.14.0_amd64.AppImage
+./Vanta_1.14.0_amd64.AppImage
 ```
 
 ---
@@ -57,6 +57,7 @@ chmod +x Vanta_1.13.0_amd64.AppImage
 - **Scriptable**: Write plugins in Python, Bash, Node.js, or any language. If it outputs JSON, Vanta can run it.
 - **Clipboard History**: Press `Super+V` to open a searchable clipboard history.
 - **File Search with filters**: Search your home directory with include/exclude globs, extension allowlist, and type filter (files-only / dirs-only). Manual rebuild button shows index freshness.
+- **Window Switcher v2**: Dedicated Windows section grouped by app/class, ordered by recency, with focus and close actions.
 - **Math**: Type an expression like `2^10 + 5` and get the result instantly.
 - **Script Store**: Install community scripts with `install <GitHub-URL>` or `install /path/to/script.sh`.
 - **Borderless Glass Window**: Fully transparent and undecorated window — the OS frame is replaced entirely by your CSS.
@@ -135,6 +136,8 @@ Run `vanta doctor` to lint installed scripts (metadata, executable bit, JSON sch
 ## Configuration
 
 Configuration lives at `~/.config/vanta/config.json`, created automatically on first run.
+
+Window search cap can be tuned with `search.windows_max_results` (0 uses half of `general.max_results`).
 
 <details>
   <summary><strong>View Default Configuration</strong></summary>
