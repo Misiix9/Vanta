@@ -2,6 +2,7 @@
   import { createEventDispatcher } from "svelte";
   import type { SearchResult } from "$lib/types";
   import ResultItem from "./ResultItem.svelte";
+  import SectionHeader from "./SectionHeader.svelte";
   type VisibleRow =
     | {
       type: "header";
@@ -9,6 +10,11 @@
       count: number;
       key: string;
       collapsed: boolean;
+      }
+    | {
+        type: "subheader";
+        label: string;
+        key: string;
       }
     | {
         type: "item";
@@ -22,10 +28,12 @@
     results = [],
     selectedIndex = $bindable(0),
     onActivate,
+    preferDefaultOrder = false,
   }: {
     results: SearchResult[];
     selectedIndex: number;
     onActivate: (result: SearchResult) => void;
+    preferDefaultOrder?: boolean;
   } = $props();
 
   let container: HTMLDivElement | null = $state(null);
@@ -83,12 +91,46 @@
 
   let showScrollbar = $derived(scrollHeight > clientHeight);
 
+  const sectionOrder = [
+    "Apps",
+    "Windows",
+    "Documents",
+    "Scripts",
+    "Calculator",
+    "Clipboard",
+    "Settings",
+    "Other",
+  ];
+
+  function deriveSection(res: SearchResult): string {
+    if (res.section && res.section.trim()) return res.section.trim();
+
+    if (typeof res.source === "object" && "Script" in res.source) {
+      return "Scripts";
+    }
+
+    switch (res.source) {
+      case "Application":
+        return "Apps";
+      case "Window":
+        return "Windows";
+      case "File":
+        return "Documents";
+      case "Calculator":
+        return "Calculator";
+      case "Clipboard":
+        return "Clipboard";
+      default:
+        return "Other";
+    }
+  }
+
   let groupedResults = $derived.by(() => {
     const order: { label: string; items: SearchResult[] }[] = [];
     const seen = new Map<string, { label: string; items: SearchResult[] }>();
 
     for (const res of results) {
-      const label = res.group?.trim() || "Ungrouped";
+      const label = deriveSection(res);
       let group = seen.get(label);
       if (!group) {
         group = { label, items: [] };
@@ -97,6 +139,28 @@
       }
       group.items.push(res);
     }
+
+    order.sort((a, b) => {
+      // When requested (e.g., empty query), honor the static priority.
+      if (preferDefaultOrder) {
+        const ai = sectionOrder.indexOf(a.label);
+        const bi = sectionOrder.indexOf(b.label);
+        const aIdx = ai === -1 ? sectionOrder.length : ai;
+        const bIdx = bi === -1 ? sectionOrder.length : bi;
+        return aIdx - bIdx;
+      }
+
+      const aTop = a.items.reduce((max, item) => Math.max(max, item.score ?? 0), -Infinity);
+      const bTop = b.items.reduce((max, item) => Math.max(max, item.score ?? 0), -Infinity);
+
+      if (aTop !== bTop) return bTop - aTop;
+
+      const ai = sectionOrder.indexOf(a.label);
+      const bi = sectionOrder.indexOf(b.label);
+      const aIdx = ai === -1 ? sectionOrder.length : ai;
+      const bIdx = bi === -1 ? sectionOrder.length : bi;
+      return aIdx - bIdx;
+    });
 
     return order;
   });
@@ -116,24 +180,56 @@
       });
 
       if (!isCollapsed) {
-        group.items.forEach((result, itemIndex) => {
-          const keyBase = result.id ?? `${result.exec}-${groupIndex}-${itemIndex}`;
-          rows.push({
-            type: "item",
-            result,
-            groupLabel: group.label,
-            itemIndex: flatItemIndex++,
-            key: `item-${groupIndex}-${itemIndex}-${keyBase}`,
+        if (group.label === "Windows") {
+          const byApp = new Map<string, SearchResult[]>();
+          for (const item of group.items) {
+            const key = item.group ?? "Windows";
+            const bucket = byApp.get(key) ?? [];
+            bucket.push(item);
+            byApp.set(key, bucket);
+          }
+
+          Array.from(byApp.entries()).forEach(([sub, items], subIndex) => {
+            rows.push({
+              type: "subheader",
+              label: sub,
+              key: `sub-${groupIndex}-${subIndex}-${sub}`,
+            });
+
+            items.forEach((result, itemIndex) => {
+              const keyBase = result.id ?? `${result.exec}-${groupIndex}-${subIndex}-${itemIndex}`;
+              rows.push({
+                type: "item",
+                result,
+                groupLabel: group.label,
+                itemIndex: flatItemIndex++,
+                key: `item-${groupIndex}-${subIndex}-${itemIndex}-${keyBase}`,
+              });
+            });
           });
-        });
+        } else {
+          group.items.forEach((result, itemIndex) => {
+            const keyBase = result.id ?? `${result.exec}-${groupIndex}-${itemIndex}`;
+            rows.push({
+              type: "item",
+              result,
+              groupLabel: group.label,
+              itemIndex: flatItemIndex++,
+              key: `item-${groupIndex}-${itemIndex}-${keyBase}`,
+            });
+          });
+        }
       }
     });
 
     return rows;
   });
 
+  // Keep itemElements aligned with visible rows so bind:element never receives undefined.
   $effect(() => {
-    itemElements.length = visibleRows.length;
+    if (itemElements.length !== visibleRows.length) {
+      itemElements = Array(visibleRows.length).fill(null);
+    }
     dispatch("visiblecount", { count: visibleRows.length });
   });
 
@@ -196,28 +292,22 @@
     >
       {#each visibleRows as row, i (row.key)}
         {#if row.type === "header"}
+          <SectionHeader
+            bind:element={itemElements[i]}
+            label={row.label}
+            count={row.count}
+            collapsed={row.collapsed}
+            selected={i === selectedIndex}
+            on:hover={() => handleSelect(i)}
+            on:toggle={() => toggleHeaderAt(i)}
+          />
+        {:else if row.type === "subheader"}
           <div
-            class="group-header"
-            class:selected={i === selectedIndex}
+            class="subheader"
             bind:this={itemElements[i]}
-            id="result-row-{i}"
-            role="button"
-            tabindex="0"
-            aria-expanded={!row.collapsed}
-            onmouseenter={() => handleSelect(i)}
-            onclick={() => toggleHeaderAt(i)}
-            onkeydown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                toggleHeaderAt(i);
-              }
-            }}
+            aria-hidden="true"
           >
-            <span class="group-title">
-              <span class={`chevron ${row.collapsed ? "collapsed" : ""}`}>▸</span>
-              {row.label}
-            </span>
-            <span class="group-count">{row.count}</span>
+            {row.label}
           </div>
         {:else}
           <div
@@ -275,55 +365,5 @@
     <p class="empty-text">Type to search applications...</p>
   </div>
 {/if}
-
-
-<style>
-  .group-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.7);
-    background: rgba(255, 255, 255, 0.02);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    transition: background 140ms ease, color 140ms ease;
-  }
-
-  .group-header.selected {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.95);
-  }
-
-  .group-title {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-  }
-
-  .chevron {
-    display: inline-block;
-    transition: transform 140ms ease;
-  }
-
-  .chevron.collapsed {
-    transform: rotate(90deg);
-  }
-
-  .group-count {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.8);
-    background: rgba(255, 255, 255, 0.04);
-  }
-</style>
 
 

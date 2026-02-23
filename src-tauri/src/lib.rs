@@ -239,6 +239,7 @@ where
                 actions: Some(actions),
                 id: Some(win.address.clone()),
                 group: Some(app_class.clone()),
+                section: Some("Windows".to_string()),
             });
         }
     }
@@ -483,10 +484,17 @@ async fn search(
     };
 
     let mut results = if search_config.applications.enabled {
+        // Show all apps when the query is empty; otherwise cap by configured max_results.
+        let app_limit = if query.trim().is_empty() {
+            apps.len()
+        } else {
+            max_results
+        };
+
         matcher::fuzzy_search(
             &query,
             &apps,
-            max_results,
+            app_limit,
             &usage_map,
             search_config.applications.weight,
         )
@@ -497,7 +505,12 @@ async fn search(
     // Search Open Windows (grouped and capped)
     let query_lower = query.to_lowercase();
     if search_config.windows.enabled {
-        let window_cap = std::cmp::max(1, max_results / 2);
+        let derived_cap = std::cmp::max(1, max_results / 2);
+        let window_cap = if search_config.windows_max_results > 0 {
+            search_config.windows_max_results
+        } else {
+            derived_cap
+        };
         let window_results = build_window_results(
             &query_lower,
             window_cap,
@@ -523,40 +536,48 @@ async fn search(
             actions: None,
             id: None,
             group: None,
+            section: Some("Calculator".to_string()),
         };
         results.push(calc_result);
         }
     }
 
-    // Check for file search - instant in-memory lookup!
-    if query.starts_with('/') || query.starts_with("~/") {
-        if !search_config.files.enabled {
-            record_latency(
-                "search",
-                search_start.elapsed(),
-                &SEARCH_CALLS,
-                &SEARCH_TOTAL_MS,
-                &SEARCH_MAX_MS,
-            );
-            return Ok(Vec::new());
-        }
-
+    // File search (in-memory index) – always available so sections are searched together.
+    if search_config.files.enabled {
         let index_guard = state
             .file_index
             .lock()
             .map_err(|_| "Failed to access file index".to_string())?;
-        let mut file_results = files::search_index(&index_guard, &query, 20);
+        let mut file_results = files::search_index(&index_guard, &query, max_results);
         for file_result in &mut file_results {
             file_result.score = weighted_score(file_result.score, search_config.files.weight);
         }
-        record_latency(
-            "search",
-            search_start.elapsed(),
-            &SEARCH_CALLS,
-            &SEARCH_TOTAL_MS,
-            &SEARCH_MAX_MS,
-        );
-        return Ok(file_results);
+        results.extend(file_results);
+    }
+
+    // Surface settings when the query clearly asks for it.
+    let wants_settings = query_lower.contains("setting")
+        || query_lower.contains("preferences")
+        || query_lower.contains("config")
+        || query_lower.contains("option");
+
+    if wants_settings && search_config.applications.enabled {
+        if let Some((raw_score, indices)) = matcher::fuzzy_score_text(&query, "Open Vanta Settings") {
+            let base = 900_000u32.saturating_add(raw_score.saturating_mul(20));
+            results.push(SearchResult {
+                title: "Settings".to_string(),
+                subtitle: Some("Open Vanta settings".to_string()),
+                icon: None,
+                exec: "open-settings".to_string(),
+                score: weighted_score(base, search_config.applications.weight),
+                match_indices: indices,
+                source: matcher::ResultSource::Application,
+                actions: None,
+                id: Some("settings".to_string()),
+                group: None,
+                section: Some("Settings".to_string()),
+            });
+        }
     }
 
     if query.starts_with("install ") {
@@ -644,6 +665,7 @@ async fn search(
                             actions: None,
                             id: None,
                             group: None,
+                            section: Some("Documents".to_string()),
                         });
                     }
                 }
@@ -669,6 +691,7 @@ async fn search(
                       res.exec = format!("install:{}", res.exec);
                       res.score = 800000;
                  }
+                  res.section = Some("Documents".to_string());
                  
                  results.push(res);
              }
@@ -700,6 +723,7 @@ async fn search(
                 actions: None,
                 id: None,
                 group: None,
+                section: Some("Apps".to_string()),
             };
             // Put the exact match at the top
             results.insert(0, inst_result);
@@ -719,6 +743,7 @@ async fn search(
             actions: None,
             id: None,
             group: None,
+            section: Some("Apps".to_string()),
         });
     }
 
@@ -766,7 +791,7 @@ async fn get_suggestions(
         .apps
         .lock()
         .map_err(|_| "Failed to access app cache".to_string())?;
-    
+
     let history = state
         .history
         .lock()
@@ -777,7 +802,10 @@ async fn get_suggestions(
         .lock()
         .map_err(|_| "Failed to access config".to_string())?;
 
-    let max_results = config.general.max_results;
+    let file_index = state
+        .file_index
+        .lock()
+        .map_err(|_| "Failed to access file index".to_string())?;
 
     if !config.search.applications.enabled {
         record_latency(
@@ -799,10 +827,8 @@ async fn get_suggestions(
     // Sort by usage count descending
     scored_apps.sort_by(|a, b| b.1.cmp(&a.1));
 
-    // Convert to SearchResult without truncating
-    let results: Vec<SearchResult> = scored_apps
+    let mut results: Vec<SearchResult> = scored_apps
         .into_iter()
-        .take(max_results)
         .map(|(app, _count)| SearchResult {
             title: app.name.clone(),
             subtitle: app.generic_name.clone().or_else(|| app.comment.clone()),
@@ -814,8 +840,36 @@ async fn get_suggestions(
             actions: None,
             id: None,
             group: None,
+            section: Some("Apps".to_string()),
         })
         .collect();
+
+    // Documents: pull a handful of indexed entries (dirs first) for smart suggestions
+    let mut doc_results = files::search_index(&file_index, "", 12);
+    doc_results.sort_by(|a, b| {
+        let a_dir = a.icon.as_deref() == Some("dir");
+        let b_dir = b.icon.as_deref() == Some("dir");
+        b_dir.cmp(&a_dir)
+    });
+    for mut doc in doc_results {
+        doc.section = Some("Documents".to_string());
+        results.push(doc);
+    }
+
+    // Settings entry
+    results.push(SearchResult {
+        title: "Settings".to_string(),
+        subtitle: Some("Open Vanta settings".to_string()),
+        icon: None,
+        exec: "open-settings".to_string(),
+        score: 1_200_000,
+        match_indices: vec![],
+        source: ResultSource::Application,
+        actions: None,
+        id: Some("settings".to_string()),
+        group: None,
+        section: Some("Settings".to_string()),
+    });
 
     record_latency(
         "suggestions",

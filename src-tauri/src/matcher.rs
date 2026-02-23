@@ -20,6 +20,8 @@ pub struct SearchResult {
     pub id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -85,6 +87,7 @@ pub fn fuzzy_search(
                 actions: None,
                 id: None,
                 group: None,
+                section: Some("Apps".to_string()),
             })
             .collect();
     }
@@ -164,6 +167,7 @@ pub fn fuzzy_search(
             actions: None,
             id: None,
             group: None,
+            section: Some("Apps".to_string()),
         })
         .collect();
 
@@ -176,4 +180,29 @@ pub fn fuzzy_search(
     );
 
     results
+}
+
+/// Fuzzy score an arbitrary text snippet, returning the score and matched indices.
+pub fn fuzzy_score_text(query: &str, text: &str) -> Option<(u32, Vec<u32>)> {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let mut matcher = Matcher::new(Config::DEFAULT);
+    let pattern = Atom::new(
+        trimmed,
+        CaseMatching::Smart,
+        Normalization::Smart,
+        AtomKind::Fuzzy,
+        false,
+    );
+
+    let mut haystack_buf = Vec::new();
+    let mut indices = Vec::new();
+    let haystack = Utf32Str::new(text, &mut haystack_buf);
+
+    pattern
+        .indices(haystack, &mut matcher, &mut indices)
+        .map(|score| (score as u32, indices))
 }

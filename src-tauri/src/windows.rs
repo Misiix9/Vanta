@@ -144,8 +144,10 @@ impl RecencyStore {
     fn stamp(&self, addr: &str) -> u64 {
         if let Ok(mut map) = self.inner.lock() {
             let now = Self::now();
-            map.insert(addr.to_string(), now);
-            now
+            let entry = map
+                .entry(addr.to_string())
+                .or_insert_with(|| now.saturating_sub(1));
+            *entry
         } else {
             Self::now()
         }

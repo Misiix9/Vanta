@@ -175,10 +175,15 @@
     <div class="sections">
         <!-- Theme Section -->
         <div class="accordion-item" class:active={activeSection === "Theme Profile"}>
-            <div class="accordion-header" onclick={() => toggleSection("Theme Profile")}>
+            <button
+                class="accordion-header"
+                type="button"
+                onclick={() => toggleSection("Theme Profile")}
+                aria-expanded={activeSection === "Theme Profile"}
+            >
                 <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 <h3>Theme Profile</h3>
-            </div>
+            </button>
             {#if activeSection === "Theme Profile"}
                 <div class="accordion-content">
 <div class="control-group">
@@ -280,10 +285,15 @@
 
         <!-- Scripts Section -->
         <div class="accordion-item" class:active={activeSection === "Scripts"}>
-            <div class="accordion-header" onclick={() => toggleSection("Scripts")}>
+            <button
+                class="accordion-header"
+                type="button"
+                onclick={() => toggleSection("Scripts")}
+                aria-expanded={activeSection === "Scripts"}
+            >
                 <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 <h3>Scripts</h3>
-            </div>
+            </button>
             {#if activeSection === "Scripts"}
                 <div class="accordion-content">
 <div class="control-group">
@@ -316,10 +326,15 @@
 
         <!-- Window Section -->
         <div class="accordion-item" class:active={activeSection === "Window"}>
-            <div class="accordion-header" onclick={() => toggleSection("Window")}>
+            <button
+                class="accordion-header"
+                type="button"
+                onclick={() => toggleSection("Window")}
+                aria-expanded={activeSection === "Window"}
+            >
                 <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 <h3>Window</h3>
-            </div>
+            </button>
             {#if activeSection === "Window"}
                 <div class="accordion-content">
 <div class="control-group">
@@ -358,10 +373,15 @@
 
         <!-- General Section -->
         <div class="accordion-item" class:active={activeSection === "General"}>
-            <div class="accordion-header" onclick={() => toggleSection("General")}>
+            <button
+                class="accordion-header"
+                type="button"
+                onclick={() => toggleSection("General")}
+                aria-expanded={activeSection === "General"}
+            >
                 <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 <h3>General</h3>
-            </div>
+            </button>
             {#if activeSection === "General"}
                 <div class="accordion-content">
 <div class="control-group">
@@ -392,10 +412,15 @@
 
         <!-- File Search Section -->
         <div class="accordion-item" class:active={activeSection === "File Search"}>
-            <div class="accordion-header" onclick={() => toggleSection("File Search")}>
+            <button
+                class="accordion-header"
+                type="button"
+                onclick={() => toggleSection("File Search")}
+                aria-expanded={activeSection === "File Search"}
+            >
                 <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 <h3>File Search</h3>
-            </div>
+            </button>
             {#if activeSection === "File Search"}
                 <div class="accordion-content">
 <div class="control-group">
@@ -529,10 +554,15 @@
 
         <!-- Search Ranking Section -->
         <div class="accordion-item" class:active={activeSection === "Search Ranking"}>
-            <div class="accordion-header" onclick={() => toggleSection("Search Ranking")}>
+            <button
+                class="accordion-header"
+                type="button"
+                onclick={() => toggleSection("Search Ranking")}
+                aria-expanded={activeSection === "Search Ranking"}
+            >
                 <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 <h3>Search Ranking</h3>
-            </div>
+            </button>
             {#if activeSection === "Search Ranking"}
                 <div class="accordion-content">
 <div class="control-group">
@@ -628,10 +658,15 @@
 
         <!-- Diagnostics Section -->
         <div class="accordion-item" class:active={activeSection === "Diagnostics"}>
-            <div class="accordion-header" onclick={() => toggleSection("Diagnostics")}>
+            <button
+                class="accordion-header"
+                type="button"
+                onclick={() => toggleSection("Diagnostics")}
+                aria-expanded={activeSection === "Diagnostics"}
+            >
                 <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 <h3>Diagnostics</h3>
-            </div>
+            </button>
             {#if activeSection === "Diagnostics"}
                 <div class="accordion-content">
 <div class="control-group">

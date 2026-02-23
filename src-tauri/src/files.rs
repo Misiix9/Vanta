@@ -1,5 +1,5 @@
 use crate::config::FilesConfig;
-use crate::matcher::{ActionHint, ResultSource, SearchResult};
+use crate::matcher::{ActionHint, ResultSource, SearchResult, fuzzy_score_text};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -149,6 +149,9 @@ pub fn search_index(index: &FileIndexState, query: &str, limit: usize) -> Vec<Se
     }
     .to_lowercase();
 
+    let query_trimmed = query.trim();
+    let query_lower = query_trimmed.to_lowercase();
+
     let mut results = Vec::new();
 
     for entry in &index.entries {
@@ -156,6 +159,30 @@ pub fn search_index(index: &FileIndexState, query: &str, limit: usize) -> Vec<Se
         if term.is_empty() || entry.name.contains(&term) {
             let is_dir = entry.icon == "dir";
             let mut actions: Vec<ActionHint> = Vec::new();
+
+            // Score by fuzzy match so document-centric queries surface higher.
+            let mut base_score: u32 = 50;
+            let mut match_indices: Vec<u32> = Vec::new();
+
+            if !query_trimmed.is_empty() {
+                if let Some((score, indices)) = fuzzy_score_text(query_trimmed, &entry.name_display) {
+                    // Boost matches heavily so document-focused queries reorder sections.
+                    base_score = 20_000 + score.saturating_mul(40);
+                    match_indices = indices;
+                } else if entry.name.contains(&term) {
+                    base_score = 15_000;
+                }
+
+                // Heuristic boost for explicit document intent
+                if query_lower.contains("document")
+                    || query_lower.contains("documents")
+                    || query_lower.contains("download")
+                    || query_lower.contains("downloads")
+                    || query_lower.contains("file")
+                {
+                    base_score = base_score.saturating_add(120_000);
+                }
+            }
 
             // File/dir secondary actions
             actions.push(ActionHint {
@@ -182,12 +209,13 @@ pub fn search_index(index: &FileIndexState, query: &str, limit: usize) -> Vec<Se
                 subtitle: Some(entry.path.clone()),
                 icon: Some(entry.icon.clone()),
                 exec: entry.path.clone(),
-                score: 50,
-                match_indices: vec![],
+                score: base_score,
+                match_indices,
                 source: ResultSource::File,
                 actions: Some(actions),
                 id: None,
                 group: None,
+                section: Some("Documents".to_string()),
             });
 
             if results.len() >= limit {

@@ -30,6 +30,10 @@
   let selectedIndex = $state(0);
   let searchTime: number | null = $state(null);
   let visibleRowCount = $state(0);
+    let currentMode: "launcher" | "clipboard" = $state("launcher");
+  let preferDefaultOrder = $derived(
+    query.trim() === "" && currentMode === "launcher" && !isScriptMode,
+  );
   let blurMode: string = $state("fallback");
   let searchInputRef: SearchInput | undefined = $state();
   let resultsListRef: ResultsList | undefined = $state();
@@ -70,7 +74,6 @@
   );
 
   // Clipboard State
-  let currentMode: "launcher" | "clipboard" = $state("launcher");
   let clipboardHistory: any[] = [];
 
   // Keep selection valid when result sets change
@@ -209,6 +212,7 @@
         source: "Clipboard",
         id: item.id,
         match_indices: [],
+        section: "Clipboard",
       }));
     } else {
       const lower = q.toLowerCase();
@@ -224,12 +228,14 @@
         source: "Clipboard",
         id: item.id,
         match_indices: [],
+        section: "Clipboard",
       }));
     }
     selectedIndex = 0;
   }
 
   /**
+            section: "Clipboard",
    * Check if query begins with a known script keyword.
    * Returns [keyword, args] if matched, or null.
    */
@@ -253,13 +259,32 @@
     try {
       const suggestions = await invoke<SearchResult[]>("get_suggestions");
       if (requestId !== searchRequestId) return;
-      results = suggestions;
-      // If we have suggestions, select the first one
+      console.info("suggestions", suggestions?.length ?? 0);
+      if (suggestions.length === 0) {
+        // Fallback to a real search to avoid blank UI if suggestions fail.
+        const searchFallback = await invoke<SearchResult[]>("search", { query: "" });
+        if (requestId !== searchRequestId) return;
+        results = searchFallback;
+      } else {
+        results = suggestions;
+      }
+
       if (results.length > 0) {
         selectedIndex = 0;
       }
     } catch (e) {
       console.error("Failed to load suggestions:", e);
+      // Fallback to empty search results to keep UI populated
+      try {
+        const searchFallback = await invoke<SearchResult[]>("search", { query: "" });
+        if (requestId === searchRequestId) {
+          results = searchFallback;
+          console.info("fallback search", results?.length ?? 0);
+          if (results.length > 0) selectedIndex = 0;
+        }
+      } catch (err) {
+        console.error("Fallback search failed:", err);
+      }
     }
   }
 
@@ -330,6 +355,7 @@
       if (requestId !== searchRequestId) return;
       const elapsed = performance.now() - start;
 
+      console.info("search results", searchResults?.length ?? 0, "for", q);
       results = searchResults;
       selectedIndex = 0;
       searchTime = elapsed;
@@ -351,6 +377,9 @@
         setTimeout(() => {
           document.querySelector("input")?.focus();
         }, 10);
+        return;
+      } else if (result.exec === "open-settings") {
+        view = "settings";
         return;
       } else if (result.exec.startsWith("copy-path:")) {
         const value = result.exec.slice(10);
@@ -617,6 +646,7 @@
         {results}
         bind:selectedIndex
         onActivate={handleActivate}
+        {preferDefaultOrder}
         on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
       />
     </div>
@@ -663,6 +693,7 @@
           {results}
           bind:selectedIndex
           onActivate={handleActivate}
+          {preferDefaultOrder}
           on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
         />
       {/if}

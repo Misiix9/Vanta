@@ -26,6 +26,8 @@ pub struct SearchConfig {
     pub calculator: SourcePreference,
     #[serde(default)]
     pub files: SourcePreference,
+    #[serde(default = "default_windows_cap")]
+    pub windows_max_results: usize,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -60,8 +62,13 @@ impl Default for SearchConfig {
             windows: SourcePreference::default(),
             calculator: SourcePreference::default(),
             files: SourcePreference::default(),
+            windows_max_results: default_windows_cap(),
         }
     }
+}
+
+fn default_windows_cap() -> usize {
+    0
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

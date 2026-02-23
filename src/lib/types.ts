@@ -64,6 +64,7 @@ export interface SearchConfig {
     windows: SourcePreference;
     calculator: SourcePreference;
     files: SourcePreference;
+    windows_max_results?: number;
 }
 
 export interface VantaConfig {
@@ -105,6 +106,7 @@ export interface SearchResult {
     id?: number | string;
     actions?: ResultAction[];
     group?: string;
+    section?: string;
 }
 
 export type ResultSource = "Application" | "Calculator" | "Window" | "Clipboard" | "File" | { Script: { keyword: string } };
