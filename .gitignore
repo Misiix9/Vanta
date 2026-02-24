@@ -19,6 +19,7 @@ coverage/
 .env.*
 !.env.example
 
+.worktrees/
 pkg/
 *.pkg.tar.zst
 *.deb
