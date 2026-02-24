@@ -1204,3 +1204,16 @@ input[type="range"] {
     flex-direction: column;
     gap: 12px;
 }
+/* FontAwesome Icon Styling */
+.item-icon i.fa-solid, 
+.item-icon i.fa-regular, 
+.item-icon i.fa-brands,
+.item-icon i.icon-fa {
+    font-size: 24px;
+    color: var(--vanta-accent, #7b35f0);
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}

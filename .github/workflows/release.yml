@@ -1,9 +1,12 @@
-name: Release Vanta v1.14.1
+name: Release Vanta v1.15.0
 
 on:
   push:
     tags:
       - 'v*'
+  release:
+    types: [published, created]
+  workflow_dispatch:
 
 jobs:
   release:
@@ -82,17 +85,19 @@ jobs:
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
             ## What's New in ${{ steps.get_version.outputs.VERSION }}
+            
+            ### New
+            - Added Commands section actions: Sleep, Lock, Shutdown, Restart, Log Out, and Go to BIOS (firmware).
+            - Scripts section now auto-refreshes after installs so new scripts appear immediately.
 
-            ### Clipboard Mode Reliability
-            - `--clipboard` launch and hotkey now open the clipboard view consistently via startup retries and delayed emits.
-            - Clipboard history loads immediately and focuses the search input after the window shows.
+            ### Changes
+            - Commands are always listed at the bottom; Scripts sit above Commands for clarity.
+            - Settings entry and all command icons use the theme accent via FontAwesome, defined in the theme CSS.
 
-            ### Startup & Defaults
-            - Window size honors config, clamps to sane bounds, and recenters before showing.
-            - `--hidden`/env start hidden respected; window shown only when requested.
-            - Config and theme defaults are auto-created if missing to avoid blank launches.
+            ### Fixes
+            - Resolved launcher icon parsing and ensured consistent command execution wiring for the new actions.
 
-            ### Packaging
-            - Release builds run in production mode; AppImage/Deb/RPM artifacts are produced for x86_64 and uploaded as draft assets.
+            ### Known Issues
+            - None reported for this release. If you hit issues, please file them on GitHub with logs.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -102,6 +102,7 @@
     "Clipboard",
     "Settings",
     "Other",
+    "Commands",
   ];
 
   function deriveSection(res: SearchResult): string {
@@ -224,6 +225,16 @@
   // Keep the selected row anchored in view as selection changes via keys or hover.
   $effect(() => {
     scrollToSelected();
+  });
+
+  // Avoid selecting section headers; jump to the first real item when results change.
+  $effect(() => {
+    if (!visibleRows.length) return;
+    const row = visibleRows[selectedIndex];
+    if (row?.type === "header") {
+      const firstItemIndex = visibleRows.findIndex((r) => r.type === "item");
+      if (firstItemIndex >= 0) selectedIndex = firstItemIndex;
+    }
   });
 
   // Default-collapse Running when showing idle suggestions, expand when actively searching.

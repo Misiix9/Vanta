@@ -5476,7 +5476,7 @@ dependencies = [
 
 [[package]]
 name = "vanta"
-version = "1.14.1"
+version = "1.15.0"
 dependencies = [
  "chrono",
  "clap",

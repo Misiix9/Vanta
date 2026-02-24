@@ -1,15 +1,17 @@
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::fs;
 use std::io::{BufRead, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 use std::time::Duration;
-use std::env;
+
 use jsonschema::{Draft, JSONSchema};
 use serde_json::json;
-use std::sync::OnceLock;
 
 use crate::config;
+use crate::permissions::{self, Capability, Decision};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ScriptAction {
@@ -60,6 +62,38 @@ pub struct ScriptOutput {
 
 static SCRIPT_OUTPUT_SCHEMA: OnceLock<Result<JSONSchema, String>> = OnceLock::new();
 
+#[derive(Debug)]
+pub enum PermissionError {
+    Deny,
+    NeedsPrompt { missing_caps: Vec<Capability> },
+}
+
+pub fn check_and_record_permissions(
+    script_id: &str,
+    requested_caps: &[Capability],
+) -> Result<(), PermissionError> {
+    if requested_caps.is_empty() {
+        return Ok(());
+    }
+
+    let response = permissions::get_decision_for(script_id, requested_caps);
+
+    match response.decision {
+        Decision::Allow if response.missing_caps.is_empty() => Ok(()),
+        Decision::Allow | Decision::Ask => Err(PermissionError::NeedsPrompt {
+            missing_caps: response.missing_caps,
+        }),
+        Decision::Deny => {
+            for capability in requested_caps {
+                if let Err(err) = permissions::record_block_event(script_id, capability.clone(), None) {
+                    log::warn!("Failed to record block event for {}: {}", script_id, err);
+                }
+            }
+            Err(PermissionError::Deny)
+        }
+    }
+}
+
 // Metadata scraped from script file headers.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ScriptEntry {
@@ -68,6 +102,8 @@ pub struct ScriptEntry {
     pub description: Option<String>,
     pub icon: Option<String>,
     pub path: String,
+    #[serde(default)]
+    pub capabilities: Vec<Capability>,
 }
 
 fn scripts_dir() -> PathBuf {
@@ -127,7 +163,7 @@ pub fn scan_scripts() -> Vec<ScriptEntry> {
         }
 
         // Parse optional vanta: metadata from first 5 lines
-        let (name, description, icon) = parse_script_metadata(&path);
+        let (name, description, icon, capabilities) = parse_script_metadata(&path);
 
         entries.push(ScriptEntry {
             keyword,
@@ -135,6 +171,7 @@ pub fn scan_scripts() -> Vec<ScriptEntry> {
             description,
             icon,
             path: path.to_string_lossy().to_string(),
+            capabilities,
         });
     }
 
@@ -144,14 +181,17 @@ pub fn scan_scripts() -> Vec<ScriptEntry> {
 }
 
 // Reads metadata like name/icon from the first few lines of the script.
-fn parse_script_metadata(path: &Path) -> (Option<String>, Option<String>, Option<String>) {
+fn parse_script_metadata(
+    path: &Path,
+) -> (Option<String>, Option<String>, Option<String>, Vec<Capability>) {
     let mut name = None;
     let mut description = None;
     let mut icon = None;
+    let mut capabilities: Vec<Capability> = Vec::new();
 
     let file = match fs::File::open(path) {
         Ok(f) => f,
-        Err(_) => return (name, description, icon),
+        Err(_) => return (name, description, icon, capabilities),
     };
 
     let reader = std::io::BufReader::new(file);
@@ -176,23 +216,71 @@ fn parse_script_metadata(path: &Path) -> (Option<String>, Option<String>, Option
 
         if let Some(rest) = content.strip_prefix("vanta:") {
             if let Some((key, value)) = rest.split_once('=') {
-                match key.trim() {
-                    "name" => name = Some(value.trim().to_string()),
-                    "description" => description = Some(value.trim().to_string()),
-                    "icon" => icon = Some(value.trim().to_string()),
+                let key = key.trim();
+                let value = value.trim();
+                match key {
+                    "name" => name = Some(value.to_string()),
+                    "description" => description = Some(value.to_string()),
+                    "icon" => icon = Some(value.to_string()),
+                    "capabilities" => {
+                        for cap_str in value.split(',').map(|s| s.trim().to_lowercase()) {
+                            let cap = match cap_str.as_str() {
+                                "network" => Some(Capability::Network),
+                                "shell" => Some(Capability::Shell),
+                                "filesystem" | "fs" | "file" => Some(Capability::Filesystem),
+                                _ => None,
+                            };
+                            if let Some(cap) = cap {
+                                if !capabilities.contains(&cap) {
+                                    capabilities.push(cap);
+                                }
+                            } else if !cap_str.is_empty() {
+                                log::warn!(
+                                    "Unknown capability '{}' in script metadata for {}",
+                                    cap_str,
+                                    path.display()
+                                );
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
         }
     }
 
-    (name, description, icon)
+    (name, description, icon, capabilities)
 }
 
 // Executes the script. Enforces timeout and 1MB output cap to keep things sane.
-pub fn execute_script(keyword: &str, args: &str, timeout_ms: u64) -> Result<ScriptOutput, String> {
+pub fn execute_script(
+    keyword: &str,
+    args: &str,
+    timeout_ms: u64,
+    requested_caps: &[Capability],
+) -> Result<ScriptOutput, String> {
     let start = std::time::Instant::now();
     let dir = scripts_dir();
+
+    if let Err(err) = check_and_record_permissions(keyword, requested_caps) {
+        return match err {
+            PermissionError::NeedsPrompt { missing_caps } => {
+                let payload = json!({
+                    "script_id": keyword,
+                    "missing_caps": missing_caps,
+                    "requested_caps": requested_caps,
+                });
+                Err(format!("PERMISSION_NEEDED:{}", payload))
+            }
+            PermissionError::Deny => {
+                let payload = json!({
+                    "script_id": keyword,
+                    "requested_caps": requested_caps,
+                });
+                Err(format!("PERMISSION_DENIED:{}", payload))
+            }
+        };
+    }
 
     if let Some(ms) = simulate_timeout_ms() {
         log::warn!("Simulating timeout for '{}' after {}ms", keyword, ms);
@@ -450,6 +538,14 @@ pub fn watch_scripts(app_handle: tauri::AppHandle) {
                     last_scan = std::time::Instant::now();
 
                     let scripts = scan_scripts();
+                    // Seed permission store so newly added scripts prompt on first run.
+                    let seeds: Vec<(String, Vec<Capability>)> = scripts
+                        .iter()
+                        .map(|s| (s.keyword.clone(), s.capabilities.clone()))
+                        .collect();
+                    if let Err(err) = permissions::seed_missing_decisions(&seeds) {
+                        log::warn!("Failed to seed permissions for new scripts: {}", err);
+                    }
                     log::info!("Scripts re-scanned: {} scripts", scripts.len());
                     let _ = app_handle.emit("scripts-changed", &scripts);
                 }

@@ -78,7 +78,7 @@ pub fn run(args: DoctorArgs) -> Result<(), String> {
         }
 
         // Attempt to execute the script to validate JSON structure.
-        match scripts::execute_script(&entry.keyword, "", script_timeout) {
+        match scripts::execute_script(&entry.keyword, "", script_timeout, &[]) {
             Ok(output) => match scripts::validate_script_output(&output) {
                 Ok(()) => {}
                 Err(msg) => {

@@ -12,6 +12,9 @@
     ScriptItem,
     ScriptOutput,
     ThemeMeta,
+    Capability,
+    PermissionNeededPayload,
+    PermissionDeniedPayload,
   } from "$lib/types";
   import { applyTheme } from "$lib/theme";
   import SearchInput from "$lib/components/SearchInput.svelte";
@@ -19,10 +22,12 @@
   import StatusBar from "$lib/components/StatusBar.svelte";
   import ScriptResultItem from "$lib/components/ScriptResultItem.svelte";
   import SettingsView from "$lib/components/SettingsView.svelte";
+  import PermissionModal from "$lib/components/PermissionModal.svelte";
 
   let query = $state("");
   let vantaConfig: VantaConfig | undefined = $state();
   let results: SearchResult[] = $state([]);
+  let baseResults: SearchResult[] = $state([]);
   let view: "launcher" | "settings" = $state("launcher");
   let scriptResults: ScriptItem[] = $state([]);
   let isScriptMode = $state(false);
@@ -41,10 +46,151 @@
   let actionInFlight = $state(false); // guard: don't dismiss during actions
   let isVisible = $state(true);
   let isMouseOver = $state(false);
+  let permissionPrompt = $state<{
+    scriptId: string;
+    missingCaps: Capability[];
+    requestedCaps: Capability[];
+    keyword: string;
+    args: string;
+  } | null>(null);
+  let permissionBusy = $state(false);
+
+  // Lightweight app rescan throttle (only when window is shown/opened)
+  const RESCAN_INTERVAL_MS = 15000;
+  let lastAppRescan = $state(0);
+
+  async function maybeRescanApps(force = false) {
+    const now = Date.now();
+    if (!force && now - lastAppRescan < RESCAN_INTERVAL_MS) return;
+    lastAppRescan = now;
+    try {
+      await invoke<number>("rescan_apps");
+    } catch (e) {
+      console.error("App rescan failed", e);
+    }
+  }
 
   let availableThemes: ThemeMeta[] = $state([]);
   let searchRequestId = 0;
   const unlisteners: Array<() => void> = [];
+
+  let activeScriptCaps = $derived(
+    activeScriptKeyword ? capsForScript(activeScriptKeyword) : [],
+  );
+
+  const builtinCommands: SearchResult[] = [
+    {
+      title: "Sleep",
+      subtitle: "Suspend this machine immediately",
+      icon: "fa-solid fa-moon",
+      exec: "system-action:sleep",
+      score: 1_400_000,
+      match_indices: [],
+      source: "Application",
+      id: "cmd-sleep",
+      section: "Commands",
+    },
+    {
+      title: "Lock",
+      subtitle: "Lock the current session",
+      icon: "fa-solid fa-lock",
+      exec: "system-action:lock",
+      score: 1_390_000,
+      match_indices: [],
+      source: "Application",
+      id: "cmd-lock",
+      section: "Commands",
+    },
+    {
+      title: "Shutdown",
+      subtitle: "Power off this device",
+      icon: "fa-solid fa-power-off",
+      exec: "system-action:shutdown",
+      score: 1_380_000,
+      match_indices: [],
+      source: "Application",
+      id: "cmd-shutdown",
+      section: "Commands",
+    },
+    {
+      title: "Restart",
+      subtitle: "Reboot the machine",
+      icon: "fa-solid fa-rotate-right",
+      exec: "system-action:restart",
+      score: 1_370_000,
+      match_indices: [],
+      source: "Application",
+      id: "cmd-restart",
+      section: "Commands",
+    },
+    {
+      title: "Go to BIOS",
+      subtitle: "Reboot into firmware setup",
+      icon: "fa-solid fa-microchip",
+      exec: "system-action:bios",
+      score: 1_350_000,
+      match_indices: [],
+      source: "Application",
+      id: "cmd-bios",
+      section: "Commands",
+    },
+    {
+      title: "Log Out",
+      subtitle: "Terminate the current session",
+      icon: "fa-solid fa-right-from-bracket",
+      exec: "system-action:logout",
+      score: 1_360_000,
+      match_indices: [],
+      source: "Application",
+      id: "cmd-logout",
+      section: "Commands",
+    },
+  ];
+
+  function filterCommandResults(q: string): SearchResult[] {
+    const normalized = q.trim().toLowerCase();
+    if (!normalized) return builtinCommands;
+
+    return builtinCommands.filter((cmd) => {
+      const inTitle = cmd.title.toLowerCase().includes(normalized);
+      const inSubtitle = (cmd.subtitle || "").toLowerCase().includes(normalized);
+      return inTitle || inSubtitle;
+    });
+  }
+
+  function buildScriptResults(q: string): SearchResult[] {
+    if (!availableScripts.length) return [];
+    const normalized = q.trim().toLowerCase();
+
+    return availableScripts
+      .filter((script) => {
+        if (!normalized) return true;
+        const name = script.name || script.keyword;
+        const desc = script.description || "";
+        return (
+          script.keyword.toLowerCase().includes(normalized) ||
+          name.toLowerCase().includes(normalized) ||
+          desc.toLowerCase().includes(normalized)
+        );
+      })
+      .map((script, index) => ({
+        title: script.name || script.keyword,
+        subtitle: script.description || script.path,
+        icon: script.icon || null,
+        exec: `run-script:${script.keyword}`,
+        score: 1_200_000 - index,
+        match_indices: [],
+        source: { Script: { keyword: script.keyword } },
+        id: `script-${script.keyword}`,
+        section: "Scripts",
+      }));
+  }
+
+  function composeResults(base: SearchResult[], q: string): SearchResult[] {
+    const commands = filterCommandResults(q);
+    const scripts = buildScriptResults(q);
+    return [...commands, ...base, ...scripts];
+  }
 
   onDestroy(() => {
     for (const unlisten of unlisteners) {
@@ -72,6 +218,13 @@
   let totalItems = $derived(
     isScriptMode ? scriptResults.length : visibleRowCount,
   );
+
+  $effect(() => {
+    if (isScriptMode || currentMode !== "launcher") return;
+    const scriptsVersion = availableScripts.length;
+    results = composeResults(baseResults, query);
+    void scriptsVersion; // ensure reactivity when scripts change
+  });
 
   // Clipboard State
   let clipboardHistory: any[] = [];
@@ -173,6 +326,17 @@
       }),
     );
 
+    // Refresh scripts after store installs finish
+    unlisteners.push(
+      await listen("download_status", (event) => {
+        const status = (event.payload as any)?.status;
+        if (status === "success") {
+          refreshScripts();
+        }
+      }),
+    );
+
+
     // Listen for app cache refresh events and update suggestions when idle.
     unlisteners.push(
       await listen("apps-changed", () => {
@@ -190,10 +354,11 @@
       }),
     );
 
-    // Listen for window shown event → refocus the search input and reload suggestions
+    // When the window is shown (hotkey/toggle/open), refresh apps once and refocus
     unlisteners.push(
-      await listen("tauri://focus", () => {
+      await listen("tauri://show", () => {
         isVisible = true;
+        maybeRescanApps();
         setTimeout(() => {
           searchInputRef?.focus?.();
           if (query.trim() === "" && currentMode === "launcher") {
@@ -204,6 +369,8 @@
     );
 
     loadSuggestions();
+    // Ensure app cache is fresh when GUI is first opened
+    maybeRescanApps(true);
   });
 
   function updateClipboardSuggestions(q: string) {
@@ -259,6 +426,273 @@
     return null;
   }
 
+  function capsForScript(keyword: string): Capability[] {
+    const match = availableScripts.find(
+      (s) => s.keyword.toLowerCase() === keyword.toLowerCase(),
+    );
+    return match?.capabilities ?? [];
+  }
+
+  function capIcon(cap: Capability): string {
+    switch (cap) {
+      case "Network":
+        return "network";
+      case "Shell":
+        return "shell";
+      case "Filesystem":
+        return "filesystem";
+    }
+  }
+
+  function parsePermissionError(err: unknown):
+    | { type: "needed"; payload: PermissionNeededPayload }
+    | { type: "denied"; payload: PermissionDeniedPayload }
+    | null {
+    const raw =
+      typeof err === "string"
+        ? err
+        : typeof err === "object" && err && "message" in err
+          ? String((err as any).message)
+          : String(err ?? "");
+
+    if (!raw) return null;
+
+    const neededPrefix = "PERMISSION_NEEDED:";
+    if (raw.startsWith(neededPrefix)) {
+      try {
+        const payload = JSON.parse(raw.slice(neededPrefix.length));
+        return { type: "needed", payload } as any;
+      } catch (e) {
+        console.warn("Failed to parse PERMISSION_NEEDED payload", e, raw);
+      }
+    }
+
+    const deniedPrefix = "PERMISSION_DENIED:";
+    if (raw.startsWith(deniedPrefix)) {
+      try {
+        const payload = JSON.parse(raw.slice(deniedPrefix.length));
+        return { type: "denied", payload } as any;
+      } catch (e) {
+        console.warn("Failed to parse PERMISSION_DENIED payload", e, raw);
+      }
+    }
+
+    return null;
+  }
+
+  function handlePermissionError(err: unknown, keyword: string, args: string) {
+    const parsed = parsePermissionError(err);
+    if (!parsed) return false;
+
+    if (parsed.type === "needed") {
+      const missingCaps = parsed.payload.missing_caps || [];
+      const requestedCaps = parsed.payload.requested_caps || missingCaps;
+
+      permissionPrompt = {
+        scriptId: parsed.payload.script_id || keyword,
+        missingCaps,
+        requestedCaps,
+        keyword,
+        args,
+      };
+      // Keep the script view active with a clear placeholder
+      isScriptMode = true;
+      activeScriptKeyword = keyword;
+      scriptResults = [
+        {
+          title: "Permission required",
+          subtitle: `Grant access to run ${keyword}`,
+          icon: "lock",
+          urgency: "critical",
+        },
+      ];
+      searchTime = null;
+      return true;
+    }
+
+    if (parsed.type === "denied") {
+      const caps = parsed.payload.requested_caps || [];
+      isScriptMode = true;
+      activeScriptKeyword = keyword;
+      scriptResults = [
+        {
+          title: "Permission denied",
+          subtitle: caps.length
+            ? `Requested: ${caps.join(", ")}`
+            : "Script denied by policy",
+          icon: "lock",
+          urgency: "critical",
+        },
+      ];
+      searchTime = null;
+      return true;
+    }
+
+    return false;
+  }
+
+  async function runScriptWithCaps(
+    keyword: string,
+    args: string,
+    caps: Capability[],
+  ) {
+    const start = performance.now();
+    try {
+      const output = await invoke<ScriptOutput>("execute_script", {
+        keyword,
+        args,
+        caps,
+      });
+
+      scriptResults = output.items;
+      isScriptMode = true;
+      activeScriptKeyword = keyword;
+      selectedIndex = 0;
+      searchTime = performance.now() - start;
+      return true;
+    } catch (e) {
+      if (handlePermissionError(e, keyword, args)) return false;
+      console.error("Script execution failed (retry)", e);
+      scriptResults = [
+        {
+          title: `Script Error: ${keyword}`,
+          subtitle: String(e),
+          icon: "error",
+          urgency: "critical",
+        },
+      ];
+      searchTime = null;
+      return false;
+    }
+  }
+
+  async function refreshScripts() {
+    try {
+      availableScripts = await invoke<ScriptEntry[]>("get_scripts");
+      if (!isScriptMode && currentMode === "launcher") {
+        results = composeResults(baseResults, query);
+      }
+    } catch (e) {
+      console.error("Failed to refresh scripts", e);
+    }
+  }
+
+  async function setDecision(
+    decision: "Allow" | "Deny" | "Ask",
+    caps: Capability[],
+    note?: string,
+  ) {
+    if (!permissionPrompt) throw new Error("No permission prompt active");
+    await invoke("set_permission_decision", {
+      scriptId: permissionPrompt.scriptId,
+      requestedCaps: caps,
+      decision,
+      note,
+    });
+  }
+
+  async function handleAllowOnce() {
+    if (!permissionPrompt) return;
+    permissionBusy = true;
+    const caps =
+      permissionPrompt.requestedCaps.length
+        ? permissionPrompt.requestedCaps
+        : permissionPrompt.missingCaps;
+
+    try {
+      await setDecision("Allow", caps, "allow-once");
+      const ran = await runScriptWithCaps(
+        permissionPrompt.keyword,
+        permissionPrompt.args,
+        caps,
+      );
+      if (ran) {
+        await setDecision("Ask", caps, "reset-after-once");
+        permissionPrompt = null;
+      }
+    } catch (e) {
+      console.error("Allow once failed", e);
+      scriptResults = [
+        {
+          title: "Permission decision failed",
+          subtitle: String(e),
+          icon: "error",
+          urgency: "critical",
+        },
+      ];
+    } finally {
+      permissionBusy = false;
+    }
+  }
+
+  async function handleAllowAlways() {
+    if (!permissionPrompt) return;
+    permissionBusy = true;
+    const caps =
+      permissionPrompt.requestedCaps.length
+        ? permissionPrompt.requestedCaps
+        : permissionPrompt.missingCaps;
+
+    try {
+      await setDecision("Allow", caps, "persist");
+      const ran = await runScriptWithCaps(
+        permissionPrompt.keyword,
+        permissionPrompt.args,
+        caps,
+      );
+      if (ran) {
+        permissionPrompt = null;
+      }
+    } catch (e) {
+      console.error("Allow always failed", e);
+      scriptResults = [
+        {
+          title: "Permission decision failed",
+          subtitle: String(e),
+          icon: "error",
+          urgency: "critical",
+        },
+      ];
+    } finally {
+      permissionBusy = false;
+    }
+  }
+
+  async function handleDeny() {
+    if (!permissionPrompt) return;
+    permissionBusy = true;
+    const caps =
+      permissionPrompt.requestedCaps.length
+        ? permissionPrompt.requestedCaps
+        : permissionPrompt.missingCaps;
+
+    try {
+      await setDecision("Deny", caps, "user-deny");
+      scriptResults = [
+        {
+          title: "Blocked",
+          subtitle: "You denied this script's request.",
+          icon: "lock",
+          urgency: "critical",
+        },
+      ];
+      searchTime = null;
+    } catch (e) {
+      console.error("Deny failed", e);
+      scriptResults = [
+        {
+          title: "Permission decision failed",
+          subtitle: String(e),
+          icon: "error",
+          urgency: "critical",
+        },
+      ];
+    } finally {
+      permissionPrompt = null;
+      permissionBusy = false;
+    }
+  }
+
   async function loadSuggestions() {
     const requestId = ++searchRequestId;
     try {
@@ -269,10 +703,12 @@
         // Fallback to a real search to avoid blank UI if suggestions fail.
         const searchFallback = await invoke<SearchResult[]>("search", { query: "" });
         if (requestId !== searchRequestId) return;
-        results = searchFallback;
+        baseResults = searchFallback;
       } else {
-        results = suggestions;
+        baseResults = suggestions;
       }
+
+      results = composeResults(baseResults, "");
 
       if (results.length > 0) {
         selectedIndex = 0;
@@ -283,7 +719,8 @@
       try {
         const searchFallback = await invoke<SearchResult[]>("search", { query: "" });
         if (requestId === searchRequestId) {
-          results = searchFallback;
+          baseResults = searchFallback;
+          results = composeResults(baseResults, "");
           console.info("fallback search", results?.length ?? 0);
           if (results.length > 0) selectedIndex = 0;
         }
@@ -316,33 +753,15 @@
       const [keyword, args] = scriptMatch;
       isScriptMode = true;
       activeScriptKeyword = keyword;
+      baseResults = [];
       results = [];
+      const caps = capsForScript(keyword);
 
-      try {
-        const start = performance.now();
-        const output = await invoke<ScriptOutput>("execute_script", {
-          keyword,
-          args,
-        });
-        if (requestId !== searchRequestId) return;
-        const elapsed = performance.now() - start;
-
-        scriptResults = output.items;
+      const localRequestId = requestId;
+      const ran = await runScriptWithCaps(keyword, args, caps);
+      if (localRequestId !== searchRequestId) return;
+      if (ran) {
         selectedIndex = 0;
-        searchTime = elapsed;
-      } catch (e) {
-        if (requestId !== searchRequestId) return;
-        console.error("Script execution failed:", e);
-        // Show error as a script result
-        scriptResults = [
-          {
-            title: `Script Error: ${keyword}`,
-            subtitle: String(e),
-            icon: "error",
-            urgency: "critical",
-          },
-        ];
-        searchTime = null;
       }
       return;
     }
@@ -361,18 +780,21 @@
       const elapsed = performance.now() - start;
 
       console.info("search results", searchResults?.length ?? 0, "for", q);
-      results = searchResults;
+      baseResults = searchResults;
+      results = composeResults(baseResults, q);
       selectedIndex = 0;
       searchTime = elapsed;
     } catch (e) {
       if (requestId !== searchRequestId) return;
       console.error("Search failed:", e);
+      baseResults = [];
       results = [];
       searchTime = null;
     }
   }
 
   async function handleActivate(result: SearchResult) {
+    if (permissionPrompt) return; // modal blocks background actions
     if (actionInFlight) return;
     actionInFlight = true;
     try {
@@ -382,6 +804,20 @@
         setTimeout(() => {
           document.querySelector("input")?.focus();
         }, 10);
+        return;
+      } else if (result.exec.startsWith("run-script:")) {
+        const keyword = result.exec.slice(11);
+        const caps = capsForScript(keyword);
+        await runScriptWithCaps(keyword, "", caps);
+        return;
+      } else if (result.exec.startsWith("system-action:")) {
+        const action = result.exec.slice(14);
+        try {
+          await invoke("system_action", { action });
+          resetAndHide();
+        } catch (e) {
+          console.error("System action failed", e);
+        }
         return;
       } else if (result.exec === "open-settings") {
         view = "settings";
@@ -412,6 +848,7 @@
         );
         if (!ok) return;
         await invoke("launch_app", { exec: result.exec });
+        refreshScripts();
         // deliberately leaving window open to view progress
       } else if (result.source === "File") {
         await invoke("open_path", { path: result.exec });
@@ -428,6 +865,7 @@
   }
 
   async function handleScriptActivate(item: ScriptItem) {
+    if (permissionPrompt) return; // modal blocks background actions
     if (actionInFlight) return;
     if (!item.action) return;
 
@@ -474,6 +912,7 @@
   }
 
   async function handleEscape() {
+    if (permissionPrompt) return; // hard-block: modal must be resolved
     if (currentMode === "clipboard" && query === "") {
       // Close the window entirely instead of staying in launcher
       resetAndHide();
@@ -483,6 +922,9 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (permissionPrompt) {
+      return; // modal owns keyboard focus
+    }
     // Global: Ctrl+, toggles settings
     if (e.key === "," && e.ctrlKey) {
       e.preventDefault();
@@ -674,10 +1116,29 @@
           role="listbox"
           aria-label="Script results"
         >
+          {#if activeScriptCaps.length}
+            <div class="cap-badges" aria-label="Capabilities required">
+              {#each activeScriptCaps as cap}
+                <span class="cap-badge">
+                  <span class={`cap-svg icon-${capIcon(cap)}`}></span>
+                  {cap}
+                </span>
+              {/each}
+              <span class="cap-note">Requires permission</span>
+            </div>
+          {/if}
+
           {#if scriptResults.length === 0}
             <div class="empty-state">
               <span class="empty-icon">⚡</span>
-              <span>Running {activeScriptKeyword}...</span>
+              <span>
+                Running {activeScriptKeyword}...
+                {#if activeScriptCaps.length}
+                  <small class="cap-footnote">
+                    Capabilities: {activeScriptCaps.join(", ")}
+                  </small>
+                {/if}
+              </span>
             </div>
           {:else}
             {#each scriptResults as item, i}
@@ -708,5 +1169,16 @@
         {searchTime}
       />
     </div>
+  {/if}
+
+  {#if permissionPrompt}
+    <PermissionModal
+      scriptId={permissionPrompt.scriptId}
+      missingCaps={permissionPrompt.missingCaps}
+      onAllowOnce={handleAllowOnce}
+      onAllowAlways={handleAllowAlways}
+      onDeny={handleDeny}
+      busy={permissionBusy}
+    />
   {/if}
 </div>

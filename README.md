@@ -15,11 +15,7 @@
 
 ## Why Vanta?
 
-Traditional application launchers are often bloated, slow, or ugly. **Vanta** is built differently. It leverages **Rust** for instant startup times and uses a transparent, borderless UI designed specifically for Wayland compositors like Hyprland and Sway.
-
-Vanta is also deeply scriptable — if your script can output JSON, Vanta can run it. Calculate math, control Spotify, fetch weather, or manage Docker containers without ever leaving your keyboard.
-
-Since v1.8.0, Vanta's visual style is **entirely driven by CSS files** you control. There is no hardcoded theme. Every color, radius, font, and layout dimension is overridable.
+Traditional launchers are often slow or clunky. **Vanta** is a fast, Wayland-native command palette built with Rust and Svelte. It starts instantly, stays out of your way, and is fully themeable with plain CSS. If your script can output JSON, Vanta can run it.
 
 ---
 
@@ -33,36 +29,35 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_1.14.1_amd64.deb
+sudo dpkg -i vanta_1.15.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-1.14.1-1.x86_64.rpm
+sudo rpm -i vanta-1.15.0-1.x86_64.rpm
 ```
 
 ### AppImage (Universal)
 ```bash
-chmod +x Vanta_1.14.1_amd64.AppImage
-./Vanta_1.14.1_amd64.AppImage
+chmod +x Vanta_1.15.0_amd64.AppImage
+./Vanta_1.15.0_amd64.AppImage
 ```
 
 ---
 
 ## Features
 
-- **Blazing Fast**: Powered by Rust and `nucleo-matcher` for sub-millisecond fuzzy search.
-- **Clipboard-First**: `--clipboard` launch and `Super+V` always open the clipboard view with retry and delayed emits; history loads instantly and refocuses the input.
-- **Fully Themeable**: All styles live in `~/.config/vanta/themes/`. Drop in any `.css` file, select it in Settings, and the app resizes and reskins instantly — no restart required.
-- **Resilient Startup**: Honors config window size, clamps to sane bounds, recenters before show, and respects `--hidden`/`VANTA_HIDDEN` for background launches.
-- **Scriptable**: Write plugins in Python, Bash, Node.js, or any language. If it outputs JSON, Vanta can run it.
-- **Clipboard History**: Press `Super+V` to open a searchable clipboard history.
-- **File Search with filters**: Search your home directory with include/exclude globs, extension allowlist, and type filter (files-only / dirs-only). Manual rebuild button shows index freshness.
-- **Window Switcher v2**: Dedicated Windows section grouped by app/class, ordered by recency, with focus and close actions.
-- **Math**: Type an expression like `2^10 + 5` and get the result instantly.
-- **Script Store**: Install community scripts with `install <GitHub-URL>` or `install /path/to/script.sh`.
-- **Borderless Glass Window**: Fully transparent and undecorated window — the OS frame is replaced entirely by your CSS.
+- **Fast fuzzy search** powered by Rust + `nucleo-matcher`.
+- **Commands section**: Sleep, Lock, Shutdown, Restart, Log Out, and Go to BIOS (firmware) available out of the box.
+- **Scripts section**: Installed scripts are listed together and refresh automatically after install.
+- **Clipboard-first**: `--clipboard` launch and `Super+V` open the clipboard view; history loads instantly and refocuses input.
+- **File search with filters**: Include/exclude globs, extension allowlist, and type filters; quick manual index rebuild.
+- **Window switcher v2**: Grouped by app/class, ordered by recency, with focus and close actions.
+- **Math & calculator**: Type `2^10 + 5` to copy the result.
+- **Script Store**: `install <GitHub-URL>` or `install /path/to/script.sh` to add plugins.
+- **Fully themeable**: Everything is CSS in `~/.config/vanta/themes/`; adjust colors, blur, radius, and layout.
+- **Resilient startup**: Honors config window size, clamps bounds, recenters before show, and supports hidden startup.
 
 ---
 
@@ -78,41 +73,28 @@ cargo tauri dev
 **Flags:**
 - `--hidden` or `VANTA_HIDDEN=1`: start minimized/hidden.
 - `--clipboard` or `-c`: open directly to clipboard mode on launch.
-- Hotkeys: `Alt+Space` (toggle), `Super+V` (clipboard).
+- **Hotkeys:** `Alt+Space` (toggle), `Super+V` (clipboard).
 
-**Fresh installs:** If config or theme files are missing, Vanta seeds `~/.config/vanta/config.json` and `~/.config/vanta/themes/default.css` automatically.
+**Fresh installs:** Vanta seeds `~/.config/vanta/config.json` and `~/.config/vanta/themes/default.css` if missing.
+
+**Built-in commands:** Sleep, Lock, Shutdown, Restart, Log Out, Go to BIOS — available in the Commands section.
+
+**Scripts:** Installed scripts appear in the Scripts section and auto-refresh after install.
 
 ---
 
-## Theming
+## Settings & Theming
 
-Vanta's entire visual appearance is controlled by CSS files in `~/.config/vanta/themes/`.
+All styling lives in `~/.config/vanta/themes/`. A default theme is seeded on first launch; duplicate and edit freely.
 
-A default theme is seeded to `~/.config/vanta/themes/default.css` on first launch. To create a custom theme, duplicate it and edit freely.
+Key CSS variables:
+- `--vanta-width` / `--vanta-height`: window size
+- `--vanta-accent`: accent color
+- `--vanta-blur`, `--vanta-radius`, `--vanta-opacity`: glass look
 
-### Theme File Format
+Set a theme name via `/* Theme Name: ... */` to surface it in Settings.
 
-```css
-/* Theme Name: My Theme */
-:root {
-  --vanta-width: 680px;   /* Window width */
-  --vanta-height: 420px;  /* Window height */
-
-  --vanta-bg: #0a0a0a;
-  --vanta-text: #f5f5f5;
-  --vanta-text-dim: #888888;
-  --vanta-accent: #ffffff;
-  --vanta-blur: 40px;
-  --vanta-radius: 24px;
-  --vanta-opacity: 0.88;
-}
-
-/* Add any CSS you want below */
-```
-
-The comment `/* Theme Name: ... */` sets the display name in the Settings dropdown. `--vanta-width` and `--vanta-height` control the window size when this theme is active.
-
-To install a theme from a URL:
+Install a theme from a URL:
 ```
 install https://example.com/my-theme.css
 ```

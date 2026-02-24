@@ -18,6 +18,19 @@ fn spawn_cmd(_cmd: &str, _args: &[String]) -> Result<(), std::io::Error> {
     Ok(())
 }
 
+fn try_commands(commands: Vec<(&str, Vec<String>)>) -> Result<(), String> {
+    let mut errors = Vec::new();
+
+    for (cmd, args) in commands {
+        match spawn_cmd(cmd, &args) {
+            Ok(_) => return Ok(()),
+            Err(e) => errors.push(format!("{}: {}", cmd, e)),
+        }
+    }
+
+    Err(format!("All commands failed: {}", errors.join("; ")))
+}
+
 // Handles .desktop Exec placeholders (like %u, %F) so we don't pass garbage to the shell.
 pub fn launch(exec: &str, app_handle: Option<&tauri::AppHandle>) -> Result<(), String> {
     let start = std::time::Instant::now();
@@ -103,6 +116,42 @@ pub fn launch(exec: &str, app_handle: Option<&tauri::AppHandle>) -> Result<(), S
     log::debug!("Launch took {:?}", elapsed);
 
     Ok(())
+}
+
+pub fn system_action(action: &str) -> Result<(), String> {
+    let normalized = action.to_lowercase();
+
+    match normalized.as_str() {
+        "sleep" => try_commands(vec![("systemctl", vec!["suspend".into()])]),
+        "shutdown" => try_commands(vec![("systemctl", vec!["poweroff".into()])]),
+        "restart" | "reboot" => try_commands(vec![("systemctl", vec!["reboot".into()])]),
+        "lock" => try_commands(vec![
+            ("loginctl", vec!["lock-session".into()]),
+            ("loginctl", vec!["lock-sessions".into()]),
+        ]),
+        "logout" | "log-out" => {
+            let mut candidates: Vec<(&str, Vec<String>)> = Vec::new();
+
+            if let Ok(session) = env::var("XDG_SESSION_ID") {
+                candidates.push(("loginctl", vec!["terminate-session".into(), session]));
+            }
+
+            if let Ok(user) = env::var("USER") {
+                candidates.push(("loginctl", vec!["terminate-user".into(), user]));
+            }
+
+            candidates.push(("loginctl", vec!["kill-session".into(), "self".into()]));
+
+            try_commands(candidates)
+        }
+        "bios" | "firmware" | "uefi" => try_commands(vec![
+            (
+                "systemctl",
+                vec!["reboot".into(), "--firmware-setup".into()],
+            ),
+        ]),
+        other => Err(format!("Unsupported system action: {}", other)),
+    }
 }
 
 // Removes those pesky %u %F codes that freedesktop specs use.

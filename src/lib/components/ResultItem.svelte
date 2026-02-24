@@ -71,6 +71,11 @@
         );
     }
 
+    function isFontAwesome(icon: string | null | undefined): boolean {
+        if (!icon) return false;
+        return icon.includes("fa-");
+    }
+
     function svgToDataUri(icon: string | null | undefined): string {
         if (!isTrustedInlineSvg(icon)) return "";
         return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(icon!.trim())}`;
@@ -110,6 +115,8 @@
             <span class="icon-emoji">🧮</span>
         {:else if typeof result.source === "object" && "Script" in result.source}
             <span class="icon-emoji">⚡</span>
+        {:else if isFontAwesome(result.icon)}
+            <i class="{result.icon} icon-fa"></i>
         {:else if safeInlineSvgUrl}
             <img src={safeInlineSvgUrl} alt={result.title} class="icon-img" />
         {:else if result.icon && (result.icon === "dir" || result.icon.startsWith("file"))}

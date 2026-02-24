@@ -13,6 +13,7 @@ pub mod files; // New files module
 pub mod window;
 pub mod windows; // New windows enumeration module
 pub mod themes;
+pub mod permissions;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -25,6 +26,7 @@ use history::History;
 use matcher::{ResultSource, SearchResult};
 use scanner::AppEntry;
 use scripts::{ScriptEntry, ScriptOutput};
+use permissions::Capability;
 use windows::{list_windows_grouped, WindowGroup};
 use config::clamp_window_size;
 
@@ -630,7 +632,7 @@ async fn search(
             results.push(SearchResult {
                 title: "Settings".to_string(),
                 subtitle: Some("Open Vanta settings".to_string()),
-                icon: None,
+                icon: Some("fa-solid fa-gear".to_string()),
                 exec: "open-settings".to_string(),
                 score: weighted_score(base, search_config.applications.weight),
                 match_indices: indices,
@@ -846,6 +848,11 @@ async fn launch_app(
 }
 
 #[tauri::command]
+async fn system_action(action: String) -> Result<(), String> {
+    launcher::system_action(&action)
+}
+
+#[tauri::command]
 async fn get_suggestions(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<SearchResult>, String> {
@@ -937,7 +944,7 @@ async fn get_suggestions(
     results.push(SearchResult {
         title: "Settings".to_string(),
         subtitle: Some("Open Vanta settings".to_string()),
-        icon: None,
+        icon: Some("fa-solid fa-gear".to_string()),
         exec: "open-settings".to_string(),
         score: 1_200_000,
         match_indices: vec![],
@@ -1017,6 +1024,7 @@ async fn get_scripts(
 async fn execute_script(
     keyword: String,
     args: String,
+    caps: Option<Vec<Capability>>, // Optional to avoid breaking older callers
     state: tauri::State<'_, AppState>,
 ) -> Result<ScriptOutput, String> {
     let (timeout_ms, strict_json) = {
@@ -1027,8 +1035,43 @@ async fn execute_script(
         (config.scripts.timeout_ms, config.scripts.strict_json)
     };
 
+    let requested_caps = match caps {
+        Some(c) if !c.is_empty() => c,
+        _ => {
+            // Fallback: derive capabilities from the script cache/scan so permission prompts still fire.
+            let from_cache = {
+                let cached = state
+                    .scripts_cache
+                    .lock()
+                    .map(|scripts| {
+                        scripts
+                            .iter()
+                            .find(|s| s.keyword.eq_ignore_ascii_case(&keyword))
+                            .map(|s| s.capabilities.clone())
+                            .unwrap_or_default()
+                    })
+                    .unwrap_or_default();
+                cached
+            };
+
+            if !from_cache.is_empty() {
+                from_cache
+            } else {
+                let scanned = scripts::scan_scripts();
+                if let Ok(mut cached) = state.scripts_cache.lock() {
+                    *cached = scanned.clone();
+                }
+                scanned
+                    .iter()
+                    .find(|s| s.keyword.eq_ignore_ascii_case(&keyword))
+                    .map(|s| s.capabilities.clone())
+                    .unwrap_or_default()
+            }
+        }
+    };
+
     tokio::task::spawn_blocking(move || {
-        let output = scripts::execute_script(&keyword, &args, timeout_ms)?;
+        let output = scripts::execute_script(&keyword, &args, timeout_ms, &requested_caps)?;
 
         if strict_json {
             scripts::validate_script_output(&output)
@@ -1358,6 +1401,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             save_config,
             search,
             launch_app,
+            system_action,
             rescan_apps,
             hide_window,
             show_window,
@@ -1370,6 +1414,8 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             reveal_in_file_manager,
             open_with_editor,
             run_doctor_terminal,
+            permissions::get_permission_decision,
+            permissions::set_permission_decision,
             get_apps,
             themes::get_installed_themes,
             themes::resize_window_for_theme,
@@ -1527,6 +1573,13 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                     let _ = handle_for_initial_scan.emit("apps-changed", ());
 
                     let scripts = scripts::scan_scripts();
+                    let seeds: Vec<(String, Vec<Capability>)> = scripts
+                        .iter()
+                        .map(|s| (s.keyword.clone(), s.capabilities.clone()))
+                        .collect();
+                    if let Err(err) = permissions::seed_missing_decisions(&seeds) {
+                        log::warn!("Failed to seed permissions for new scripts: {}", err);
+                    }
                     log::info!("Initial script scan complete: {} scripts", scripts.len());
                     if let Some(state) = handle_for_initial_scan.try_state::<AppState>() {
                         if let Ok(mut cached_scripts) = state.scripts_cache.lock() {

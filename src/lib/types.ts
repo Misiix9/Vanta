@@ -149,4 +149,20 @@ export interface ScriptEntry {
     description?: string;
     icon?: string;
     path: string;
+    capabilities?: Capability[];
+}
+
+export type Capability = "Network" | "Shell" | "Filesystem";
+
+export type PermissionDecision = "Allow" | "Deny" | "Ask";
+
+export interface PermissionNeededPayload {
+    script_id: string;
+    missing_caps: Capability[];
+    requested_caps?: Capability[];
+}
+
+export interface PermissionDeniedPayload {
+    script_id: string;
+    requested_caps: Capability[];
 }
