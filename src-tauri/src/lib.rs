@@ -15,6 +15,7 @@ pub mod windows; // New windows enumeration module
 pub mod themes;
 pub mod permissions;
 pub mod workflows;
+pub mod bundles;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
