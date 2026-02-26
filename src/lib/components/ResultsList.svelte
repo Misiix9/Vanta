@@ -97,6 +97,7 @@
     "Running",
     "Apps",
     "Documents",
+    "Macros",
     "Scripts",
     "Calculator",
     "Clipboard",

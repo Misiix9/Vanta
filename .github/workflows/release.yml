@@ -1,4 +1,4 @@
-name: Release Vanta v1.15.0
+name: Release Vanta v1.16.0
 
 on:
   push:
@@ -87,15 +87,16 @@ jobs:
             ## What's New in ${{ steps.get_version.outputs.VERSION }}
             
             ### New
-            - Added Commands section actions: Sleep, Lock, Shutdown, Restart, Log Out, and Go to BIOS (firmware).
-            - Scripts section now auto-refreshes after installs so new scripts appear immediately.
+            - Workflow macros (beta): define multi-step macros with variables, optional prompts per step, and dry-run previews.
+            - Macro runner UI: launcher results show macro scripts and args, with status bar prompts for required inputs before run.
+            - Default sample macro shipped enabled for quick onboarding and testing.
 
             ### Changes
-            - Commands are always listed at the bottom; Scripts sit above Commands for clarity.
-            - Settings entry and all command icons use the theme accent via FontAwesome, defined in the theme CSS.
+            - Macro list honors per-macro enable toggles and exposes argument editing inline.
+            - Workflow results respect section ordering with subheaders and new script detail rows.
 
             ### Fixes
-            - Resolved launcher icon parsing and ensured consistent command execution wiring for the new actions.
+            - Improved macro prompt rendering and dry-run substitution accuracy for edge-case variables.
 
             ### Known Issues
             - None reported for this release. If you hit issues, please file them on GitHub with logs.

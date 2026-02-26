@@ -14,6 +14,8 @@ pub mod window;
 pub mod windows; // New windows enumeration module
 pub mod themes;
 pub mod permissions;
+pub mod workflows;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -21,12 +23,13 @@ use tauri::{Manager, Emitter}; // Added Emitter for .emit()
 use serde::Serialize;
 use clap::{Parser, Subcommand, Args};
 
-use config::VantaConfig;
+use config::{VantaConfig, WorkflowMacro};
 use history::History;
 use matcher::{ResultSource, SearchResult};
 use scanner::AppEntry;
 use scripts::{ScriptEntry, ScriptOutput};
 use permissions::Capability;
+use workflows::{MacroDryRunResult, MacroRunResult};
 use windows::{list_windows_grouped, WindowGroup};
 use config::clamp_window_size;
 
@@ -1021,6 +1024,32 @@ async fn get_scripts(
 }
 
 #[tauri::command]
+async fn get_workflows(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<WorkflowMacro>, String> {
+    workflows::list_macros(&state)
+}
+
+#[tauri::command]
+async fn dry_run_macro(
+    macro_id: String,
+    args: HashMap<String, String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<MacroDryRunResult, String> {
+    workflows::dry_run_macro(&macro_id, args, &state)
+}
+
+#[tauri::command]
+async fn run_macro(
+    macro_id: String,
+    args: HashMap<String, String>,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<MacroRunResult, String> {
+    workflows::run_macro(&macro_id, args, &state, &app_handle)
+}
+
+#[tauri::command]
 async fn execute_script(
     keyword: String,
     args: String,
@@ -1406,6 +1435,9 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             hide_window,
             show_window,
             get_scripts,
+            get_workflows,
+            dry_run_macro,
+            run_macro,
             execute_script,
             get_suggestions,
             get_search_diagnostics,

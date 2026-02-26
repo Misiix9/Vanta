@@ -3,6 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Emitter;
 
+use crate::permissions::Capability;
+
 // Embedded default config for fallback writes.
 const DEFAULT_CONFIG_JSON: &str = include_str!("../resources/config.json");
 
@@ -17,6 +19,8 @@ pub struct VantaConfig {
     pub files: FilesConfig,
     #[serde(default)]
     pub search: SearchConfig,
+    #[serde(default)]
+    pub workflows: WorkflowsConfig,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -201,6 +205,103 @@ pub struct ScriptsConfig {
     pub strict_json: bool,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct WorkflowsConfig {
+    #[serde(default)]
+    pub macros: Vec<WorkflowMacro>,
+}
+
+impl Default for WorkflowsConfig {
+    fn default() -> Self {
+        Self {
+            macros: default_workflow_macros(),
+        }
+    }
+}
+
+fn default_workflow_macros() -> Vec<WorkflowMacro> {
+    vec![WorkflowMacro {
+        id: "open-and-sync".to_string(),
+        name: "Open and Sync".to_string(),
+        description: Some("Open a project folder then sync it".to_string()),
+        enabled: false,
+        args: vec![
+            MacroArg {
+                name: "project_path".to_string(),
+                description: Some("Path to the project root".to_string()),
+                required: true,
+                default_value: None,
+            },
+            MacroArg {
+                name: "branch".to_string(),
+                description: Some("Branch name".to_string()),
+                required: false,
+                default_value: Some("main".to_string()),
+            },
+        ],
+        steps: vec![
+            MacroStep::System {
+                command: "xdg-open".to_string(),
+                args: vec!["{project_path}".to_string()],
+                capabilities: vec![Capability::Filesystem],
+            },
+            MacroStep::Script {
+                script: "sync-project".to_string(),
+                args: vec!["--branch".to_string(), "{branch}".to_string()],
+                capabilities: vec![Capability::Shell],
+            },
+        ],
+    }]
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct WorkflowMacro {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub args: Vec<MacroArg>,
+    #[serde(default)]
+    pub steps: Vec<MacroStep>,
+    #[serde(default = "default_macro_enabled")]
+    pub enabled: bool,
+}
+
+fn default_macro_enabled() -> bool {
+    true
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct MacroArg {
+    pub name: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub required: bool,
+    #[serde(default)]
+    pub default_value: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum MacroStep {
+    Script {
+        script: String,
+        #[serde(default)]
+        args: Vec<String>,
+        #[serde(default)]
+        capabilities: Vec<Capability>,
+    },
+    System {
+        command: String,
+        #[serde(default)]
+        args: Vec<String>,
+        #[serde(default)]
+        capabilities: Vec<Capability>,
+    },
+}
+
 impl Default for VantaConfig {
     fn default() -> Self {
         Self {
@@ -246,6 +347,7 @@ impl Default for VantaConfig {
                 indexed_at: None,
             },
             search: SearchConfig::default(),
+            workflows: WorkflowsConfig::default(),
         }
     }
 }
@@ -455,5 +557,79 @@ mod tests {
         assert_eq!(deserialized.allowed_extensions, cfg.allowed_extensions);
         assert_eq!(deserialized.type_filter, cfg.type_filter);
         assert_eq!(deserialized.indexed_at, cfg.indexed_at);
+    }
+
+    #[test]
+    fn workflows_macro_round_trip() {
+        let cfg = WorkflowsConfig {
+            macros: vec![WorkflowMacro {
+                id: "open-and-sync".to_string(),
+                name: "Open and Sync".to_string(),
+                description: Some("Open a project folder then sync it".to_string()),
+                enabled: true,
+                args: vec![
+                    MacroArg {
+                        name: "project_path".to_string(),
+                        description: Some("Path to the project root".to_string()),
+                        required: true,
+                        default_value: None,
+                    },
+                    MacroArg {
+                        name: "branch".to_string(),
+                        description: Some("Branch name".to_string()),
+                        required: false,
+                        default_value: Some("main".to_string()),
+                    },
+                ],
+                steps: vec![
+                    MacroStep::System {
+                        command: "xdg-open".to_string(),
+                        args: vec!["{project_path}".to_string()],
+                        capabilities: vec![Capability::Filesystem],
+                    },
+                    MacroStep::Script {
+                        script: "sync-project".to_string(),
+                        args: vec!["--branch".to_string(), "{branch}".to_string()],
+                        capabilities: vec![Capability::Shell],
+                    },
+                ],
+            }],
+        };
+
+        let serialized = serde_json::to_string(&cfg).expect("serialize workflows config");
+        let parsed: WorkflowsConfig = serde_json::from_str(&serialized).expect("deserialize workflows config");
+
+        assert_eq!(parsed.macros.len(), 1);
+        let macro_def = &parsed.macros[0];
+        assert!(macro_def.enabled);
+        assert_eq!(macro_def.id, "open-and-sync");
+        assert_eq!(macro_def.args.len(), 2);
+        assert_eq!(macro_def.steps.len(), 2);
+
+        match &macro_def.steps[0] {
+            MacroStep::System {
+                command,
+                args,
+                capabilities,
+            } => {
+                assert_eq!(command, "xdg-open");
+                assert_eq!(args, &vec!["{project_path}".to_string()]);
+                assert_eq!(capabilities, &vec![Capability::Filesystem]);
+            }
+            _ => panic!("expected system step"),
+        }
+
+        match &macro_def.steps[1] {
+            MacroStep::Script {
+                script,
+                args,
+                capabilities,
+            } => {
+                assert_eq!(script, "sync-project");
+                assert_eq!(args, &vec!["--branch".to_string(), "{branch}".to_string()]);
+                assert_eq!(capabilities, &vec![Capability::Shell]);
+            }
+            _ => panic!("expected script step"),
+        }
     }
 }

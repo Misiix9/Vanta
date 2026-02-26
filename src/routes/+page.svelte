@@ -15,6 +15,8 @@
     Capability,
     PermissionNeededPayload,
     PermissionDeniedPayload,
+    WorkflowMacro,
+    MacroDryRunResult,
   } from "$lib/types";
   import { applyTheme } from "$lib/theme";
   import SearchInput from "$lib/components/SearchInput.svelte";
@@ -23,6 +25,7 @@
   import ScriptResultItem from "$lib/components/ScriptResultItem.svelte";
   import SettingsView from "$lib/components/SettingsView.svelte";
   import PermissionModal from "$lib/components/PermissionModal.svelte";
+  import MacroPreview from "$lib/components/MacroPreview.svelte";
 
   let query = $state("");
   let vantaConfig: VantaConfig | undefined = $state();
@@ -43,6 +46,7 @@
   let searchInputRef: SearchInput | undefined = $state();
   let resultsListRef: ResultsList | undefined = $state();
   let availableScripts: ScriptEntry[] = $state([]);
+  let availableMacros: WorkflowMacro[] = $state([]);
   let actionInFlight = $state(false); // guard: don't dismiss during actions
   let isVisible = $state(true);
   let isMouseOver = $state(false);
@@ -54,6 +58,14 @@
     args: string;
   } | null>(null);
   let permissionBusy = $state(false);
+  let activeMacroId = $state<string | null>(null);
+  let macroArgs = $state<Record<string, string>>({});
+  let macroDryRun = $state<MacroDryRunResult | null>(null);
+  let macroBusy = $state(false);
+  let macroError = $state<string | null>(null);
+  let currentMacro = $derived(
+    activeMacroId ? availableMacros.find((m) => m.id === activeMacroId) : null,
+  );
 
   // Lightweight app rescan throttle (only when window is shown/opened)
   const RESCAN_INTERVAL_MS = 15000;
@@ -189,7 +201,8 @@
   function composeResults(base: SearchResult[], q: string): SearchResult[] {
     const commands = filterCommandResults(q);
     const scripts = buildScriptResults(q);
-    return [...commands, ...base, ...scripts];
+    const macros = buildMacroResults(q);
+    return [...commands, ...macros, ...base, ...scripts];
   }
 
   onDestroy(() => {
@@ -294,6 +307,12 @@
       console.error("Failed to load scripts:", e);
     }
 
+    try {
+      availableMacros = await invoke<WorkflowMacro[]>("get_workflows");
+    } catch (e) {
+      console.error("Failed to load macros:", e);
+    }
+
     // Listen for config hot-reload events
     unlisteners.push(
       await listen<VantaConfig>("config-updated", (event) => {
@@ -343,6 +362,12 @@
         if (currentMode === "launcher" && query.trim() === "") {
           loadSuggestions();
         }
+      }),
+    );
+
+    unlisteners.push(
+      await listen<WorkflowMacro[]>("macros-changed", (event) => {
+        availableMacros = event.payload;
       }),
     );
 
@@ -442,6 +467,32 @@
       case "Filesystem":
         return "filesystem";
     }
+  }
+
+  function buildMacroResults(q: string): SearchResult[] {
+    if (!availableMacros.length) return [];
+    const needle = q.trim().toLowerCase();
+    return availableMacros
+      .filter((macro) => {
+        if (!macro.enabled) return false;
+        if (!needle) return true;
+        return (
+          macro.id.toLowerCase().includes(needle) ||
+          macro.name.toLowerCase().includes(needle) ||
+          (macro.description ?? "").toLowerCase().includes(needle)
+        );
+      })
+      .map((macro, idx) => ({
+        title: macro.name,
+        subtitle: macro.description ?? macro.id,
+        icon: "fa-solid fa-diagram-project",
+        exec: `macro:${macro.id}`,
+        score: 1_300_000 - idx,
+        match_indices: [],
+        source: "Application",
+        id: `macro-${macro.id}`,
+        section: "Macros",
+      }));
   }
 
   function parsePermissionError(err: unknown):
@@ -574,6 +625,50 @@
       }
     } catch (e) {
       console.error("Failed to refresh scripts", e);
+    }
+  }
+
+  function resetMacroState() {
+    activeMacroId = null;
+    macroArgs = {};
+    macroDryRun = null;
+    macroBusy = false;
+    macroError = null;
+  }
+
+  async function dryRunMacro(macro: WorkflowMacro) {
+    macroBusy = true;
+    macroError = null;
+    try {
+      const result = await invoke<MacroDryRunResult>("dry_run_macro", {
+        macroId: macro.id,
+        args: macroArgs,
+      });
+      macroDryRun = result;
+    } catch (e) {
+      macroError = String(e);
+      console.error("Dry-run failed", e);
+    } finally {
+      macroBusy = false;
+    }
+  }
+
+  async function runMacro(macro: WorkflowMacro) {
+    macroBusy = true;
+    macroError = null;
+    try {
+      await invoke("run_macro", { macroId: macro.id, args: macroArgs });
+      resetMacroState();
+      resetAndHide();
+    } catch (e) {
+      if (handlePermissionError(e, macro.id, "")) {
+        macroBusy = false;
+        return;
+      }
+      macroError = String(e);
+      console.error("Run macro failed", e);
+    } finally {
+      macroBusy = false;
     }
   }
 
@@ -741,6 +836,7 @@
       isScriptMode = false;
       activeScriptKeyword = "";
       scriptResults = [];
+      resetMacroState();
       searchTime = null;
       // Load suggestions instead of clearing results
       await loadSuggestions();
@@ -766,8 +862,11 @@
       return;
     }
 
+    resetMacroState();
+
     // Normal app search
     isScriptMode = false;
+    resetMacroState();
     activeScriptKeyword = "";
     scriptResults = [];
 
@@ -798,6 +897,19 @@
     if (actionInFlight) return;
     actionInFlight = true;
     try {
+      if (result.exec.startsWith("macro:")) {
+        const id = result.exec.slice(6);
+        const macro = availableMacros.find((m) => m.id === id);
+        if (macro) {
+          activeMacroId = id;
+          macroArgs = Object.fromEntries(
+            (macro.args ?? []).map((a) => [a.name, a.default_value ?? ""]),
+          );
+          macroDryRun = null;
+          macroError = null;
+        }
+        return;
+      }
       if (result.exec.startsWith("fill:")) {
         query = result.exec.slice(5);
         await handleSearch(query);
@@ -905,6 +1017,7 @@
     isScriptMode = false;
     currentMode = "launcher"; // Reset mode
     activeScriptKeyword = "";
+    resetMacroState();
     selectedIndex = 0;
     searchTime = null;
     isVisible = false;
@@ -913,6 +1026,10 @@
 
   async function handleEscape() {
     if (permissionPrompt) return; // hard-block: modal must be resolved
+    if (activeMacroId) {
+      resetMacroState();
+      return;
+    }
     if (currentMode === "clipboard" && query === "") {
       // Close the window entirely instead of staying in launcher
       resetAndHide();
@@ -924,6 +1041,10 @@
   function handleKeydown(e: KeyboardEvent) {
     if (permissionPrompt) {
       return; // modal owns keyboard focus
+    }
+    if (activeMacroId && e.key === "Escape") {
+      resetMacroState();
+      return;
     }
     // Global: Ctrl+, toggles settings
     if (e.key === "," && e.ctrlKey) {
@@ -1152,6 +1273,20 @@
             {/each}
           {/if}
         </div>
+      {:else if currentMacro}
+        <MacroPreview
+          macro={currentMacro}
+          args={macroArgs}
+          dryRun={macroDryRun}
+          busy={macroBusy}
+          error={macroError}
+          onArgsChange={(name, value) => (macroArgs = { ...macroArgs, [name]: value })}
+          onDryRun={() => dryRunMacro(currentMacro)}
+          onRun={() => runMacro(currentMacro)}
+          onClose={resetMacroState}
+        />
+      {:else if activeMacroId}
+        <div class="empty-state">Macro not found</div>
       {:else}
         <!-- Normal app results -->
         <ResultsList
@@ -1165,7 +1300,13 @@
       {/if}
 
       <StatusBar
-        resultCount={isScriptMode ? scriptResults.length : visibleRowCount}
+          resultCount={
+            isScriptMode
+              ? scriptResults.length
+              : activeMacroId
+                ? macroDryRun?.steps.length ?? 0
+                : visibleRowCount
+          }
         {searchTime}
       />
     </div>

@@ -46,5 +46,43 @@
     "calculator": { "enabled": true, "weight": 100 },
     "files": { "enabled": true, "weight": 100 },
     "windows_max_results": 0
+  },
+  "workflows": {
+    "macros": [
+      {
+        "id": "open-and-sync",
+        "name": "Open and Sync",
+        "description": "Open a project folder then sync it",
+        "enabled": false,
+        "args": [
+          {
+            "name": "project_path",
+            "description": "Path to the project root",
+            "required": true,
+            "default_value": null
+          },
+          {
+            "name": "branch",
+            "description": "Branch name",
+            "required": false,
+            "default_value": "main"
+          }
+        ],
+        "steps": [
+          {
+            "kind": "system",
+            "command": "xdg-open",
+            "args": ["{project_path}"],
+            "capabilities": ["Filesystem"]
+          },
+          {
+            "kind": "script",
+            "script": "sync-project",
+            "args": ["--branch", "{branch}"],
+            "capabilities": ["Shell"]
+          }
+        ]
+      }
+    ]
   }
 }

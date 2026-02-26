@@ -67,6 +67,61 @@ export interface SearchConfig {
     windows_max_results?: number;
 }
 
+export interface MacroArg {
+    name: string;
+    description?: string | null;
+    required?: boolean;
+    default_value?: string | null;
+}
+
+export type MacroStep =
+    | { kind: "script"; script: string; args?: string[]; capabilities?: Capability[] }
+    | { kind: "system"; command: string; args?: string[]; capabilities?: Capability[] };
+
+export interface WorkflowMacro {
+    id: string;
+    name: string;
+    description?: string | null;
+    enabled?: boolean;
+    args?: MacroArg[];
+    steps: MacroStep[];
+}
+
+export interface WorkflowsConfig {
+    macros?: WorkflowMacro[];
+}
+
+export interface MacroDryRunStep {
+    index: number;
+    kind: string;
+    command: string;
+    args: string[];
+    capabilities: Capability[];
+    decision: PermissionDecision;
+    missing_caps: Capability[];
+}
+
+export interface MacroDryRunResult {
+    macro_id: string;
+    ready: boolean;
+    errors: string[];
+    steps: MacroDryRunStep[];
+}
+
+export interface MacroRunStepResult {
+    index: number;
+    kind: string;
+    command: string;
+    args: string[];
+    capabilities: Capability[];
+    status: string;
+}
+
+export interface MacroRunResult {
+    macro_id: string;
+    steps: MacroRunStepResult[];
+}
+
 export interface VantaConfig {
     general: GeneralConfig;
     appearance: AppearanceConfig;
@@ -74,6 +129,7 @@ export interface VantaConfig {
     scripts: ScriptsConfig;
     files: FilesConfig;
     search: SearchConfig;
+    workflows: WorkflowsConfig;
 }
 
 export interface PerfStats {
