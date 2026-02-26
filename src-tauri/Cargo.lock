@@ -5588,6 +5588,7 @@ dependencies = [
  "env_logger",
  "freedesktop-icons",
  "globset",
+ "hex",
  "jsonschema",
  "log",
  "meval",
