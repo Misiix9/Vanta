@@ -218,6 +218,19 @@ export interface PermissionNeededPayload {
     requested_caps?: Capability[];
 }
 
+export interface DownloadStatusPayload {
+    status: "downloading" | "success" | "failed";
+    error?: string;
+}
+
+export interface BundleUpdateStatus {
+    status: "not_installed" | "up_to_date" | "update_available" | "error";
+    name?: string | null;
+    installed_version?: string | null;
+    remote_version?: string | null;
+    message?: string | null;
+}
+
 export interface PermissionDeniedPayload {
     script_id: string;
     requested_caps: Capability[];

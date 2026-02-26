@@ -1,4 +1,7 @@
-use crate::bundles::{validate_bundle_archive, BundleManifest, ValidatedBundle};
+use crate::bundles::{read_manifest_from_archive, validate_bundle_archive, BundleManifest, ValidatedBundle};
+use semver::Version;
+use serde::Serialize;
+use std::cmp::Ordering;
 use log::info;
 use reqwest::blocking::Client;
 use std::fs::{self, File};
@@ -8,6 +11,15 @@ use std::time::Duration;
 
 const MAX_DOWNLOAD_BYTES: u64 = 25 * 1024 * 1024; // 25 MB
 const DOWNLOAD_TIMEOUT_SECS: u64 = 20;
+
+#[derive(Debug, Serialize)]
+pub struct BundleUpdateStatus {
+    pub status: String,
+    pub name: Option<String>,
+    pub installed_version: Option<String>,
+    pub remote_version: Option<String>,
+    pub message: Option<String>,
+}
 
 fn config_root() -> Result<PathBuf, String> {
     if let Ok(dir) = std::env::var("VANTA_CONFIG_DIR") {
@@ -41,6 +53,13 @@ fn persist_manifest(manifest: &BundleManifest, scripts_dir: &Path) -> Result<(),
     let manifest_path = scripts_dir.join(format!("{}.manifest.json", manifest.name));
     let json = serde_json::to_vec_pretty(manifest).map_err(|e| e.to_string())?;
     fs::write(&manifest_path, json).map_err(|e| e.to_string())
+}
+
+fn compare_versions(installed: &str, remote: &str) -> Ordering {
+    match (Version::parse(installed), Version::parse(remote)) {
+        (Ok(a), Ok(b)) => a.cmp(&b),
+        _ => installed.cmp(remote),
+    }
 }
 
 fn install_validated_bundle(bundle: ValidatedBundle, scripts_dir: &Path) -> Result<(), String> {
@@ -153,6 +172,118 @@ pub fn download_script(url: &str) -> Result<(), String> {
     install_validated_bundle(bundle, &scripts_dir)
 }
 
+pub fn check_bundle_update(url: &str) -> Result<BundleUpdateStatus, String> {
+    let trimmed = url.trim();
+    if trimmed.is_empty() {
+        return Err("No URL provided".to_string());
+    }
+
+    if trimmed.to_ascii_lowercase().ends_with(".css") {
+        return Err("Themes do not support bundle update checks".to_string());
+    }
+
+    let config_root = config_root()?;
+    let vanta_root = config_root.join("vanta");
+    let scripts_dir = vanta_root.join("scripts");
+    ensure_dir(&scripts_dir)?;
+
+    let path = std::path::Path::new(trimmed);
+    let bytes: Vec<u8> = if path.exists() && path.is_file() {
+        let meta = fs::metadata(path).map_err(|e| format!("Failed to stat bundle: {}", e))?;
+        if meta.len() > MAX_DOWNLOAD_BYTES {
+            return Err(format!(
+                "Local bundle too large: {} bytes (max {} bytes)",
+                meta.len(), MAX_DOWNLOAD_BYTES
+            ));
+        }
+        fs::read(path).map_err(|e| format!("Failed to read bundle: {}", e))?
+    } else {
+        let download_url = if trimmed.contains("github.com") && !trimmed.ends_with(".zip") {
+            format!("{}/archive/refs/heads/main.zip", trimmed.trim_end_matches('/'))
+        } else {
+            trimmed.to_string()
+        };
+
+        let client = Client::builder()
+            .timeout(Duration::from_secs(DOWNLOAD_TIMEOUT_SECS))
+            .build()
+            .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+
+        let response = client
+            .get(&download_url)
+            .send()
+            .map_err(|e| format!("Download failed: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!("Failed to download: {}", response.status()));
+        }
+
+        if let Some(content_len) = response.content_length() {
+            if content_len > MAX_DOWNLOAD_BYTES {
+                return Err(format!(
+                    "Download too large: {} bytes (max {} bytes)",
+                    content_len, MAX_DOWNLOAD_BYTES
+                ));
+            }
+        }
+
+        let mut buf = Vec::new();
+        response
+            .take(MAX_DOWNLOAD_BYTES + 1)
+            .read_to_end(&mut buf)
+            .map_err(|e| format!("Failed to read download body: {}", e))?;
+
+        if buf.len() as u64 > MAX_DOWNLOAD_BYTES {
+            return Err(format!(
+                "Download exceeded max size of {} bytes",
+                MAX_DOWNLOAD_BYTES
+            ));
+        }
+        buf
+    };
+
+    let manifest = read_manifest_from_archive(Cursor::new(bytes)).map_err(|e| e.to_string())?;
+    let installed_manifest_path = scripts_dir.join(format!("{}.manifest.json", manifest.name));
+    let installed_manifest: Option<BundleManifest> = fs::read_to_string(&installed_manifest_path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok());
+
+    let (status, message, installed_version) = if let Some(installed) = installed_manifest {
+        let ordering = compare_versions(&installed.version, &manifest.version);
+        match ordering {
+            Ordering::Less => (
+                "update_available",
+                Some("Update available".to_string()),
+                Some(installed.version.clone()),
+            ),
+            Ordering::Equal => (
+                "up_to_date",
+                Some("Bundle is up to date".to_string()),
+                Some(installed.version.clone()),
+            ),
+            Ordering::Greater => (
+                "up_to_date",
+                Some("Installed version is newer".to_string()),
+                Some(installed.version.clone()),
+            ),
+        }
+    } else {
+        (
+            "not_installed",
+            Some("Bundle not installed".to_string()),
+            None,
+        )
+    };
+
+    Ok(BundleUpdateStatus {
+        status: status.to_string(),
+        name: Some(manifest.name),
+        installed_version,
+        remote_version: Some(manifest.version),
+        message,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,11 +311,11 @@ mod tests {
         hex::encode(hasher.finalize())
     }
 
-    fn build_bundle(file_name: &str, contents: &[u8]) -> Vec<u8> {
+    fn build_bundle_with_version(version: &str, file_name: &str, contents: &[u8]) -> Vec<u8> {
         let sha = sha256_hex(contents);
         let manifest = serde_json::json!({
             "name": "demo",
-            "version": "1.0.0",
+            "version": version,
             "files": [ {"path": file_name, "sha256": sha} ]
         });
 
@@ -210,6 +341,10 @@ mod tests {
         }
 
         buf
+    }
+
+    fn build_bundle(file_name: &str, contents: &[u8]) -> Vec<u8> {
+        build_bundle_with_version("1.0.0", file_name, contents)
     }
 
     #[test]
@@ -299,5 +434,68 @@ mod tests {
             .join("themes")
             .join("theme.css");
         assert!(installed.exists());
+    }
+
+    #[test]
+    #[serial]
+    fn update_check_not_installed() {
+        let temp = tempdir().unwrap();
+        set_test_config_dir(temp.path());
+
+        let server = MockServer::start();
+        let bundle_bytes = build_bundle_with_version("1.1.0", "run.sh", b"echo remote");
+        server.mock(|when, then| {
+            when.method(GET).path("/bundle.zip");
+            then.status(200)
+                .header("content-type", "application/zip")
+                .body(bundle_bytes.clone());
+        });
+
+        let status = check_bundle_update(&format!("{}/bundle.zip", server.base_url()))
+            .expect("check should succeed");
+
+        assert_eq!(status.status, "not_installed");
+        assert_eq!(status.remote_version.as_deref(), Some("1.1.0"));
+    }
+
+    #[test]
+    #[serial]
+    fn update_check_detects_newer_remote() {
+        let temp = tempdir().unwrap();
+        set_test_config_dir(temp.path());
+        let scripts_dir = temp.path().join("vanta").join("scripts");
+        ensure_dir(&scripts_dir).unwrap();
+
+        // Seed installed manifest at 1.0.0
+        let installed_manifest = BundleManifest {
+            name: "demo".to_string(),
+            version: "1.0.0".to_string(),
+            description: None,
+            source_url: None,
+            created_at: None,
+            files: vec![],
+        };
+        let manifest_path = scripts_dir.join("demo.manifest.json");
+        fs::write(
+            &manifest_path,
+            serde_json::to_vec_pretty(&installed_manifest).unwrap(),
+        )
+        .unwrap();
+
+        let server = MockServer::start();
+        let bundle_bytes = build_bundle_with_version("1.2.0", "run.sh", b"echo remote");
+        server.mock(|when, then| {
+            when.method(GET).path("/bundle.zip");
+            then.status(200)
+                .header("content-type", "application/zip")
+                .body(bundle_bytes.clone());
+        });
+
+        let status = check_bundle_update(&format!("{}/bundle.zip", server.base_url()))
+            .expect("check should succeed");
+
+        assert_eq!(status.status, "update_available");
+        assert_eq!(status.installed_version.as_deref(), Some("1.0.0"));
+        assert_eq!(status.remote_version.as_deref(), Some("1.2.0"));
     }
 }

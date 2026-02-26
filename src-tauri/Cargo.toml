@@ -1,6 +1,6 @@
 [package]
 name = "vanta"
-version = "1.16.0"
+version = "1.17.0"
 description = "Liquid Glass command palette for Linux"
 authors = ["onxy"]
 edition = "2021"
@@ -46,6 +46,7 @@ sha2 = "0.10"
 thiserror = "1"
 hex = "0.4"
 tempfile = "3"
+semver = "1"
 
 [dev-dependencies]
 tempfile = "3"

@@ -203,6 +203,42 @@ pub fn validate_bundle_archive<R: Read + Seek>(reader: R) -> Result<ValidatedBun
     })
 }
 
+/// Extract and verify only the manifest (and signature) from a bundle archive.
+/// This is lighter than full validation and is used for update checks.
+pub fn read_manifest_from_archive<R: Read + Seek>(reader: R) -> Result<BundleManifest, BundleError> {
+    let mut archive = ZipArchive::new(reader).map_err(|e| BundleError::BundleRead(e.to_string()))?;
+
+    let mut manifest_bytes: Option<Vec<u8>> = None;
+    let mut sig_bytes: Option<Vec<u8>> = None;
+
+    for i in 0..archive.len() {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| BundleError::BundleRead(e.to_string()))?;
+
+        let name = file.name().to_string();
+        if name.ends_with('/') {
+            continue;
+        }
+
+        if name == "manifest.json" {
+            let mut buf = Vec::new();
+            file.read_to_end(&mut buf)
+                .map_err(|e| BundleError::BundleRead(e.to_string()))?;
+            manifest_bytes = Some(buf);
+        } else if name == "manifest.sig" {
+            let mut buf = Vec::new();
+            file.read_to_end(&mut buf)
+                .map_err(|e| BundleError::BundleRead(e.to_string()))?;
+            sig_bytes = Some(buf);
+        }
+    }
+
+    let manifest_bytes = manifest_bytes.ok_or(BundleError::MissingManifest)?;
+    let sig_bytes = sig_bytes.ok_or(BundleError::MissingSignature)?;
+    verify_manifest(&manifest_bytes, &sig_bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

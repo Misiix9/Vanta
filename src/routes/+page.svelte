@@ -17,6 +17,7 @@
     PermissionDeniedPayload,
     WorkflowMacro,
     MacroDryRunResult,
+    BundleUpdateStatus,
   } from "$lib/types";
   import { applyTheme } from "$lib/theme";
   import SearchInput from "$lib/components/SearchInput.svelte";
@@ -38,6 +39,13 @@
   let selectedIndex = $state(0);
   let searchTime: number | null = $state(null);
   let visibleRowCount = $state(0);
+  let bundleUpdateStatus = $state<
+    BundleUpdateStatus | { status: "idle" | "checking"; message?: string }
+  >({
+    status: "idle",
+    message: "",
+  });
+  let lastInstallTarget: string | null = $state(null);
     let currentMode: "launcher" | "clipboard" = $state("launcher");
   let preferDefaultOrder = $derived(
     query.trim() === "" && currentMode === "launcher" && !isScriptMode,
@@ -257,6 +265,13 @@
   onMount(async () => {
     // ... existing onMount code ...
 
+    try {
+      const storedTarget = localStorage.getItem("vanta:last-install-target");
+      if (storedTarget) lastInstallTarget = storedTarget;
+    } catch (e) {
+      console.warn("Failed to load last install target", e);
+    }
+
     // Register clipboard listener ASAP so startup emits aren't missed.
     try {
       unlisteners.push(
@@ -397,6 +412,53 @@
     // Ensure app cache is fresh when GUI is first opened
     maybeRescanApps(true);
   });
+
+  function rememberInstallTarget(target: string) {
+    lastInstallTarget = target;
+    try {
+      localStorage.setItem("vanta:last-install-target", target);
+    } catch (e) {
+      console.warn("Failed to persist install target", e);
+    }
+  }
+
+  function resolveUpdateTarget(): string | null {
+    const trimmed = query.trim();
+    if (trimmed.toLowerCase().startsWith("install ")) {
+      const candidate = trimmed.slice("install ".length).trim();
+      if (candidate) return candidate;
+    }
+    return lastInstallTarget;
+  }
+
+  async function handleCheckBundleUpdate() {
+    const target = resolveUpdateTarget();
+    if (!target) {
+      bundleUpdateStatus = {
+        status: "error",
+        message: "Install a bundle first with install <url>",
+      };
+      return;
+    }
+
+    bundleUpdateStatus = { status: "checking", message: "Checking for updates…" };
+
+    try {
+      const status = await invoke<BundleUpdateStatus>("check_bundle_update", { url: target });
+      bundleUpdateStatus = {
+        ...status,
+        message:
+          status.message ||
+          (status.status === "update_available" &&
+          status.installed_version &&
+          status.remote_version
+            ? `Update ${status.installed_version} → ${status.remote_version}`
+            : status.status.split("_").join(" ")),
+      };
+    } catch (e) {
+      bundleUpdateStatus = { status: "error", message: String(e) };
+    }
+  }
 
   function updateClipboardSuggestions(q: string) {
     if (!q) {
@@ -959,6 +1021,8 @@
           `Install this script or package?\n${target}`,
         );
         if (!ok) return;
+        rememberInstallTarget(target);
+        bundleUpdateStatus = { status: "idle", message: "" };
         await invoke("launch_app", { exec: result.exec });
         refreshScripts();
         // deliberately leaving window open to view progress
@@ -1308,6 +1372,8 @@
                 : visibleRowCount
           }
         {searchTime}
+        updateStatus={bundleUpdateStatus}
+        onCheckUpdate={handleCheckBundleUpdate}
       />
     </div>
   {/if}

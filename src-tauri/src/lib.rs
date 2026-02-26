@@ -1025,6 +1025,13 @@ async fn get_scripts(
 }
 
 #[tauri::command]
+async fn check_bundle_update(url: String) -> Result<store::BundleUpdateStatus, String> {
+    tauri::async_runtime::spawn_blocking(move || store::check_bundle_update(&url))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn get_workflows(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<WorkflowMacro>, String> {
@@ -1436,6 +1443,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             hide_window,
             show_window,
             get_scripts,
+            check_bundle_update,
             get_workflows,
             dry_run_macro,
             run_macro,
