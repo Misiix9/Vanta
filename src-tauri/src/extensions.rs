@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
+use tauri::Manager;
 
 use crate::config;
 use crate::permissions::{self, Capability, Decision};
@@ -321,6 +322,11 @@ pub fn watch_extensions(app_handle: tauri::AppHandle) {
                         );
                     }
                     log::info!("Extensions re-scanned: {} extensions", extensions.len());
+                    if let Some(state) = app_handle.try_state::<crate::AppState>() {
+                        if let Ok(mut cached) = state.extensions_cache.lock() {
+                            *cached = extensions.clone();
+                        }
+                    }
                     let _ = app_handle.emit("extensions-changed", &extensions);
                 }
             }

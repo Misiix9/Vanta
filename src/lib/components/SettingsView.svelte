@@ -151,10 +151,16 @@
         }
     }
 
+    function flushAndClose() {
+        if (saveTimeout) clearTimeout(saveTimeout);
+        invoke("save_config", { newConfig: config }).catch(console.error);
+        onClose();
+    }
+
     function handleKeydown(e: KeyboardEvent) {
         if (e.key === "Escape") {
             e.stopPropagation();
-            onClose();
+            flushAndClose();
         }
     }
 </script>
@@ -168,7 +174,7 @@
     <header>
         <h2>Settings</h2>
         <div class="actions">
-            <button class="close-btn" onclick={onClose}>Done</button>
+            <button class="close-btn" onclick={flushAndClose}>Done</button>
         </div>
     </header>
 

@@ -29,13 +29,13 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_2.1.0_amd64.deb
+sudo dpkg -i vanta_2.2.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-2.1.0-1.x86_64.rpm
+sudo rpm -i vanta-2.2.0-1.x86_64.rpm
 ```
 
 ---
@@ -45,7 +45,8 @@ sudo rpm -i vanta-2.1.0-1.x86_64.rpm
 - **Fast fuzzy search** powered by Rust + `nucleo-matcher`.
 - **Extension engine** (v2.0): Build custom commands and full UI screens with TypeScript/Svelte.
 - **Vanta Store** (v2.1): Browse and install extensions from the built-in store. Search "store" or "install" in the launcher.
-- **7 Default Extensions**: Weather, Smart Calculator, Color Picker, Task Manager, Network Test, Timer, and System Info.
+- **10 Default Extensions**: Weather, Smart Calculator, Color Picker, Process Manager, Network Test, Timer, System Info, Spotify, Clipboard Tools, and Password Generator.
+- **Auto-refresh** (v2.2): Settings changes, new app installations, and new extensions take effect immediately without restarting.
 - **Commands section**: Sleep, Lock, Shutdown, Restart, Log Out, and Go to BIOS available out of the box.
 - **Clipboard-first**: `--clipboard` launch and `Super+V` open the clipboard view.
 - **File search with filters**: Include/exclude globs, extension allowlist, and type filters.
@@ -95,7 +96,7 @@ Vanta v2.0 replaces the old JSON script system with a full Raycast-style extensi
   "version": "1.0.0",
   "description": "What this extension does",
   "author": "your-name",
-  "icon": "fa-solid fa-star",
+  "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/></svg>",
   "permissions": ["Network", "Shell"],
   "commands": [
     {

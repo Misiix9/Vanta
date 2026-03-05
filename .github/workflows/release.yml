@@ -1,4 +1,4 @@
-name: Release Vanta v2.1.0
+name: Release Vanta v2.2.0
 
 on:
   push:
@@ -83,25 +83,38 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.1.0 -- Vanta Store & Default Extensions
+            ## Vanta v2.2.0 -- Auto-Refresh, Extension Polish, Process Manager & New Extensions
 
-            ### New Features
+            ### Auto-Refresh
 
-            - **Vanta Store**: Browse and install extensions from the Vanta Store. Search "store" or "install" in the launcher to open. Extensions are fetched from the [vanta-extensions](https://github.com/Misiix9/vanta-extensions) GitHub repository.
-            - **7 Default Extensions**: Weather, Smart Calculator, Color Picker, Task Manager, Network Test, Timer, and System Info -- all available in the store with custom PNG icons.
-            - **Extension SDK Capabilities**: Extensions now have access to `network.fetch()`, `shell.execute()`, and `storage.get()/set()` APIs for HTTP requests, system commands, and persistent key-value storage.
-            - **PNG Icon Support**: Extensions can bundle `icon.png` files that display in launcher search results via Tauri's asset protocol.
-            - **One-click Install/Uninstall**: Install extensions from the store with a single click. Installed extensions immediately appear in launcher search.
+            - **Settings Done auto-refresh**: Clicking "Done" in settings now flushes any pending config save and immediately reloads the launcher with updated settings. No more restarting Vanta.
+            - **Live extension cache sync**: The file watcher now updates the in-memory `AppState.extensions_cache` when extensions are added or removed, so newly installed extensions appear in search results instantly.
+            - **Smart reload on apps-changed**: When desktop entries change, the launcher re-runs the current search instead of only refreshing idle suggestions.
 
-            ### Technical Highlights
+            ### Extension Polish
 
-            - New `store.rs` Rust module: fetches registry from GitHub, downloads extension bundles and icons, handles install/uninstall with path traversal protection.
-            - Extended `extensions.rs` with `extension_fetch`, `extension_shell_execute`, `extension_storage_get/set` Tauri commands.
-            - `resolve_ext_icon()` helper resolves relative icon paths to absolute filesystem paths for asset protocol rendering.
-            - `StoreView.svelte`: full-screen store UI with card layout, install/uninstall buttons, loading states, live install status.
-            - Updated CSP `connect-src` and `img-src` for GitHub raw content access.
-            - Per-extension persistent storage in `~/.config/vanta/extension-data/<ext_id>.json`.
-            - Updated scanner.rs "Vanta Store" entry to use new store flow.
+            - All 7 original extensions completely rewritten with correct `--vanta-*` CSS variable usage and proper fallbacks.
+            - Unique CSS class prefixes per extension (`.weather-*`, `.calc-*`, `.cp-*`, `.proc-*`, `.net-*`, `.timer-*`, `.si-*`) to prevent style collisions.
+            - All PNG icons replaced with inline SVG icons (24x24, stroke-based, 1:1 ratio).
+            - Buttons, inputs, and text consistently themed -- no more white-on-white issues.
+
+            ### Process Manager (replaces Task Manager)
+
+            - Real-time process table with USER, PID, %CPU, %MEM, COMMAND columns.
+            - Auto-refreshes every 3 seconds with live CPU and RAM totals in summary bar.
+            - Search/filter processes by name. Sortable columns.
+            - Kill processes: click to SIGTERM, Shift+click to SIGKILL.
+            - Color-coded rows: orange >50%, red >80% resource usage.
+
+            ### New Extensions
+
+            - **Spotify**: Connect via access token, view now playing with progress bar, playback controls (play/pause/next/previous/shuffle/repeat), search and play tracks.
+            - **Clipboard Tools**: 14 text transforms including case conversion, URL/Base64 encode/decode, JSON prettify/minify, duplicate line removal.
+            - **Password Generator**: Configurable length (8-128), character set options, strength meter with entropy estimate, secure generation via `crypto.getRandomValues()`.
+
+            ### 10 Extensions Total
+
+            Weather, Smart Calculator, Color Picker, Process Manager, Network Test, Timer, System Info, Spotify, Clipboard Tools, Password Generator.
 
             ### Known Issues
             - AppImage bundling is temporarily disabled due to linuxdeploy strip failures on RELR ELF sections.

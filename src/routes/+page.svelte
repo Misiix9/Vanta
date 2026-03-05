@@ -294,6 +294,13 @@
     unlisteners.push(
       await listen<ExtensionEntry[]>("extensions-changed", (event) => {
         availableExtensions = event.payload;
+        if (currentMode === "launcher") {
+          if (query.trim() === "") {
+            loadSuggestions();
+          } else {
+            handleSearch(query);
+          }
+        }
       }),
     );
 
@@ -301,8 +308,12 @@
     // Listen for app cache refresh events and update suggestions when idle.
     unlisteners.push(
       await listen("apps-changed", () => {
-        if (currentMode === "launcher" && query.trim() === "") {
-          loadSuggestions();
+        if (currentMode === "launcher") {
+          if (query.trim() === "") {
+            loadSuggestions();
+          } else {
+            handleSearch(query);
+          }
         }
       }),
     );
@@ -891,7 +902,7 @@
       <SettingsView
         bind:config={vantaConfig}
         {availableThemes}
-        onClose={() => (view = "launcher")}
+        onClose={() => { view = "launcher"; loadSuggestions(); }}
       />
     </div>
   {:else if currentMode === "clipboard"}
