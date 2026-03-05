@@ -16,9 +16,6 @@
   let installingSet = $state<Set<string>>(new Set());
   let uninstallingSet = $state<Set<string>>(new Set());
 
-  const BASE_ICON_URL =
-    "https://raw.githubusercontent.com/Misiix9/vanta-extensions/main/extensions";
-
   const unlisteners: Array<() => void> = [];
 
   onMount(async () => {
@@ -93,13 +90,16 @@
     }
   }
 
-  function iconUrl(ext: StoreExtensionInfo): string | null {
-    if (ext.icon && ext.icon.startsWith("fa-")) return null;
-    return `${BASE_ICON_URL}/${ext.name}/icon.png`;
+  function isFontAwesome(icon: string | null | undefined): boolean {
+    return !!icon && icon.startsWith("fa-");
   }
 
-  function isFontAwesome(icon: string | null): boolean {
-    return !!icon && icon.startsWith("fa-");
+  function isInlineSvg(icon: string | null | undefined): boolean {
+    return !!icon && icon.trim().startsWith("<svg");
+  }
+
+  function svgToDataUri(icon: string): string {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(icon.trim())}`;
   }
 </script>
 
@@ -133,13 +133,12 @@
   {:else}
     <div class="store-grid">
       {#each extensions as ext (ext.name)}
-        {@const imgUrl = iconUrl(ext)}
         <div class="ext-card" class:installed={ext.installed}>
           <div class="ext-icon">
-            {#if isFontAwesome(ext.icon)}
+            {#if isInlineSvg(ext.icon)}
+              <img src={svgToDataUri(ext.icon!)} alt={ext.title} class="icon-svg" />
+            {:else if isFontAwesome(ext.icon)}
               <i class="{ext.icon} icon-fa"></i>
-            {:else if imgUrl}
-              <img src={imgUrl} alt={ext.title} />
             {:else}
               <i class="fa-solid fa-puzzle-piece icon-fa"></i>
             {/if}
@@ -201,7 +200,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    color: var(--text-primary);
+    color: var(--vanta-text, #f5f5f5);
   }
 
   .store-header {
@@ -209,7 +208,7 @@
     align-items: center;
     gap: 12px;
     padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--vanta-border, rgba(255,255,255,0.08));
     flex-shrink: 0;
   }
 
@@ -224,7 +223,7 @@
   .refresh-btn {
     background: none;
     border: none;
-    color: var(--text-secondary);
+    color: var(--vanta-text-dim, #888);
     cursor: pointer;
     padding: 6px 8px;
     border-radius: 6px;
@@ -234,8 +233,8 @@
 
   .back-btn:hover,
   .refresh-btn:hover {
-    background: var(--surface);
-    color: var(--text-primary);
+    background: var(--vanta-surface, #0a0a0a);
+    color: var(--vanta-text, #f5f5f5);
   }
 
   .store-loading,
@@ -247,7 +246,7 @@
     align-items: center;
     justify-content: center;
     gap: 12px;
-    color: var(--text-secondary);
+    color: var(--vanta-text-dim, #888);
     font-size: 0.95rem;
   }
 
@@ -262,9 +261,9 @@
     margin-top: 8px;
     padding: 6px 16px;
     border-radius: 6px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-primary);
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.08));
+    background: var(--vanta-surface, #0a0a0a);
+    color: var(--vanta-text, #f5f5f5);
     cursor: pointer;
   }
 
@@ -283,17 +282,17 @@
     gap: 14px;
     padding: 14px;
     border-radius: 10px;
-    border: 1px solid var(--border);
-    background: var(--surface);
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.08));
+    background: var(--vanta-surface, #0a0a0a);
     transition: border-color 0.15s;
   }
 
   .ext-card:hover {
-    border-color: var(--accent);
+    border-color: var(--vanta-accent, #7b35f0);
   }
 
   .ext-card.installed {
-    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    border-color: color-mix(in srgb, var(--vanta-accent, #7b35f0) 40%, transparent);
   }
 
   .ext-icon {
@@ -301,7 +300,7 @@
     width: 48px;
     height: 48px;
     border-radius: 10px;
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    background: color-mix(in srgb, var(--vanta-accent, #7b35f0) 12%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -309,15 +308,18 @@
   }
 
   .ext-icon img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 10px;
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+
+  .ext-icon .icon-svg {
+    filter: brightness(0) invert(1);
   }
 
   .ext-icon .icon-fa {
     font-size: 1.3rem;
-    color: var(--accent);
+    color: var(--vanta-accent, #7b35f0);
   }
 
   .ext-info {
@@ -333,11 +335,12 @@
 
   .ext-desc {
     font-size: 0.82rem;
-    color: var(--text-secondary);
+    color: var(--vanta-text-dim, #888);
     margin: 0 0 6px 0;
     line-height: 1.3;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
@@ -346,7 +349,7 @@
     display: flex;
     gap: 8px;
     font-size: 0.75rem;
-    color: var(--text-secondary);
+    color: var(--vanta-text-dim, #888);
     opacity: 0.8;
   }
 
@@ -361,8 +364,8 @@
     font-size: 0.68rem;
     padding: 1px 6px;
     border-radius: 4px;
-    background: color-mix(in srgb, var(--accent) 15%, transparent);
-    color: var(--accent);
+    background: color-mix(in srgb, var(--vanta-accent, #7b35f0) 15%, transparent);
+    color: var(--vanta-accent, #7b35f0);
     font-weight: 500;
   }
 
@@ -378,7 +381,7 @@
     padding: 6px 16px;
     border-radius: 8px;
     border: none;
-    background: var(--accent);
+    background: var(--vanta-accent, #7b35f0);
     color: #fff;
     font-size: 0.82rem;
     font-weight: 600;
@@ -399,9 +402,9 @@
   .btn-uninstall {
     padding: 5px 12px;
     border-radius: 8px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.08));
     background: transparent;
-    color: var(--text-secondary);
+    color: var(--vanta-text-dim, #888);
     font-size: 0.78rem;
     cursor: pointer;
     transition: all 0.15s;
@@ -414,7 +417,7 @@
 
   .installed-badge {
     font-size: 0.72rem;
-    color: var(--accent);
+    color: var(--vanta-accent, #7b35f0);
     font-weight: 500;
   }
 

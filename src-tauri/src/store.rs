@@ -24,8 +24,9 @@ pub struct StoreExtensionInfo {
     pub installed: bool,
 }
 
+/// Wrapper for the legacy `{ "version": ..., "extensions": [...] }` format.
 #[derive(Debug, Deserialize)]
-struct RegistryFile {
+struct RegistryFileWrapped {
     #[allow(dead_code)]
     version: u32,
     extensions: Vec<StoreExtensionInfo>,
@@ -52,11 +53,15 @@ pub async fn fetch_store_registry() -> Result<Vec<StoreExtensionInfo>, String> {
         .await
         .map_err(|e| format!("Failed to read registry response: {}", e))?;
 
-    let registry: RegistryFile =
-        serde_json::from_str(&text).map_err(|e| format!("Failed to parse registry: {}", e))?;
+    let mut exts: Vec<StoreExtensionInfo> =
+        serde_json::from_str::<Vec<StoreExtensionInfo>>(&text)
+            .or_else(|_| {
+                serde_json::from_str::<RegistryFileWrapped>(&text)
+                    .map(|r| r.extensions)
+            })
+            .map_err(|e| format!("Failed to parse registry: {}", e))?;
 
     let installed = installed_extension_names();
-    let mut exts = registry.extensions;
     for ext in &mut exts {
         ext.installed = installed.contains(&ext.name);
     }
