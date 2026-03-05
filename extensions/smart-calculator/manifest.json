@@ -4,14 +4,9 @@
   "version": "1.0.0",
   "description": "Advanced calculator with unit conversions and history",
   "author": "Vanta Team",
-  "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='4' y='2' width='16' height='20' rx='2'/><line x1='8' y1='6' x2='16' y2='6'/><line x1='8' y1='10' x2='10' y2='10'/><line x1='14' y1='10' x2='16' y2='10'/><line x1='8' y1='14' x2='10' y2='14'/><line x1='14' y1='14' x2='16' y2='14'/><line x1='8' y1='18' x2='16' y2='18'/></svg>",
+  "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='5' y='2' width='14' height='20' rx='2'/><rect x='8' y='5' width='8' height='4' rx='1'/><circle cx='9.5' cy='13' r='1'/><circle cx='14.5' cy='13' r='1'/><circle cx='9.5' cy='17.5' r='1'/><circle cx='14.5' cy='17.5' r='1'/></svg>",
   "permissions": [],
   "commands": [
-    {
-      "name": "calculate",
-      "title": "Smart Calculator",
-      "subtitle": "Calculate with unit conversions",
-      "mode": "view"
-    }
+    {"name": "calculate", "title": "Smart Calculator", "subtitle": "Calculate with unit conversions", "mode": "view"}
   ]
 }

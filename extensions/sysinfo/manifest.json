@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "View system information and resource usage",
   "author": "Vanta Team",
-  "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"2\" y=\"3\" width=\"20\" height=\"14\" rx=\"2\"/><line x1=\"8\" y1=\"21\" x2=\"16\" y2=\"21\"/><line x1=\"12\" y1=\"17\" x2=\"12\" y2=\"21\"/><circle cx=\"12\" cy=\"10\" r=\"2\"/><path d=\"M12 6v1.5\"/><path d=\"M12 12.5v1.5\"/><path d=\"M8.5 8l1 1\"/><path d=\"M14.5 12l1 1\"/><path d=\"M8 10h1.5\"/><path d=\"M14.5 10H16\"/></svg>",
+  "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='2' y='3' width='20' height='14' rx='2'/><line x1='8' y1='21' x2='16' y2='21'/><line x1='12' y1='17' x2='12' y2='21'/><circle cx='12' cy='10' r='2'/><path d='M12 6v2'/><path d='M12 12v2'/><path d='M8 10h2'/><path d='M14 10h2'/></svg>",
   "permissions": ["Shell"],
   "commands": [
     {"name": "overview", "title": "System Info", "subtitle": "View OS, CPU, RAM, and disk info", "mode": "view"}
