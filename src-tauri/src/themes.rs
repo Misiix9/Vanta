@@ -28,26 +28,36 @@ pub fn get_themes_dir() -> PathBuf {
 pub fn seed_default_theme(app: &tauri::AppHandle) {
     let themes_dir = get_themes_dir();
     let dest = themes_dir.join("default.css");
-    if !dest.exists() {
-        // First try copying the packaged resource.
-        if let Ok(resource_path) = app.path().resolve(
-            "resources/themes/default.css",
-            tauri::path::BaseDirectory::Resource,
-        ) {
-            if let Err(e) = fs::copy(&resource_path, &dest) {
-                log::warn!("Could not seed default.css from resource: {}", e);
-            } else {
-                log::info!("Seeded default theme to {:?}", dest);
-                return;
-            }
-        }
 
-        // Fallback: write embedded theme contents.
-        if let Err(e) = fs::write(&dest, DEFAULT_THEME_CSS) {
-            log::warn!("Could not write embedded default theme: {}", e);
-        } else {
-            log::info!("Seeded default theme from embedded copy to {:?}", dest);
+    let needs_update = if dest.exists() {
+        match fs::read_to_string(&dest) {
+            Ok(existing) => existing != DEFAULT_THEME_CSS,
+            Err(_) => true,
         }
+    } else {
+        true
+    };
+
+    if !needs_update {
+        return;
+    }
+
+    if let Ok(resource_path) = app.path().resolve(
+        "resources/themes/default.css",
+        tauri::path::BaseDirectory::Resource,
+    ) {
+        if let Err(e) = fs::copy(&resource_path, &dest) {
+            log::warn!("Could not seed default.css from resource: {}", e);
+        } else {
+            log::info!("Updated default theme at {:?}", dest);
+            return;
+        }
+    }
+
+    if let Err(e) = fs::write(&dest, DEFAULT_THEME_CSS) {
+        log::warn!("Could not write embedded default theme: {}", e);
+    } else {
+        log::info!("Updated default theme from embedded copy at {:?}", dest);
     }
 }
 

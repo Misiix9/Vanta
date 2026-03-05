@@ -586,7 +586,7 @@
       results = composeResults(baseResults, "");
 
       if (results.length > 0) {
-        selectedIndex = 0;
+        selectedIndex = 1;
       }
     } catch (e) {
       console.error("Failed to load suggestions:", e);
@@ -597,7 +597,7 @@
           baseResults = searchFallback;
           results = composeResults(baseResults, "");
           console.info("fallback search", results?.length ?? 0);
-          if (results.length > 0) selectedIndex = 0;
+          if (results.length > 0) selectedIndex = 1;
         }
       } catch (err) {
         console.error("Fallback search failed:", err);
@@ -632,7 +632,7 @@
       console.info("search results", searchResults?.length ?? 0, "for", q);
       baseResults = searchResults;
       results = composeResults(baseResults, q);
-      selectedIndex = 0;
+      selectedIndex = results.length > 0 ? 1 : 0;
       searchTime = elapsed;
     } catch (e) {
       if (requestId !== searchRequestId) return;
