@@ -28,12 +28,43 @@ export function createVantaAPI(options: {
         await navigator.clipboard.writeText(text);
       },
     },
+    network: {
+      fetch: async (url: string, opts?: { method?: string }) => {
+        return await invoke<string>('extension_fetch', {
+          url,
+          method: opts?.method ?? 'GET',
+        });
+      },
+    },
+    shell: {
+      execute: async (command: string, args?: string[]) => {
+        return await invoke<string>('extension_shell_execute', {
+          command,
+          args: args ?? [],
+        });
+      },
+    },
+    storage: {
+      get: async (key: string) => {
+        return await invoke<string | null>('extension_storage_get', {
+          extId: options.extensionName,
+          key,
+        });
+      },
+      set: async (key: string, value: string) => {
+        await invoke('extension_storage_set', {
+          extId: options.extensionName,
+          key,
+          value,
+        });
+      },
+    },
     toast: options.onToast,
     closeMainWindow: async () => {
       await invoke('hide_window');
     },
     getPreference: <T>(_key: string): T | undefined => {
-      return undefined; // Extension preferences TBD
+      return undefined;
     },
     environment,
   };

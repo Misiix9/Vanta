@@ -29,13 +29,13 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_2.0.0_amd64.deb
+sudo dpkg -i vanta_2.1.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-2.0.0-1.x86_64.rpm
+sudo rpm -i vanta-2.1.0-1.x86_64.rpm
 ```
 
 ---
@@ -44,6 +44,8 @@ sudo rpm -i vanta-2.0.0-1.x86_64.rpm
 
 - **Fast fuzzy search** powered by Rust + `nucleo-matcher`.
 - **Extension engine** (v2.0): Build custom commands and full UI screens with TypeScript/Svelte.
+- **Vanta Store** (v2.1): Browse and install extensions from the built-in store. Search "store" or "install" in the launcher.
+- **7 Default Extensions**: Weather, Smart Calculator, Color Picker, Task Manager, Network Test, Timer, and System Info.
 - **Commands section**: Sleep, Lock, Shutdown, Restart, Log Out, and Go to BIOS available out of the box.
 - **Clipboard-first**: `--clipboard` launch and `Super+V` open the clipboard view.
 - **File search with filters**: Include/exclude globs, extension allowlist, and type filters.
@@ -163,6 +165,10 @@ Every command handler and view component receives a `VantaAPI` object:
 api.navigation.push(component, props)  // Push a new view
 api.navigation.pop()                    // Go back
 api.clipboard.copy(text)                // Copy to clipboard
+api.network.fetch(url, { method })      // HTTP request (proxied through Rust)
+api.shell.execute(command, args)        // Run a shell command
+api.storage.get(key)                    // Read from per-extension storage
+api.storage.set(key, value)             // Write to per-extension storage
 api.toast({ title, message, type })     // Show a toast
 api.closeMainWindow()                   // Hide the launcher
 api.environment.extensionName           // Current extension name

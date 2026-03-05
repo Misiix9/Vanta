@@ -20,6 +20,16 @@ export interface VantaAPI {
   clipboard: {
     copy: (text: string) => Promise<void>;
   };
+  network: {
+    fetch: (url: string, options?: { method?: string }) => Promise<string>;
+  };
+  shell: {
+    execute: (command: string, args?: string[]) => Promise<string>;
+  };
+  storage: {
+    get: (key: string) => Promise<string | null>;
+    set: (key: string, value: string) => Promise<void>;
+  };
   toast: (options: ToastOptions) => void;
   closeMainWindow: () => Promise<void>;
   getPreference: <T>(key: string) => T | undefined;

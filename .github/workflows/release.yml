@@ -1,4 +1,4 @@
-name: Release Vanta v2.0.0
+name: Release Vanta v2.1.0
 
 on:
   push:
@@ -83,33 +83,25 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.0.0 -- Raycast-Style Extension Engine
-
-            ### Breaking Changes
-
-            This is a **major architectural release**. The entire JSON script system has been replaced with a Raycast-style extension engine.
-
-            - **Removed**: JSON script system (`scripts.rs`, `doctor.rs`, `store.rs`, `bundles.rs`), `install:` prefix, script store, `vanta doctor` CLI command, `ScriptResultItem` component.
-            - **Removed config**: `scripts.directory`, `scripts.timeout_ms`, `scripts.strict_json` replaced by `extensions.directory`, `extensions.dev_mode`.
+            ## Vanta v2.1.0 -- Vanta Store & Default Extensions
 
             ### New Features
 
-            - **Extension Engine**: Extensions live in `~/.config/vanta/extensions/<name>/` with a `manifest.json` and compiled `dist/index.js` IIFE bundle.
-            - **Multi-command extensions**: Each extension can declare multiple commands with `view` (custom UI) or `no-view` (action + toast) modes.
-            - **TypeScript/Svelte SDK**: Extensions receive a `VantaAPI` object for navigation, clipboard, toast, and shell access. SDK components (`List`, `Form`, `Grid`, `Detail`, `ActionPanel`) are provided via `window.__vanta_sdk`.
-            - **Custom screen rendering**: View-mode commands mount full Svelte components inside `ExtensionHost` with navigation stack support.
-            - **Hot-reload**: File watcher on the extensions directory detects changes and re-scans automatically.
-            - **Extension search**: Extension commands appear in search results with fuzzy matching.
-            - **Workflow macros**: Updated to support `extension` step type alongside `system`.
+            - **Vanta Store**: Browse and install extensions from the Vanta Store. Search "store" or "install" in the launcher to open. Extensions are fetched from the [vanta-extensions](https://github.com/Misiix9/vanta-extensions) GitHub repository.
+            - **7 Default Extensions**: Weather, Smart Calculator, Color Picker, Task Manager, Network Test, Timer, and System Info -- all available in the store with custom PNG icons.
+            - **Extension SDK Capabilities**: Extensions now have access to `network.fetch()`, `shell.execute()`, and `storage.get()/set()` APIs for HTTP requests, system commands, and persistent key-value storage.
+            - **PNG Icon Support**: Extensions can bundle `icon.png` files that display in launcher search results via Tauri's asset protocol.
+            - **One-click Install/Uninstall**: Install extensions from the store with a single click. Installed extensions immediately appear in launcher search.
 
             ### Technical Highlights
 
-            - New `extensions.rs` Rust module: manifest parsing, validation (path traversal protection), bundle loading, file watching.
-            - `ExtensionHost.svelte`: manages view navigation stack, mount/unmount lifecycle, error boundaries, style injection.
-            - SDK loader (`loader.ts`): dynamic script injection with registration timeout and cleanup.
-            - 5 pre-built Svelte 5 SDK components themed with Vanta CSS variables.
-            - CSP updated to allow `blob:` in `script-src` for dynamic module loading.
-            - `jsonschema` dependency removed from Cargo.toml.
+            - New `store.rs` Rust module: fetches registry from GitHub, downloads extension bundles and icons, handles install/uninstall with path traversal protection.
+            - Extended `extensions.rs` with `extension_fetch`, `extension_shell_execute`, `extension_storage_get/set` Tauri commands.
+            - `resolve_ext_icon()` helper resolves relative icon paths to absolute filesystem paths for asset protocol rendering.
+            - `StoreView.svelte`: full-screen store UI with card layout, install/uninstall buttons, loading states, live install status.
+            - Updated CSP `connect-src` and `img-src` for GitHub raw content access.
+            - Per-extension persistent storage in `~/.config/vanta/extension-data/<ext_id>.json`.
+            - Updated scanner.rs "Vanta Store" entry to use new store flow.
 
             ### Known Issues
             - AppImage bundling is temporarily disabled due to linuxdeploy strip failures on RELR ELF sections.

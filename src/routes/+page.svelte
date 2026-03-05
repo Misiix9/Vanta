@@ -23,12 +23,13 @@
   import PermissionModal from "$lib/components/PermissionModal.svelte";
   import MacroPreview from "$lib/components/MacroPreview.svelte";
   import ExtensionHost from "$lib/components/ExtensionHost.svelte";
+  import StoreView from "$lib/components/StoreView.svelte";
 
   let query = $state("");
   let vantaConfig: VantaConfig | undefined = $state();
   let results: SearchResult[] = $state([]);
   let baseResults: SearchResult[] = $state([]);
-  let view: "launcher" | "settings" = $state("launcher");
+  let view: "launcher" | "settings" | "store" = $state("launcher");
   let selectedIndex = $state(0);
   let searchTime: number | null = $state(null);
   let visibleRowCount = $state(0);
@@ -681,6 +682,9 @@
       } else if (result.exec === "open-settings") {
         view = "settings";
         return;
+      } else if (result.exec === "open-store") {
+        view = "store";
+        return;
       } else if (result.exec.startsWith("copy-path:")) {
         const value = result.exec.slice(10);
         await navigator.clipboard.writeText(value);
@@ -716,6 +720,7 @@
     loadSuggestions();
 
     extensionView = null;
+    view = "launcher";
     currentMode = "launcher";
     resetMacroState();
     selectedIndex = 0;
@@ -726,6 +731,10 @@
 
   async function handleEscape() {
     if (permissionPrompt) return;
+    if (view === "store") {
+      view = "launcher";
+      return;
+    }
     if (extensionView) {
       extensionView = null;
       return;
@@ -756,14 +765,13 @@
       return;
     }
 
-    // If in settings, intercept Esc/Enter to close
-    if (view === "settings") {
-      if (e.key === "Escape" || e.key === "Enter") {
+    if (view === "settings" || view === "store") {
+      if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
         view = "launcher";
       }
-      return; // Block other keys
+      return;
     }
 
     // Ensure search input gets focus if the user types anything
@@ -868,7 +876,14 @@
   class:css-blur={blurMode === "fallback"}
   role="application"
 >
-  {#if view === "settings" && vantaConfig}
+  {#if view === "store"}
+    <div
+      in:fade={{ duration: 150 }}
+      style="height: 100%; width: 100%; position: relative;"
+    >
+      <StoreView onClose={() => (view = "launcher")} />
+    </div>
+  {:else if view === "settings" && vantaConfig}
     <div
       in:fade={{ duration: 150 }}
       style="height: 100%; width: 100%; position: relative;"

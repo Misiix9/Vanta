@@ -8,6 +8,7 @@ pub mod matcher;
 pub mod math;
 pub mod scanner;
 pub mod files;
+pub mod store;
 pub mod window;
 pub mod windows;
 pub mod themes;
@@ -309,7 +310,10 @@ fn build_extension_results(
                     results.push(SearchResult {
                         title: cmd.title.clone(),
                         subtitle: Some(ext.manifest.title.clone()),
-                        icon: cmd.icon.clone().or_else(|| ext.manifest.icon.clone()),
+                        icon: extensions::resolve_ext_icon(
+                            cmd.icon.as_deref().or(ext.manifest.icon.as_deref()),
+                            &ext.path,
+                        ),
                         exec: format!("{}:{}:{}", exec_prefix, ext.manifest.name, cmd.name),
                         score: weighted_score(score + 800_000, weight),
                         match_indices: indices,
@@ -333,7 +337,10 @@ fn build_extension_results(
             results.push(SearchResult {
                 title: cmd.title.clone(),
                 subtitle: Some(ext.manifest.title.clone()),
-                icon: cmd.icon.clone().or_else(|| ext.manifest.icon.clone()),
+                    icon: extensions::resolve_ext_icon(
+                        cmd.icon.as_deref().or(ext.manifest.icon.as_deref()),
+                        &ext.path,
+                    ),
                 exec: format!("{}:{}:{}", exec_prefix, ext.manifest.name, cmd.name),
                 score: weighted_score(900_000, weight),
                 match_indices: vec![],
@@ -636,6 +643,27 @@ async fn search(
             .map_err(|_| "Failed to access extensions cache".to_string())?;
         let ext_results = build_extension_results(&query, &ext_cache, 100);
         results.extend(ext_results);
+    }
+
+    let wants_store = query_lower.contains("store")
+        || query_lower.contains("install")
+        || query_lower.contains("extension")
+        || query_lower.contains("marketplace");
+
+    if wants_store {
+        results.push(SearchResult {
+            title: "Vanta Store".to_string(),
+            subtitle: Some("Browse and install extensions".to_string()),
+            icon: Some("fa-solid fa-store".to_string()),
+            exec: "open-store".to_string(),
+            score: weighted_score(950_000, 100),
+            match_indices: vec![],
+            source: ResultSource::Application,
+            actions: None,
+            id: Some("vanta-store".to_string()),
+            group: None,
+            section: Some("Vanta".to_string()),
+        });
     }
 
     let wants_settings = query_lower.contains("setting")
@@ -1204,6 +1232,13 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             get_extensions,
             get_extension_bundle,
             get_extension_styles,
+            extensions::extension_fetch,
+            extensions::extension_shell_execute,
+            extensions::extension_storage_get,
+            extensions::extension_storage_set,
+            store::fetch_store_registry,
+            store::install_store_extension,
+            store::uninstall_extension,
             get_workflows,
             dry_run_macro,
             run_macro,

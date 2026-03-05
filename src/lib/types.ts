@@ -217,3 +217,15 @@ export interface ExtensionEntry {
     has_bundle: boolean;
     has_styles: boolean;
 }
+
+export interface StoreExtensionInfo {
+    name: string;
+    title: string;
+    version: string;
+    description: string;
+    author: string;
+    icon: string | null;
+    permissions: string[];
+    commands_count: number;
+    installed: boolean;
+}

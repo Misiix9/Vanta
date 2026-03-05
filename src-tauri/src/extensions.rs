@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Duration;
 
 use crate::config;
@@ -326,6 +328,102 @@ pub fn watch_extensions(app_handle: tauri::AppHandle) {
                 log::error!("Extensions watcher error: {}", e);
             }
         }
+    }
+}
+
+fn extension_data_dir() -> PathBuf {
+    let dir = config::config_dir().join("extension-data");
+    if !dir.exists() {
+        if let Err(e) = fs::create_dir_all(&dir) {
+            log::warn!("Could not create extension-data directory: {}", e);
+        }
+    }
+    dir
+}
+
+fn load_storage_map(ext_id: &str) -> Result<HashMap<String, String>, String> {
+    let path = extension_data_dir().join(format!("{}.json", ext_id));
+    if !path.exists() {
+        return Ok(HashMap::new());
+    }
+    let data = fs::read_to_string(&path).map_err(|e| format!("Failed to read storage: {}", e))?;
+    serde_json::from_str(&data).map_err(|e| format!("Failed to parse storage: {}", e))
+}
+
+fn save_storage_map(ext_id: &str, map: &HashMap<String, String>) -> Result<(), String> {
+    let path = extension_data_dir().join(format!("{}.json", ext_id));
+    let data = serde_json::to_string_pretty(map)
+        .map_err(|e| format!("Failed to serialize storage: {}", e))?;
+    fs::write(&path, data).map_err(|e| format!("Failed to write storage: {}", e))
+}
+
+#[tauri::command]
+pub async fn extension_fetch(url: String, method: Option<String>) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let req = match method.as_deref().unwrap_or("GET") {
+        "POST" => client.post(&url),
+        "PUT" => client.put(&url),
+        "DELETE" => client.delete(&url),
+        _ => client.get(&url),
+    };
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| format!("HTTP request failed: {}", e))?;
+    resp.text()
+        .await
+        .map_err(|e| format!("Failed to read response body: {}", e))
+}
+
+#[tauri::command]
+pub async fn extension_shell_execute(
+    command: String,
+    args: Option<Vec<String>>,
+) -> Result<String, String> {
+    let args = args.unwrap_or_default();
+    let output = Command::new(&command)
+        .args(&args)
+        .output()
+        .map_err(|e| format!("Failed to execute command '{}': {}", command, e))?;
+
+    if output.status.success() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Command failed ({}): {}", output.status, stderr))
+    }
+}
+
+#[tauri::command]
+pub async fn extension_storage_get(
+    ext_id: String,
+    key: String,
+) -> Result<Option<String>, String> {
+    let map = load_storage_map(&ext_id)?;
+    Ok(map.get(&key).cloned())
+}
+
+#[tauri::command]
+pub async fn extension_storage_set(
+    ext_id: String,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    let mut map = load_storage_map(&ext_id)?;
+    map.insert(key, value);
+    save_storage_map(&ext_id, &map)
+}
+
+pub fn resolve_ext_icon(icon: Option<&str>, ext_path: &str) -> Option<String> {
+    let icon = icon?;
+    if icon.starts_with("fa-") || icon.starts_with("<svg") || icon.starts_with("http") {
+        return Some(icon.to_string());
+    }
+    let resolved = PathBuf::from(ext_path).join(icon);
+    if resolved.exists() {
+        Some(resolved.to_string_lossy().to_string())
+    } else {
+        Some(icon.to_string())
     }
 }
 
