@@ -167,10 +167,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div
-    class="settings-panel"
-    style="position:absolute;inset:0;z-index:50;background:var(--vanta-bg,#000);border-radius:var(--vanta-radius,24px);overflow:hidden;"
->
+<div class="settings-panel">
     <header>
         <h2>Settings</h2>
         <div class="actions">

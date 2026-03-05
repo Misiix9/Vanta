@@ -78,7 +78,8 @@
 
     function svgToDataUri(icon: string | null | undefined): string {
         if (!isTrustedInlineSvg(icon)) return "";
-        return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(icon!.trim())}`;
+        const themed = icon!.trim().replace(/currentColor/g, '#ebebeb');
+        return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(themed)}`;
     }
 
     function primaryActionLabel(): string {
