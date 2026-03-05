@@ -25,7 +25,10 @@
   import ExtensionHost from "$lib/components/ExtensionHost.svelte";
   import StoreView from "$lib/components/StoreView.svelte";
   import ClipboardView from "$lib/components/ClipboardView.svelte";
+  import NowPlayingBar from "$lib/components/NowPlayingBar.svelte";
+  import SpotifyMiniPlayer from "$lib/components/SpotifyMiniPlayer.svelte";
 
+  let isMiniPlayer = $state(false);
   let query = $state("");
   let vantaConfig: VantaConfig | undefined = $state();
   let results: SearchResult[] = $state([]);
@@ -212,7 +215,10 @@
   });
 
   onMount(async () => {
-    // ... existing onMount code ...
+    if (window.location.search.includes('view=mini-player')) {
+      isMiniPlayer = true;
+      return;
+    }
 
     // Register clipboard listener ASAP so startup emits aren't missed.
     try {
@@ -897,6 +903,9 @@
   }}
 />
 
+{#if isMiniPlayer}
+  <SpotifyMiniPlayer />
+{:else}
 <div
   class="vanta-root vanta-glass"
   class:css-blur={blurMode === "fallback"}
@@ -979,6 +988,7 @@
         />
       {/if}
 
+      <NowPlayingBar />
       <StatusBar
         resultCount={
           activeMacroId
@@ -1001,3 +1011,4 @@
     />
   {/if}
 </div>
+{/if}

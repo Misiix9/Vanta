@@ -30,6 +30,9 @@ export interface VantaAPI {
     get: (key: string) => Promise<string | null>;
     set: (key: string, value: string) => Promise<void>;
   };
+  window: {
+    openMiniPlayer: () => Promise<void>;
+  };
   toast: (options: ToastOptions) => void;
   closeMainWindow: () => Promise<void>;
   getPreference: <T>(key: string) => T | undefined;

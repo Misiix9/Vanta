@@ -95,6 +95,9 @@
         Grid: ExtGrid,
         Detail: ExtDetail,
         ActionPanel: ExtActionPanel,
+        window: {
+          openMiniPlayer: () => invoke('open_spotify_mini_player'),
+        },
       });
 
       let registration = getRegistration(extId) ?? undefined;

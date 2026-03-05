@@ -1181,6 +1181,34 @@ async fn open_with_editor(
     Ok(())
 }
 
+#[tauri::command]
+async fn open_spotify_mini_player(app_handle: tauri::AppHandle) -> Result<(), String> {
+    use tauri::WebviewUrl;
+
+    if let Some(existing) = app_handle.get_webview_window("spotify-mini") {
+        existing.set_focus().map_err(|e| format!("Focus failed: {}", e))?;
+        return Ok(());
+    }
+
+    let url = WebviewUrl::App("index.html?view=mini-player".into());
+    let builder = tauri::WebviewWindowBuilder::new(
+        &app_handle,
+        "spotify-mini",
+        url,
+    )
+    .title("Spotify Mini Player")
+    .inner_size(340.0, 160.0)
+    .min_inner_size(280.0, 120.0)
+    .resizable(true)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(true)
+    .skip_taskbar(false);
+
+    builder.build().map_err(|e| format!("Failed to create mini player window: {}", e))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(start_hidden: bool, open_clipboard: bool) {
     env_logger::init();
@@ -1306,6 +1334,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             open_path,
             reveal_in_file_manager,
             open_with_editor,
+            open_spotify_mini_player,
             permissions::get_permission_decision,
             permissions::set_permission_decision,
             get_apps,

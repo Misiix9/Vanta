@@ -59,6 +59,11 @@ export function createVantaAPI(options: {
         });
       },
     },
+    window: {
+      openMiniPlayer: async () => {
+        await invoke('open_spotify_mini_player');
+      },
+    },
     toast: options.onToast,
     closeMainWindow: async () => {
       await invoke('hide_window');
