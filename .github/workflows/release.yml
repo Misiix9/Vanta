@@ -1,4 +1,4 @@
-name: Release Vanta v1.16.0
+name: Release Vanta v1.18.0
 
 on:
   push:
@@ -61,8 +61,8 @@ jobs:
           jq -r '.version' src-tauri/tauri.conf.json
           grep '^version' src-tauri/Cargo.toml
 
-      - name: Build Vanta (release AppImage, Deb, RPM)
-        run: npm run tauri -- build --target x86_64-unknown-linux-gnu --bundles appimage deb rpm
+      - name: Build Vanta (Deb, RPM)
+        run: npm run tauri -- build --target x86_64-unknown-linux-gnu --bundles deb rpm
         env:
           NODE_ENV: production
           TAURI_ENVIRONMENT: production
@@ -77,7 +77,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            src-tauri/target/**/bundle/appimage/*.AppImage
             src-tauri/target/**/bundle/deb/*.deb
             src-tauri/target/**/bundle/rpm/*.rpm
           draft: true
@@ -85,20 +84,15 @@ jobs:
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
             ## What's New in ${{ steps.get_version.outputs.VERSION }}
-            
-            ### New
-            - Workflow macros (beta): define multi-step macros with variables, optional prompts per step, and dry-run previews.
-            - Macro runner UI: launcher results show macro scripts and args, with status bar prompts for required inputs before run.
-            - Default sample macro shipped enabled for quick onboarding and testing.
 
             ### Changes
-            - Macro list honors per-macro enable toggles and exposes argument editing inline.
-            - Workflow results respect section ordering with subheaders and new script detail rows.
+            - Launcher sections are always visible with static, non-interactive headers; items render under every section even when empty.
+            - Section headers remain selectable without snapping back to Apps during navigation.
 
             ### Fixes
-            - Improved macro prompt rendering and dry-run substitution accuracy for edge-case variables.
+            - General stability improvements from latest backend/frontend test pass.
 
             ### Known Issues
-            - None reported for this release. If you hit issues, please file them on GitHub with logs.
+            - AppImage bundling is temporarily disabled in this workflow due to linuxdeploy strip failures on RELR ELF sections.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

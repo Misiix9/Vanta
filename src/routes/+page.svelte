@@ -46,10 +46,7 @@
     message: "",
   });
   let lastInstallTarget: string | null = $state(null);
-    let currentMode: "launcher" | "clipboard" = $state("launcher");
-  let preferDefaultOrder = $derived(
-    query.trim() === "" && currentMode === "launcher" && !isScriptMode,
-  );
+  let currentMode: "launcher" | "clipboard" = $state("launcher");
   let blurMode: string = $state("fallback");
   let searchInputRef: SearchInput | undefined = $state();
   let resultsListRef: ResultsList | undefined = $state();
@@ -1200,8 +1197,6 @@
         e.preventDefault();
         if (isScriptMode && scriptResults[selectedIndex]) {
           handleScriptActivate(scriptResults[selectedIndex]);
-        } else if (activeRow?.type === "header") {
-          resultsListRef?.toggleHeaderAt(selectedIndex);
         } else if (activeResult) {
           handleActivate(activeResult);
         }
@@ -1278,7 +1273,6 @@
         {results}
         bind:selectedIndex
         onActivate={handleActivate}
-        {preferDefaultOrder}
         on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
       />
     </div>
@@ -1358,7 +1352,6 @@
           {results}
           bind:selectedIndex
           onActivate={handleActivate}
-          {preferDefaultOrder}
           on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
         />
       {/if}

@@ -9,7 +9,6 @@
       label: string;
       count: number;
       key: string;
-      collapsed: boolean;
       }
     | {
         type: "subheader";
@@ -28,20 +27,15 @@
     results = [],
     selectedIndex = $bindable(0),
     onActivate,
-    preferDefaultOrder = false,
   }: {
     results: SearchResult[];
     selectedIndex: number;
     onActivate: (result: SearchResult) => void;
-    preferDefaultOrder?: boolean;
   } = $props();
 
   let container: HTMLDivElement | null = $state(null);
   let itemElements: (HTMLDivElement | null)[] = $state([]);
   const dispatch = createEventDispatcher<{ visiblecount: { count: number } }>();
-  let collapsedGroups = $state(new Set<string>());
-  // Remember if the user explicitly toggled Running so we don't auto-collapse it again.
-  let runningOverride: boolean | null = $state(null);
 
   let scrollTop = $state(0);
   let scrollHeight = $state(0);
@@ -130,45 +124,35 @@
   }
 
   let groupedResults = $derived.by(() => {
-    const order: { label: string; items: SearchResult[] }[] = [];
     const seen = new Map<string, { label: string; items: SearchResult[] }>();
 
     for (const res of results) {
       const label = deriveSection(res);
-      let group = seen.get(label);
-      if (!group) {
-        group = { label, items: [] };
-        seen.set(label, group);
-        order.push(group);
-      }
+      const group = seen.get(label) ?? { label, items: [] };
       group.items.push(res);
+      seen.set(label, group);
     }
 
-    // Always surface a Running group so the header is visible even if no window rows are present.
-    if (!seen.has("Running")) {
-      const placeholder = { label: "Running", items: [] };
-      seen.set("Running", placeholder);
-      order.push(placeholder);
+    // Ensure every known section is present with at least an empty group so headers always render.
+    for (const label of sectionOrder) {
+      if (!seen.has(label)) {
+        seen.set(label, { label, items: [] });
+      }
     }
 
-    order.sort((a, b) => {
-      const ai = sectionOrder.indexOf(a.label);
-      const bi = sectionOrder.indexOf(b.label);
-      const aIdx = ai === -1 ? sectionOrder.length : ai;
-      const bIdx = bi === -1 ? sectionOrder.length : bi;
+    // Preserve explicit section order, then append any additional labels alphabetically.
+    const ordered: { label: string; items: SearchResult[] }[] = [];
+    for (const label of sectionOrder) {
+      const group = seen.get(label);
+      if (group) ordered.push(group);
+    }
 
-      // Always enforce the explicit section priority so Apps and Documents stay on top.
-      if (aIdx !== bIdx) return aIdx - bIdx;
+    const extras = Array.from(seen.values()).filter(
+      (g) => !sectionOrder.includes(g.label),
+    );
+    extras.sort((a, b) => a.label.localeCompare(b.label));
 
-      // Within the same priority bucket, fall back to the highest scored item for stability.
-      const aTop = a.items.reduce((max, item) => Math.max(max, item.score ?? 0), -Infinity);
-      const bTop = b.items.reduce((max, item) => Math.max(max, item.score ?? 0), -Infinity);
-      if (aTop !== bTop) return bTop - aTop;
-
-      return a.label.localeCompare(b.label);
-    });
-
-    return order;
+    return [...ordered, ...extras];
   });
 
   let visibleRows = $derived.by<VisibleRow[]>(() => {
@@ -176,40 +160,23 @@
     let flatItemIndex = 0;
 
     groupedResults.forEach((group, groupIndex) => {
-      const isCollapsed = collapsedGroups.has(group.label);
       rows.push({
         type: "header",
         label: group.label,
         count: group.items.length,
         key: `header-${groupIndex}-${group.label}`,
-        collapsed: isCollapsed,
       });
 
-      if (!isCollapsed) {
-        if (group.label === "Running") {
-          group.items.forEach((result, itemIndex) => {
-            const keyBase = result.id ?? `${result.exec}-${groupIndex}-${itemIndex}`;
-            rows.push({
-              type: "item",
-              result,
-              groupLabel: group.label,
-              itemIndex: flatItemIndex++,
-              key: `item-${groupIndex}-${itemIndex}-${keyBase}`,
-            });
-          });
-        } else {
-          group.items.forEach((result, itemIndex) => {
-            const keyBase = result.id ?? `${result.exec}-${groupIndex}-${itemIndex}`;
-            rows.push({
-              type: "item",
-              result,
-              groupLabel: group.label,
-              itemIndex: flatItemIndex++,
-              key: `item-${groupIndex}-${itemIndex}-${keyBase}`,
-            });
-          });
-        }
-      }
+      group.items.forEach((result, itemIndex) => {
+        const keyBase = result.id ?? `${result.exec}-${groupIndex}-${itemIndex}`;
+        rows.push({
+          type: "item",
+          result,
+          groupLabel: group.label,
+          itemIndex: flatItemIndex++,
+          key: `item-${groupIndex}-${itemIndex}-${keyBase}`,
+        });
+      });
     });
 
     return rows;
@@ -228,52 +195,9 @@
     scrollToSelected();
   });
 
-  // Avoid selecting section headers; jump to the first real item when results change.
-  $effect(() => {
-    if (!visibleRows.length) return;
-    const row = visibleRows[selectedIndex];
-    if (row?.type === "header") {
-      const firstItemIndex = visibleRows.findIndex((r) => r.type === "item");
-      if (firstItemIndex >= 0) selectedIndex = firstItemIndex;
-    }
-  });
-
-  // Default-collapse Running when showing idle suggestions, expand when actively searching.
-  // If the user toggles it, respect their override until they toggle again.
-  $effect(() => {
-    const next = new Set(collapsedGroups);
-    const desiredCollapsed =
-      runningOverride !== null ? runningOverride : preferDefaultOrder;
-
-    if (desiredCollapsed && !next.has("Running")) {
-      next.add("Running");
-      collapsedGroups = next;
-    }
-
-    if (!desiredCollapsed && next.has("Running")) {
-      next.delete("Running");
-      collapsedGroups = next;
-    }
-  });
-
   function handleSelect(index: number) {
     if (index < 0 || index >= visibleRows.length) return;
     selectedIndex = index;
-  }
-
-  export function toggleHeaderAt(index: number) {
-    const row = visibleRows[index];
-    if (!row || row.type !== "header") return;
-
-    const next = new Set(collapsedGroups);
-    if (next.has(row.label)) {
-      next.delete(row.label);
-      if (row.label === "Running") runningOverride = false;
-    } else {
-      next.add(row.label);
-      if (row.label === "Running") runningOverride = true;
-    }
-    collapsedGroups = next;
   }
 
   export function getVisibleRow(index: number) {
@@ -321,10 +245,6 @@
             bind:element={itemElements[i]}
             label={row.label}
             count={row.count}
-            collapsed={row.collapsed}
-            selected={i === selectedIndex}
-            on:hover={() => handleSelect(i)}
-            on:toggle={() => toggleHeaderAt(i)}
           />
         {:else if row.type === "subheader"}
           <div
