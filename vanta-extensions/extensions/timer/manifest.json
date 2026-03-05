@@ -4,14 +4,9 @@
   "version": "1.0.0",
   "description": "Countdown timer with presets and visual progress",
   "author": "Vanta Team",
-  "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"14\" r=\"8\"/><polyline points=\"12 10 12 14 14 16\"/><line x1=\"10\" y1=\"2\" x2=\"14\" y2=\"2\"/><line x1=\"12\" y1=\"2\" x2=\"12\" y2=\"4\"/></svg>",
+  "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='14' r='8'/><path d='M12 14l-3.5-2'/><path d='M12 14V8'/><line x1='10' y1='2' x2='14' y2='2'/><line x1='12' y1='2' x2='12' y2='6'/><path d='M18.5 8l1.5-1.5'/></svg>",
   "permissions": [],
   "commands": [
-    {
-      "name": "start",
-      "title": "Timer",
-      "subtitle": "Set a countdown timer",
-      "mode": "view"
-    }
+    {"name": "start", "title": "Timer", "subtitle": "Set a countdown timer", "mode": "view"}
   ]
 }

@@ -4,14 +4,9 @@
   "version": "1.0.0",
   "description": "Check weather for any location with forecasts and saved locations",
   "author": "Vanta Team",
-  "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 2v2'/><path d='M12 20v2'/><path d='m4.93 4.93 1.41 1.41'/><path d='m17.66 17.66 1.41 1.41'/><path d='M2 12h2'/><path d='M20 12h2'/><path d='m6.34 17.66-1.41 1.41'/><path d='m19.07 4.93-1.41 1.41'/><circle cx='12' cy='12' r='4'/><path d='M16 18a4 4 0 0 0-8 0'/><path d='M17.5 21H20a2 2 0 0 0 0-4h-.5A4.5 4.5 0 1 0 11 21'/></svg>",
+  "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='18' cy='6' r='3'/><path d='M18 1v2'/><path d='M23 6h-2'/><path d='M21 3l-1 1'/><path d='M21 9l-1-1'/><path d='M5 20a3 3 0 0 1 0-6 4.5 4.5 0 0 1 9 0 3 3 0 0 1 0 6z'/></svg>",
   "permissions": ["Network"],
   "commands": [
-    {
-      "name": "current",
-      "title": "Weather",
-      "subtitle": "View current weather and forecast",
-      "mode": "view"
-    }
+    {"name": "current", "title": "Weather", "subtitle": "View current weather and forecast", "mode": "view"}
   ]
 }
