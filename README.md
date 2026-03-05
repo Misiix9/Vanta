@@ -3,7 +3,7 @@
 
   # Vanta
 
-  **A hyper-fast, scriptable application launcher and command palette for Wayland. (Spotlight alternative)**
+  **A hyper-fast, extensible application launcher and command palette for Wayland. (Spotlight alternative)**
 
   [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
   [![Built with Rust](https://img.shields.io/badge/Built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
@@ -15,7 +15,7 @@
 
 ## Why Vanta?
 
-Traditional launchers are often slow or clunky. **Vanta** is a fast, Wayland-native command palette built with Rust and Svelte. It starts instantly, stays out of your way, and is fully themeable with plain CSS. If your script can output JSON, Vanta can run it.
+Traditional launchers are often slow or clunky. **Vanta** is a fast, Wayland-native command palette built with Rust and Svelte. It starts instantly, stays out of your way, and is fully themeable with plain CSS. With the v2.0 extension engine, anyone can build custom commands and full UI screens using TypeScript and Svelte.
 
 ---
 
@@ -29,19 +29,13 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_1.15.0_amd64.deb
+sudo dpkg -i vanta_2.0.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-1.15.0-1.x86_64.rpm
-```
-
-### AppImage (Universal)
-```bash
-chmod +x Vanta_1.15.0_amd64.AppImage
-./Vanta_1.15.0_amd64.AppImage
+sudo rpm -i vanta-2.0.0-1.x86_64.rpm
 ```
 
 ---
@@ -49,15 +43,14 @@ chmod +x Vanta_1.15.0_amd64.AppImage
 ## Features
 
 - **Fast fuzzy search** powered by Rust + `nucleo-matcher`.
-- **Commands section**: Sleep, Lock, Shutdown, Restart, Log Out, and Go to BIOS (firmware) available out of the box.
-- **Scripts section**: Installed scripts are listed together and refresh automatically after install.
-- **Clipboard-first**: `--clipboard` launch and `Super+V` open the clipboard view; history loads instantly and refocuses input.
-- **File search with filters**: Include/exclude globs, extension allowlist, and type filters; quick manual index rebuild.
-- **Window switcher v2**: Grouped by app/class, ordered by recency, with focus and close actions.
+- **Extension engine** (v2.0): Build custom commands and full UI screens with TypeScript/Svelte.
+- **Commands section**: Sleep, Lock, Shutdown, Restart, Log Out, and Go to BIOS available out of the box.
+- **Clipboard-first**: `--clipboard` launch and `Super+V` open the clipboard view.
+- **File search with filters**: Include/exclude globs, extension allowlist, and type filters.
+- **Window switcher**: Grouped by app/class, ordered by recency, with focus and close actions.
 - **Math & calculator**: Type `2^10 + 5` to copy the result.
-- **Script Store**: `install <GitHub-URL>` or `install /path/to/script.sh` to add plugins.
-- **Fully themeable**: Everything is CSS in `~/.config/vanta/themes/`; adjust colors, blur, radius, and layout.
-- **Resilient startup**: Honors config window size, clamps bounds, recenters before show, and supports hidden startup.
+- **Fully themeable**: Everything is CSS in `~/.config/vanta/themes/`.
+- **Workflow macros**: Chain system commands and extension actions into automated sequences.
 
 ---
 
@@ -75,71 +68,156 @@ cargo tauri dev
 - `--clipboard` or `-c`: open directly to clipboard mode on launch.
 - **Hotkeys:** `Alt+Space` (toggle), `Super+V` (clipboard).
 
-**Fresh installs:** Vanta seeds `~/.config/vanta/config.json` and `~/.config/vanta/themes/default.css` if missing.
+---
 
-**Built-in commands:** Sleep, Lock, Shutdown, Restart, Log Out, Go to BIOS — available in the Commands section.
+## Extension SDK
 
-**Scripts:** Installed scripts appear in the Scripts section and auto-refresh after install.
+Vanta v2.0 replaces the old JSON script system with a full Raycast-style extension engine. Extensions live in `~/.config/vanta/extensions/` and can declare multiple commands with custom UI.
+
+### Extension Structure
+
+```
+~/.config/vanta/extensions/my-extension/
+  manifest.json       # Metadata, commands, permissions
+  dist/
+    index.js          # Compiled IIFE bundle
+    style.css         # Optional scoped styles
+```
+
+### Manifest Format
+
+```json
+{
+  "name": "my-extension",
+  "title": "My Extension",
+  "version": "1.0.0",
+  "description": "What this extension does",
+  "author": "your-name",
+  "icon": "fa-solid fa-star",
+  "permissions": ["Network", "Shell"],
+  "commands": [
+    {
+      "name": "quick-action",
+      "title": "Quick Action",
+      "subtitle": "Does something fast",
+      "mode": "no-view",
+      "icon": "fa-solid fa-bolt"
+    },
+    {
+      "name": "browse-items",
+      "title": "Browse Items",
+      "subtitle": "Opens a searchable list",
+      "mode": "view",
+      "icon": "fa-solid fa-list"
+    }
+  ]
+}
+```
+
+### Command Modes
+
+- **`no-view`**: Runs a handler function (e.g., toggle playback, copy text), shows a toast, and optionally closes the window.
+- **`view`**: Mounts a Svelte component inside the extension host for full custom screen rendering.
+
+### Writing an Extension
+
+Extensions compile to IIFE bundles that register via `window.__vanta_host`:
+
+```javascript
+(function(vanta) {
+  const sdk = window.__vanta_sdk;
+
+  vanta.registerExtension('my-extension', {
+    commands: {
+      'quick-action': {
+        handler: async (api) => {
+          api.toast({ title: 'Done!', type: 'success' });
+          await api.closeMainWindow();
+        }
+      },
+      'browse-items': {
+        component: sdk.List  // Use a pre-built SDK component
+      }
+    }
+  });
+})(window.__vanta_host);
+```
+
+### SDK Components
+
+Extensions can use pre-built Svelte components via `window.__vanta_sdk`:
+
+| Component | Description |
+| :--- | :--- |
+| `sdk.List` | Searchable, keyboard-navigable list with sections |
+| `sdk.Form` | Form with text, password, dropdown, checkbox, and date fields |
+| `sdk.Grid` | Visual grid layout with images/icons |
+| `sdk.Detail` | Detail view with content and metadata sidebar |
+| `sdk.ActionPanel` | Action panel overlay with keyboard shortcuts |
+
+### VantaAPI
+
+Every command handler and view component receives a `VantaAPI` object:
+
+```typescript
+api.navigation.push(component, props)  // Push a new view
+api.navigation.pop()                    // Go back
+api.clipboard.copy(text)                // Copy to clipboard
+api.toast({ title, message, type })     // Show a toast
+api.closeMainWindow()                   // Hide the launcher
+api.environment.extensionName           // Current extension name
+```
+
+### Building with Vite
+
+```typescript
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
+
+export default defineConfig({
+  plugins: [svelte()],
+  build: {
+    lib: {
+      entry: 'src/index.ts',
+      formats: ['iife'],
+      name: 'MyExtension',
+      fileName: () => 'index.js',
+    },
+    outDir: 'dist',
+    rollupOptions: {
+      external: ['@vanta/sdk'],
+      output: { globals: { '@vanta/sdk': 'window.__vanta_sdk' } },
+    },
+  },
+});
+```
+
+### Migration from v1.x Scripts
+
+The v1.x JSON script system (`~/.config/vanta/scripts/`) has been fully removed. To migrate:
+
+1. Create a new extension directory in `~/.config/vanta/extensions/your-script/`
+2. Write a `manifest.json` with your command metadata
+3. Convert your script logic to a JavaScript handler
+4. Build to `dist/index.js` (or write the IIFE directly)
 
 ---
 
 ## Settings & Theming
 
-All styling lives in `~/.config/vanta/themes/`. A default theme is seeded on first launch; duplicate and edit freely.
+All styling lives in `~/.config/vanta/themes/`. A default theme is seeded on first launch.
 
 Key CSS variables:
 - `--vanta-width` / `--vanta-height`: window size
 - `--vanta-accent`: accent color
 - `--vanta-blur`, `--vanta-radius`, `--vanta-opacity`: glass look
 
-Set a theme name via `/* Theme Name: ... */` to surface it in Settings.
-
-Install a theme from a URL:
-```
-install https://example.com/my-theme.css
-```
-
----
-
-## Scripting
-
-Vanta scans `~/.config/vanta/scripts/` for executable files. A script outputs JSON and Vanta renders it.
-
-**Example: `~/.config/vanta/scripts/hello.sh`**
-```bash
-#!/bin/bash
-# vanta:name=Hello World
-# vanta:description=A simple test script
-# vanta:icon=star
-
-echo '{
-  "items": [
-    {
-      "title": "Hello from Bash!",
-      "subtitle": "Click to copy",
-      "action": { "type": "copy", "value": "Hello Vanta!" }
-    }
-  ]
-}'
-```
-Type `hello` in Vanta and this result appears instantly. Actions can be `copy`, `open`, or `run`.
-
-To install a script from GitHub:
-```
-install https://github.com/user/vanta-scripts
-```
-
-### Script validation
-
-Run `vanta doctor` to lint installed scripts (metadata, executable bit, JSON schema). You can also type “vanta doctor” in the launcher to open a terminal and run it. Enable strict JSON validation at runtime in **Settings → Scripts**.
-
 ---
 
 ## Configuration
 
 Configuration lives at `~/.config/vanta/config.json`, created automatically on first run.
-
-Window search cap can be tuned with `search.windows_max_results` (0 uses half of `general.max_results`).
 
 <details>
   <summary><strong>View Default Configuration</strong></summary>
@@ -166,10 +244,9 @@ Window search cap can be tuned with `search.windows_max_results` (0 uses half of
       "border": "rgba(255,255,255,0.05)"
     }
   },
-  "scripts": {
-    "directory": "~/.config/vanta/scripts",
-    "timeout_ms": 5000,
-    "strict_json": false
+  "extensions": {
+    "directory": "~/.config/vanta/extensions",
+    "dev_mode": false
   },
   "files": {
     "include_hidden": false,
@@ -196,7 +273,7 @@ Window search cap can be tuned with `search.windows_max_results` (0 uses half of
 | `Alt + Space` | Toggle window |
 | `Super + V` | Open clipboard history |
 | `Ctrl + ,` | Open settings |
-| `Esc` | Close window |
+| `Esc` | Close window / Back (in extensions) |
 | `Enter` | Launch / Execute |
 | `Arrow Up / Down` | Navigate results |
 | `Tab` | Autocomplete / Next result |
@@ -204,5 +281,5 @@ Window search cap can be tuned with `search.windows_max_results` (0 uses half of
 ---
 
 <div align="center">
-  <sub>Made with ♥️ by <a href="https://github.com/Misiix9">onxy</a></sub>
+  <sub>Made with love by <a href="https://github.com/Misiix9">onxy</a></sub>
 </div>

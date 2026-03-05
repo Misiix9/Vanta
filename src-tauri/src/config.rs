@@ -14,7 +14,8 @@ pub struct VantaConfig {
     pub general: GeneralConfig,
     pub appearance: AppearanceConfig,
     pub window: WindowConfig,
-    pub scripts: ScriptsConfig,
+    #[serde(default)]
+    pub extensions: ExtensionsConfig,
     #[serde(default)]
     pub files: FilesConfig,
     #[serde(default)]
@@ -198,11 +199,24 @@ pub struct ColorsConfig {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ScriptsConfig {
+pub struct ExtensionsConfig {
+    #[serde(default = "default_extensions_dir")]
     pub directory: String,
-    pub timeout_ms: u64,
     #[serde(default)]
-    pub strict_json: bool,
+    pub dev_mode: bool,
+}
+
+fn default_extensions_dir() -> String {
+    "~/.config/vanta/extensions".to_string()
+}
+
+impl Default for ExtensionsConfig {
+    fn default() -> Self {
+        Self {
+            directory: default_extensions_dir(),
+            dev_mode: false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -245,8 +259,9 @@ fn default_workflow_macros() -> Vec<WorkflowMacro> {
                 args: vec!["{project_path}".to_string()],
                 capabilities: vec![Capability::Filesystem],
             },
-            MacroStep::Script {
-                script: "sync-project".to_string(),
+            MacroStep::Extension {
+                ext_id: "sync-project".to_string(),
+                command: "sync".to_string(),
                 args: vec!["--branch".to_string(), "{branch}".to_string()],
                 capabilities: vec![Capability::Shell],
             },
@@ -286,8 +301,9 @@ pub struct MacroArg {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum MacroStep {
-    Script {
-        script: String,
+    Extension {
+        ext_id: String,
+        command: String,
         #[serde(default)]
         args: Vec<String>,
         #[serde(default)]
@@ -329,11 +345,7 @@ impl Default for VantaConfig {
                     border: "rgba(255, 255, 255, 0.08)".to_string(),
                 },
             },
-            scripts: ScriptsConfig {
-                directory: "~/.config/vanta/scripts".to_string(),
-                timeout_ms: 5000,
-                strict_json: false,
-            },
+            extensions: ExtensionsConfig::default(),
             files: FilesConfig {
                 include_hidden: false,
                 max_depth: 3,
@@ -400,16 +412,15 @@ pub fn load_or_create_default() -> VantaConfig {
         }
     }
 
-    // No config exists: create dir, seed scripts dir, and write default.
     let dir = config_dir();
     if let Err(e) = fs::create_dir_all(&dir) {
         log::error!("Could not create config directory {}: {}", dir.display(), e);
         return VantaConfig::default();
     }
 
-    let scripts_dir = dir.join("scripts");
-    if let Err(e) = fs::create_dir_all(&scripts_dir) {
-        log::warn!("Could not create scripts directory: {}", e);
+    let extensions_dir = dir.join("extensions");
+    if let Err(e) = fs::create_dir_all(&extensions_dir) {
+        log::warn!("Could not create extensions directory: {}", e);
     }
 
     rewrite_default_config()
@@ -587,8 +598,9 @@ mod tests {
                         args: vec!["{project_path}".to_string()],
                         capabilities: vec![Capability::Filesystem],
                     },
-                    MacroStep::Script {
-                        script: "sync-project".to_string(),
+                    MacroStep::Extension {
+                        ext_id: "sync-project".to_string(),
+                        command: "sync".to_string(),
                         args: vec!["--branch".to_string(), "{branch}".to_string()],
                         capabilities: vec![Capability::Shell],
                     },
@@ -620,16 +632,18 @@ mod tests {
         }
 
         match &macro_def.steps[1] {
-            MacroStep::Script {
-                script,
+            MacroStep::Extension {
+                ext_id,
+                command,
                 args,
                 capabilities,
             } => {
-                assert_eq!(script, "sync-project");
+                assert_eq!(ext_id, "sync-project");
+                assert_eq!(command, "sync");
                 assert_eq!(args, &vec!["--branch".to_string(), "{branch}".to_string()]);
                 assert_eq!(capabilities, &vec![Capability::Shell]);
             }
-            _ => panic!("expected script step"),
+            _ => panic!("expected extension step"),
         }
     }
 }

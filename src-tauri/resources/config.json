@@ -23,10 +23,9 @@
     "width": 680.0,
     "height": 420.0
   },
-  "scripts": {
-    "directory": "~/.config/vanta/scripts",
-    "timeout_ms": 5000,
-    "strict_json": false
+  "extensions": {
+    "directory": "~/.config/vanta/extensions",
+    "dev_mode": false
   },
   "files": {
     "include_hidden": false,
@@ -76,8 +75,9 @@
             "capabilities": ["Filesystem"]
           },
           {
-            "kind": "script",
-            "script": "sync-project",
+            "kind": "extension",
+            "ext_id": "sync-project",
+            "command": "sync",
             "args": ["--branch", "{branch}"],
             "capabilities": ["Shell"]
           }

@@ -283,43 +283,40 @@
             {/if}
         </div>
 
-        <!-- Scripts Section -->
-        <div class="accordion-item" class:active={activeSection === "Scripts"}>
+        <!-- Extensions Section -->
+        <div class="accordion-item" class:active={activeSection === "Extensions"}>
             <button
                 class="accordion-header"
                 type="button"
-                onclick={() => toggleSection("Scripts")}
-                aria-expanded={activeSection === "Scripts"}
+                onclick={() => toggleSection("Extensions")}
+                aria-expanded={activeSection === "Extensions"}
             >
                 <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                <h3>Scripts</h3>
+                <h3>Extensions</h3>
             </button>
-            {#if activeSection === "Scripts"}
+            {#if activeSection === "Extensions"}
                 <div class="accordion-content">
-<div class="control-group">
-                <label>
-                    Timeout (ms)
-                    <input
-                        type="number"
-                        min="500"
-                        max="60000"
-                        step="100"
-                        bind:value={config.scripts.timeout_ms}
-                        oninput={debouncedSave}
-                    />
-                </label>
-            </div>
-
-            <div class="control-group">
-                <label>
-                    Strict JSON Validation
-                    <input
-                        type="checkbox"
-                        bind:checked={config.scripts.strict_json}
-                        onchange={debouncedSave}
-                    />
-                </label>
-            </div>
+                    <div class="control-group">
+                        <label>
+                            Extensions Directory
+                            <input
+                                type="text"
+                                bind:value={config.extensions.directory}
+                                oninput={debouncedSave}
+                                readonly
+                            />
+                        </label>
+                    </div>
+                    <div class="control-group">
+                        <label>
+                            Developer Mode
+                            <input
+                                type="checkbox"
+                                bind:checked={config.extensions.dev_mode}
+                                onchange={debouncedSave}
+                            />
+                        </label>
+                    </div>
                 </div>
             {/if}
         </div>

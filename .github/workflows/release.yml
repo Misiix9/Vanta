@@ -1,4 +1,4 @@
-name: Release Vanta v1.18.0
+name: Release Vanta v2.0.0
 
 on:
   push:
@@ -83,16 +83,35 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## What's New in ${{ steps.get_version.outputs.VERSION }}
+            ## Vanta v2.0.0 -- Raycast-Style Extension Engine
 
-            ### Changes
-            - Launcher sections are always visible with static, non-interactive headers; items render under every section even when empty.
-            - Section headers remain selectable without snapping back to Apps during navigation.
+            ### Breaking Changes
 
-            ### Fixes
-            - General stability improvements from latest backend/frontend test pass.
+            This is a **major architectural release**. The entire JSON script system has been replaced with a Raycast-style extension engine.
+
+            - **Removed**: JSON script system (`scripts.rs`, `doctor.rs`, `store.rs`, `bundles.rs`), `install:` prefix, script store, `vanta doctor` CLI command, `ScriptResultItem` component.
+            - **Removed config**: `scripts.directory`, `scripts.timeout_ms`, `scripts.strict_json` replaced by `extensions.directory`, `extensions.dev_mode`.
+
+            ### New Features
+
+            - **Extension Engine**: Extensions live in `~/.config/vanta/extensions/<name>/` with a `manifest.json` and compiled `dist/index.js` IIFE bundle.
+            - **Multi-command extensions**: Each extension can declare multiple commands with `view` (custom UI) or `no-view` (action + toast) modes.
+            - **TypeScript/Svelte SDK**: Extensions receive a `VantaAPI` object for navigation, clipboard, toast, and shell access. SDK components (`List`, `Form`, `Grid`, `Detail`, `ActionPanel`) are provided via `window.__vanta_sdk`.
+            - **Custom screen rendering**: View-mode commands mount full Svelte components inside `ExtensionHost` with navigation stack support.
+            - **Hot-reload**: File watcher on the extensions directory detects changes and re-scans automatically.
+            - **Extension search**: Extension commands appear in search results with fuzzy matching.
+            - **Workflow macros**: Updated to support `extension` step type alongside `system`.
+
+            ### Technical Highlights
+
+            - New `extensions.rs` Rust module: manifest parsing, validation (path traversal protection), bundle loading, file watching.
+            - `ExtensionHost.svelte`: manages view navigation stack, mount/unmount lifecycle, error boundaries, style injection.
+            - SDK loader (`loader.ts`): dynamic script injection with registration timeout and cleanup.
+            - 5 pre-built Svelte 5 SDK components themed with Vanta CSS variables.
+            - CSP updated to allow `blob:` in `script-src` for dynamic module loading.
+            - `jsonschema` dependency removed from Cargo.toml.
 
             ### Known Issues
-            - AppImage bundling is temporarily disabled in this workflow due to linuxdeploy strip failures on RELR ELF sections.
+            - AppImage bundling is temporarily disabled due to linuxdeploy strip failures on RELR ELF sections.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

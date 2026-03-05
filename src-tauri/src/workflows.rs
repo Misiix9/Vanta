@@ -6,8 +6,8 @@ use serde_json::json;
 use tauri::State;
 
 use crate::config::{MacroArg, MacroStep, WorkflowMacro};
+use crate::extensions;
 use crate::permissions::{self, Capability, Decision};
-use crate::scripts::{self, ScriptEntry, ScriptOutput};
 use crate::{launcher, AppState};
 
 #[derive(Debug, Clone, Serialize)]
@@ -37,8 +37,6 @@ pub struct MacroRunStepResult {
     pub args: Vec<String>,
     pub capabilities: Vec<Capability>,
     pub status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub output: Option<ScriptOutput>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -49,7 +47,7 @@ pub struct MacroRunResult {
 
 #[derive(Debug, Clone)]
 enum ResolvedKind {
-    Script { script: String },
+    Extension { ext_id: String, command: String },
     System { command: String },
 }
 
@@ -76,7 +74,7 @@ pub fn dry_run_macro(
 ) -> Result<MacroDryRunResult, String> {
     let macro_def = fetch_macro(state, macro_id)?;
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
-    let resolved_steps = resolve_steps(&macro_def, &arg_map, state)?;
+    let resolved_steps = resolve_steps(&macro_def, &arg_map)?;
 
     let mut steps = Vec::new();
     let mut errors = Vec::new();
@@ -87,11 +85,13 @@ pub fn dry_run_macro(
         steps.push(MacroDryRunStep {
             index: idx,
             kind: match step.kind {
-                ResolvedKind::Script { .. } => "script".to_string(),
+                ResolvedKind::Extension { .. } => "extension".to_string(),
                 ResolvedKind::System { .. } => "system".to_string(),
             },
             command: match &step.kind {
-                ResolvedKind::Script { script } => script.clone(),
+                ResolvedKind::Extension { ext_id, command } => {
+                    format!("{}:{}", ext_id, command)
+                }
                 ResolvedKind::System { command } => command.clone(),
             },
             args: step.args.clone(),
@@ -129,48 +129,19 @@ pub fn run_macro(
 ) -> Result<MacroRunResult, String> {
     let macro_def = fetch_macro(state, macro_id)?;
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
-    let resolved_steps = resolve_steps(&macro_def, &arg_map, state)?;
-
-    let (timeout_ms, strict_json) = {
-        let cfg = state
-            .config
-            .lock()
-            .map_err(|_| "Failed to access config".to_string())?;
-        (cfg.scripts.timeout_ms, cfg.scripts.strict_json)
-    };
+    let resolved_steps = resolve_steps(&macro_def, &arg_map)?;
 
     let mut steps = Vec::new();
 
     for (idx, step) in resolved_steps.into_iter().enumerate() {
         match step.kind {
-            ResolvedKind::Script { ref script } => {
-                let args_str = shell_words::join(step.args.clone());
-                let output = scripts::execute_script(
-                    script,
-                    &args_str,
-                    timeout_ms,
-                    &step.capabilities,
-                )?;
-
-                if strict_json {
-                    scripts::validate_script_output(&output)
-                        .map_err(|e| format!("Script output failed validation: {}", e))?;
-                }
-
-                steps.push(MacroRunStepResult {
-                    index: idx,
-                    kind: "script".to_string(),
-                    command: script.clone(),
-                    args: step.args,
-                    capabilities: step.capabilities,
-                    status: "ok".to_string(),
-                    output: Some(output),
-                });
-            }
-            ResolvedKind::System { ref command } => {
-                match scripts::check_and_record_permissions(&step.id, &step.capabilities) {
+            ResolvedKind::Extension {
+                ref ext_id,
+                ref command,
+            } => {
+                match extensions::check_extension_permissions(&step.id, &step.capabilities) {
                     Ok(()) => {}
-                    Err(scripts::PermissionError::NeedsPrompt { missing_caps }) => {
+                    Err(extensions::PermissionError::NeedsPrompt { missing_caps }) => {
                         let payload = json!({
                             "script_id": step.id,
                             "missing_caps": missing_caps,
@@ -178,7 +149,43 @@ pub fn run_macro(
                         });
                         return Err(format!("PERMISSION_NEEDED:{}", payload));
                     }
-                    Err(scripts::PermissionError::Deny) => {
+                    Err(extensions::PermissionError::Deny) => {
+                        let payload = json!({
+                            "script_id": step.id,
+                            "requested_caps": step.capabilities,
+                        });
+                        return Err(format!("PERMISSION_DENIED:{}", payload));
+                    }
+                }
+
+                log::info!(
+                    "Macro step {}: extension {}:{}",
+                    idx,
+                    ext_id,
+                    command
+                );
+
+                steps.push(MacroRunStepResult {
+                    index: idx,
+                    kind: "extension".to_string(),
+                    command: format!("{}:{}", ext_id, command),
+                    args: step.args,
+                    capabilities: step.capabilities,
+                    status: "ok".to_string(),
+                });
+            }
+            ResolvedKind::System { ref command } => {
+                match extensions::check_extension_permissions(&step.id, &step.capabilities) {
+                    Ok(()) => {}
+                    Err(extensions::PermissionError::NeedsPrompt { missing_caps }) => {
+                        let payload = json!({
+                            "script_id": step.id,
+                            "missing_caps": missing_caps,
+                            "requested_caps": step.capabilities,
+                        });
+                        return Err(format!("PERMISSION_NEEDED:{}", payload));
+                    }
+                    Err(extensions::PermissionError::Deny) => {
                         let payload = json!({
                             "script_id": step.id,
                             "requested_caps": step.capabilities,
@@ -199,7 +206,6 @@ pub fn run_macro(
                     args: step.args,
                     capabilities: step.capabilities,
                     status: "ok".to_string(),
-                    output: None,
                 });
             }
         }
@@ -251,7 +257,10 @@ fn resolve_args(
     Ok(resolved)
 }
 
-fn render_tokens(tokens: &[String], arg_map: &HashMap<String, String>) -> Result<Vec<String>, String> {
+fn render_tokens(
+    tokens: &[String],
+    arg_map: &HashMap<String, String>,
+) -> Result<Vec<String>, String> {
     let re = Regex::new(r"\{([A-Za-z0-9_]+)\}").unwrap();
     let mut rendered = Vec::new();
 
@@ -280,26 +289,26 @@ fn render_tokens(tokens: &[String], arg_map: &HashMap<String, String>) -> Result
 fn resolve_steps(
     macro_def: &WorkflowMacro,
     arg_map: &HashMap<String, String>,
-    state: &State<'_, AppState>,
 ) -> Result<Vec<ResolvedStep>, String> {
     let mut steps = Vec::new();
 
     for (idx, step) in macro_def.steps.iter().enumerate() {
         match step {
-            MacroStep::Script {
-                script,
+            MacroStep::Extension {
+                ext_id,
+                command,
                 args,
                 capabilities,
             } => {
                 let rendered_args = render_tokens(args, arg_map)?;
-                let caps = resolve_script_capabilities(script, capabilities, state);
                 steps.push(ResolvedStep {
-                    id: format!("macro:{}:script:{}", macro_def.id, script),
-                    kind: ResolvedKind::Script {
-                        script: script.clone(),
+                    id: format!("macro:{}:ext:{}:{}", macro_def.id, ext_id, command),
+                    kind: ResolvedKind::Extension {
+                        ext_id: ext_id.clone(),
+                        command: command.clone(),
                     },
                     args: rendered_args,
-                    capabilities: caps,
+                    capabilities: capabilities.clone(),
                 });
             }
             MacroStep::System {
@@ -324,40 +333,6 @@ fn resolve_steps(
     Ok(steps)
 }
 
-fn resolve_script_capabilities(
-    script: &str,
-    explicit: &[Capability],
-    state: &State<'_, AppState>,
-) -> Vec<Capability> {
-    if !explicit.is_empty() {
-        return explicit.to_vec();
-    }
-
-    let from_cache = state
-        .scripts_cache
-        .lock()
-        .map(|cache| find_script_caps(cache.as_slice(), script))
-        .unwrap_or_default();
-    if !from_cache.is_empty() {
-        return from_cache;
-    }
-
-    let scanned = scripts::scan_scripts();
-    if let Ok(mut cache) = state.scripts_cache.lock() {
-        *cache = scanned.clone();
-    }
-
-    find_script_caps(&scanned, script)
-}
-
-fn find_script_caps(cache: &[ScriptEntry], keyword: &str) -> Vec<Capability> {
-    cache
-        .iter()
-        .find(|s| s.keyword.eq_ignore_ascii_case(keyword))
-        .map(|s| s.capabilities.clone())
-        .unwrap_or_default()
-}
-
 fn require_system_capabilities(caps: &[Capability]) -> Result<(), String> {
     if caps.is_empty() {
         Err("System steps must declare at least one capability".to_string())
@@ -375,7 +350,10 @@ mod tests {
         let map = HashMap::from([("name".to_string(), "world".to_string())]);
         let tokens = vec!["hello {name}".to_string(), "{name}!".to_string()];
         let rendered = render_tokens(&tokens, &map).unwrap();
-        assert_eq!(rendered, vec!["hello world".to_string(), "world!".to_string()]);
+        assert_eq!(
+            rendered,
+            vec!["hello world".to_string(), "world!".to_string()]
+        );
     }
 
     #[test]

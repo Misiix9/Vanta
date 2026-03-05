@@ -1,34 +1,32 @@
-pub mod clipboard; // New clipboard module
+pub mod clipboard;
 pub mod config;
 pub mod errors;
+pub mod extensions;
 pub mod history;
 pub mod launcher;
 pub mod matcher;
-pub mod math; // New math module
+pub mod math;
 pub mod scanner;
-pub mod scripts;
-pub mod doctor;
-pub mod store; // Script download module
-pub mod files; // New files module
+pub mod files;
 pub mod window;
-pub mod windows; // New windows enumeration module
+pub mod windows;
 pub mod themes;
 pub mod permissions;
 pub mod workflows;
-pub mod bundles;
+
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::{Manager, Emitter}; // Added Emitter for .emit()
+use tauri::{Manager, Emitter};
 use serde::Serialize;
-use clap::{Parser, Subcommand, Args};
+use clap::Parser;
 
 use config::{VantaConfig, WorkflowMacro};
 use history::History;
 use matcher::{ResultSource, SearchResult};
 use scanner::AppEntry;
-use scripts::{ScriptEntry, ScriptOutput};
+use extensions::ExtensionEntry;
 use permissions::Capability;
 use workflows::{MacroDryRunResult, MacroRunResult};
 use windows::{list_windows_grouped, WindowGroup};
@@ -38,11 +36,10 @@ use files::FileIndex;
 use tokio::time::sleep;
 use tauri::WebviewWindow;
 
-// Everything is Mutex'd because Tauri commands are async.
 pub struct AppState {
     pub apps: Mutex<Vec<AppEntry>>,
     pub config: Mutex<VantaConfig>,
-    pub scripts_cache: Mutex<Vec<ScriptEntry>>,
+    pub extensions_cache: Mutex<Vec<ExtensionEntry>>,
     pub history: Mutex<History>,
     pub file_index: FileIndex,
 }
@@ -59,7 +56,6 @@ static LAUNCH_CALLS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_TOTAL_MS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_MAX_MS: AtomicU64 = AtomicU64::new(0);
 
-/// Fetch the persisted window size (clamped) from state.
 fn current_window_dims(app: &tauri::AppHandle) -> (f64, f64) {
     let state = app.state::<AppState>();
     let (w, h) = match state.config.lock() {
@@ -72,7 +68,6 @@ fn current_window_dims(app: &tauri::AppHandle) -> (f64, f64) {
     (wc.width, wc.height)
 }
 
-/// Emit the clipboard-open event with a couple of retries to ensure the frontend listener is attached.
 fn emit_clipboard_with_retries(win: &WebviewWindow) {
     let w1 = win.clone();
     let w2 = win.clone();
@@ -84,51 +79,14 @@ fn emit_clipboard_with_retries(win: &WebviewWindow) {
     });
 }
 
-// -----------------------
-// CLI entrypoint
-// -----------------------
-
 #[derive(Parser, Debug)]
 #[command(name = "vanta", about = "Vanta launcher and CLI toolkit")]
 pub struct Cli {
-    /// Start Vanta hidden (no window shown at launch)
     #[arg(long, default_value_t = false)]
     pub hidden: bool,
 
-    /// Launch directly into clipboard mode
     #[arg(long, short = 'c', default_value_t = false)]
     pub clipboard: bool,
-
-    #[command(subcommand)]
-    pub command: Option<CliCommand>,
-}
-
-#[derive(Subcommand, Debug, Clone)]
-pub enum CliCommand {
-    /// Run script validator and simulator
-    Doctor(DoctorArgs),
-}
-
-#[derive(Args, Debug, Clone)]
-pub struct DoctorArgs {
-    /// Enforce strict JSON schema validation for script output
-    #[arg(long, default_value_t = false)]
-    pub strict: bool,
-
-    /// Simulate a timeout for a target script (ms)
-    #[arg(long, value_name = "MS")]
-    pub simulate_timeout: Option<u64>,
-
-    /// Simulate an error for a target script keyword
-    #[arg(long, value_name = "KEYWORD")]
-    pub simulate_error: Option<String>,
-}
-
-/// Dispatch CLI subcommands. Returns Ok on success or a descriptive error.
-pub fn run_cli(command: CliCommand) -> Result<(), String> {
-    match command {
-        CliCommand::Doctor(args) => doctor::run(args),
-    }
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -233,7 +191,6 @@ where
                     return true;
                 }
 
-                // Also match against the associated application name/generic name so windows are discoverable by app name.
                 if let Some(app) = apps.iter().find(|app| {
                     app.startup_wm_class
                         .as_deref()
@@ -318,6 +275,82 @@ where
     results
 }
 
+fn build_extension_results(
+    query: &str,
+    extensions: &[ExtensionEntry],
+    weight: u32,
+) -> Vec<SearchResult> {
+    if query.is_empty() {
+        return Vec::new();
+    }
+
+    let query_lower = query.to_lowercase();
+    let mut results = Vec::new();
+
+    for ext in extensions {
+        if !ext.has_bundle {
+            continue;
+        }
+        for cmd in &ext.manifest.commands {
+            let title_lower = cmd.title.to_lowercase();
+            let ext_title_lower = ext.manifest.title.to_lowercase();
+
+            let matches = title_lower.contains(&query_lower)
+                || ext_title_lower.contains(&query_lower)
+                || cmd.name.to_lowercase().contains(&query_lower);
+
+            if !matches {
+                if let Some((score, indices)) = matcher::fuzzy_score_text(query, &cmd.title) {
+                    let exec_prefix = match cmd.mode {
+                        extensions::CommandMode::View => "ext-view",
+                        extensions::CommandMode::NoView => "ext-no-view",
+                    };
+
+                    results.push(SearchResult {
+                        title: cmd.title.clone(),
+                        subtitle: Some(ext.manifest.title.clone()),
+                        icon: cmd.icon.clone().or_else(|| ext.manifest.icon.clone()),
+                        exec: format!("{}:{}:{}", exec_prefix, ext.manifest.name, cmd.name),
+                        score: weighted_score(score + 800_000, weight),
+                        match_indices: indices,
+                        source: ResultSource::Extension {
+                            ext_id: ext.manifest.name.clone(),
+                        },
+                        actions: None,
+                        id: Some(format!("ext:{}:{}", ext.manifest.name, cmd.name)),
+                        group: None,
+                        section: Some("Extensions".to_string()),
+                    });
+                }
+                continue;
+            }
+
+            let exec_prefix = match cmd.mode {
+                extensions::CommandMode::View => "ext-view",
+                extensions::CommandMode::NoView => "ext-no-view",
+            };
+
+            results.push(SearchResult {
+                title: cmd.title.clone(),
+                subtitle: Some(ext.manifest.title.clone()),
+                icon: cmd.icon.clone().or_else(|| ext.manifest.icon.clone()),
+                exec: format!("{}:{}:{}", exec_prefix, ext.manifest.name, cmd.name),
+                score: weighted_score(900_000, weight),
+                match_indices: vec![],
+                source: ResultSource::Extension {
+                    ext_id: ext.manifest.name.clone(),
+                },
+                actions: None,
+                id: Some(format!("ext:{}:{}", ext.manifest.name, cmd.name)),
+                group: None,
+                section: Some("Extensions".to_string()),
+            });
+        }
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod cli_tests {
     use super::*;
@@ -325,29 +358,8 @@ mod cli_tests {
     #[test]
     fn parse_defaults_to_gui() {
         let cli = Cli::parse_from(["vanta"]);
-        assert!(cli.command.is_none());
-    }
-
-    #[test]
-    fn parse_doctor_with_flags() {
-        let cli = Cli::parse_from([
-            "vanta",
-            "doctor",
-            "--strict",
-            "--simulate-timeout",
-            "1500",
-            "--simulate-error",
-            "cpu",
-        ]);
-
-        match cli.command {
-            Some(CliCommand::Doctor(args)) => {
-                assert!(args.strict);
-                assert_eq!(args.simulate_timeout, Some(1500));
-                assert_eq!(args.simulate_error.as_deref(), Some("cpu"));
-            }
-            other => panic!("Unexpected command: {:?}", other),
-        }
+        assert!(!cli.hidden);
+        assert!(!cli.clipboard);
     }
 }
 
@@ -472,7 +484,6 @@ async fn save_config(
 ) -> Result<(), String> {
     let new_files_config = new_config.files.clone();
 
-    // Enforce sane window bounds on save.
     let _ = clamp_window_size(&mut new_config.window);
 
     {
@@ -484,7 +495,6 @@ async fn save_config(
         config.save()?;
     }
 
-    // Re-index in background whenever file settings may have changed
     let index_clone = state.file_index.clone();
     std::thread::spawn(move || {
         let state = files::build_index(&new_files_config);
@@ -548,7 +558,6 @@ async fn search(
         (config.general.max_results, config.search.clone())
     };
 
-    // Get usage history for boosting
     let usage_map = {
         let history = state
             .history
@@ -557,7 +566,6 @@ async fn search(
         history.usage.clone()
     };
 
-    // Always include applications and running windows; config toggles only affect weighting.
     let app_limit = if query.trim().is_empty() {
         apps.len()
     } else {
@@ -572,7 +580,6 @@ async fn search(
         search_config.applications.weight,
     );
 
-    // Search Open Windows (grouped and capped)
     let query_lower = query.to_lowercase();
     let derived_cap = std::cmp::max(1, max_results / 2);
     let window_cap = if search_config.windows_max_results > 0 {
@@ -587,31 +594,28 @@ async fn search(
         search_config.windows.weight,
         |cap| list_windows_grouped(cap),
     );
-    eprintln!("[vanta][search] windows={} cap={} query={}", window_results.len(), window_cap, query);
     results.extend(window_results);
 
-    // Check for math
     if search_config.calculator.enabled {
         if let Some(val) = math::evaluate(&query) {
-        let val_str = format!("{}", val);
-        let calc_result = SearchResult {
-            title: format!("= {}", val_str),
-            subtitle: Some("Click to Copy".to_string()),
-            icon: Some("calculator".to_string()), 
-            exec: format!("copy:{}", val_str), 
-            score: weighted_score(900_000, search_config.calculator.weight),
-            match_indices: vec![],
-            source: matcher::ResultSource::Calculator,
-            actions: None,
-            id: None,
-            group: None,
-            section: Some("Calculator".to_string()),
-        };
-        results.push(calc_result);
+            let val_str = format!("{}", val);
+            let calc_result = SearchResult {
+                title: format!("= {}", val_str),
+                subtitle: Some("Click to Copy".to_string()),
+                icon: Some("calculator".to_string()),
+                exec: format!("copy:{}", val_str),
+                score: weighted_score(900_000, search_config.calculator.weight),
+                match_indices: vec![],
+                source: matcher::ResultSource::Calculator,
+                actions: None,
+                id: None,
+                group: None,
+                section: Some("Calculator".to_string()),
+            };
+            results.push(calc_result);
         }
     }
 
-    // File search (in-memory index) – always available so sections are searched together.
     if search_config.files.enabled {
         let index_guard = state
             .file_index
@@ -624,7 +628,16 @@ async fn search(
         results.extend(file_results);
     }
 
-    // Surface settings when the query clearly asks for it.
+    // Extension command search
+    {
+        let ext_cache = state
+            .extensions_cache
+            .lock()
+            .map_err(|_| "Failed to access extensions cache".to_string())?;
+        let ext_results = build_extension_results(&query, &ext_cache, 100);
+        results.extend(ext_results);
+    }
+
     let wants_settings = query_lower.contains("setting")
         || query_lower.contains("preferences")
         || query_lower.contains("config")
@@ -649,173 +662,6 @@ async fn search(
         }
     }
 
-    if query.starts_with("install ") {
-        let url = query.trim_start_matches("install ").trim().to_string();
-        
-        if url.starts_with('/') || url.starts_with("~/") {
-            let expanded_url = if url.starts_with("~/") {
-                 let home = dirs::home_dir().unwrap_or_default();
-                 url.replacen("~/", &format!("{}/", home.display()), 1)
-            } else if url.starts_with('/') {
-                 let home_str = dirs::home_dir().unwrap_or_default().to_string_lossy().into_owned();
-                 if url.starts_with(&home_str) {
-                     url.clone()
-                 } else {
-                     if url == "/" {
-                         format!("{}/", home_str)
-                     } else {
-                         url.replacen("/", &format!("{}/", home_str), 1)
-                     }
-                 }
-            } else {
-                 url.clone()
-            };
-            
-            let path = std::path::Path::new(&expanded_url);
-            
-            let (dir_to_read, file_prefix) = if path.is_dir() && expanded_url.ends_with('/') {
-                (path.to_path_buf(), "".to_string())
-            } else {
-                (path.parent().unwrap_or(std::path::Path::new("/")).to_path_buf(), path.file_name().unwrap_or_default().to_string_lossy().to_string())
-            };
-            
-            if let Ok(entries) = std::fs::read_dir(&dir_to_read) {
-                for entry in entries.flatten() {
-                    let file_name = entry.file_name().to_string_lossy().into_owned();
-                    // Don't suggest hidden files unless prefix starts with .
-                    if file_name.starts_with('.') && !file_prefix.starts_with('.') {
-                        continue;
-                    }
-                    if file_name.to_lowercase().starts_with(&file_prefix.to_lowercase()) {
-                        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
-                        
-                        let mut suggestion_path = dir_to_read.join(&file_name).to_string_lossy().into_owned();
-                        if is_dir {
-                            suggestion_path.push('/');
-                        }
-                        
-                        let display_path = if url.starts_with("~/") {
-                            let home_str = dirs::home_dir().unwrap_or_default().to_string_lossy().into_owned();
-                            suggestion_path.replacen(&home_str, "~", 1)
-                        } else if url.starts_with('/') {
-                            let home_str = dirs::home_dir().unwrap_or_default().to_string_lossy().into_owned();
-                            if url.starts_with(&home_str) {
-                                suggestion_path.clone()
-                            } else {
-                                suggestion_path.replacen(&home_str, "", 1)
-                            }
-                        } else {
-                            suggestion_path.clone()
-                        };
-                        
-                        let dir_str = dir_to_read.to_string_lossy().into_owned();
-                        let subtitle = if is_dir {
-                             format!("{} (Dir)", dir_str)
-                        } else {
-                             dir_str
-                        };
-                        
-                        let exec_cmd = if is_dir {
-                             format!("fill:install {}", display_path)
-                        } else {
-                             format!("install:{}", suggestion_path)
-                        };
-                        
-                        let icon = if is_dir { "dir".to_string() } else { format!("file:{}", suggestion_path) };
-                        
-                        results.push(SearchResult {
-                            title: file_name,
-                            subtitle: Some(subtitle),
-                            icon: Some(icon),
-                            exec: exec_cmd,
-                            score: if is_dir { 900000 } else { 800000 },
-                            match_indices: vec![],
-                            source: matcher::ResultSource::File,
-                            actions: None,
-                            id: None,
-                            group: None,
-                            section: Some("Documents".to_string()),
-                        });
-                    }
-                }
-            }
-        } else if !url.is_empty() && !url.contains("github.com") && !url.starts_with("http") {
-             let index_guard = state
-            .file_index
-            .lock()
-            .map_err(|_| "Failed to access file index".to_string())?;
-             let file_results = files::search_index(&index_guard, &url, 15);
-             for mut res in file_results {
-                 let path = std::path::Path::new(&res.exec);
-                 let is_dir = path.is_dir();
-                 
-                 let dir_found = path.parent().unwrap_or(std::path::Path::new("")).to_string_lossy().into_owned();
-                 
-                 res.subtitle = Some(if is_dir { format!("{} (Dir)", dir_found) } else { dir_found });
-                 
-                 if is_dir {
-                      res.exec = format!("fill:install {}/", res.exec);
-                      res.score = 900000;
-                 } else {
-                      res.exec = format!("install:{}", res.exec);
-                      res.score = 800000;
-                 }
-                  res.section = Some("Documents".to_string());
-                 
-                 results.push(res);
-             }
-        }
-
-        if !url.is_empty() {
-            let is_local = std::path::Path::new(&url).exists();
-            
-            let title = if is_local {
-                format!("Install Local File: {}", std::path::Path::new(&url).file_name().unwrap_or_default().to_string_lossy())
-            } else {
-                format!("Install Web Script: {}", url)
-            };
-            
-            let subtitle = if is_local {
-                "Press Enter to extract/copy this file directly into the Vanta Store".to_string()
-            } else {
-                "Press Enter to download and install this script from GitHub".to_string()
-            };
-
-            let inst_result = SearchResult {
-                title,
-                subtitle: Some(subtitle),
-                icon: Some("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><polyline points=\"7 10 12 15 17 10\"/><line x1=\"12\" x2=\"12\" y1=\"15\" y2=\"3\"/></svg>".to_string()),
-                exec: format!("install:{}", url),
-                score: 1000000, // Top priority
-                match_indices: vec![],
-                source: matcher::ResultSource::Application,
-                actions: None,
-                id: None,
-                group: None,
-                section: Some("Apps".to_string()),
-            };
-            // Put the exact match at the top
-            results.insert(0, inst_result);
-        }
-    }
-
-    let trimmed = query.trim().to_lowercase();
-    if trimmed.starts_with("vanta doctor") {
-        results.push(matcher::SearchResult {
-            title: "Run vanta doctor".to_string(),
-            subtitle: Some("Open terminal and run the script validator".to_string()),
-            icon: None,
-            exec: "doctor:run".to_string(),
-            score: 1_050_000,
-            match_indices: Vec::new(),
-            source: matcher::ResultSource::Application,
-            actions: None,
-            id: None,
-            group: None,
-            section: Some("Apps".to_string()),
-        });
-    }
-
     results.sort_by(|a, b| b.score.cmp(&a.score));
 
     record_latency(
@@ -835,7 +681,6 @@ async fn launch_app(
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let launch_start = Instant::now();
-    // Track usage
     if let Ok(mut history) = state.history.lock() {
         history.increment(&exec);
     }
@@ -886,7 +731,6 @@ async fn get_suggestions(
 
     let mut results: Vec<SearchResult> = Vec::new();
 
-    // Running windows first (so the section appears at the top in UI ordering). Always include, even if windows were disabled in config.
     let derived_cap = std::cmp::max(3, max_results / 2);
     let window_cap = if search_config.windows_max_results > 0 {
         search_config.windows_max_results
@@ -901,16 +745,13 @@ async fn get_suggestions(
         search_config.windows.weight,
         |cap| list_windows_grouped(cap),
     );
-    eprintln!("[vanta][suggestions] windows={} cap={}", window_results.len(), window_cap);
     results.extend(window_results);
 
-    // Create a list of apps with their usage count
     let mut scored_apps: Vec<(&AppEntry, u32)> = apps
         .iter()
         .map(|app| (app, history.get_usage(&app.exec)))
         .collect();
 
-    // Sort by usage count descending
     scored_apps.sort_by(|a, b| b.1.cmp(&a.1));
 
     let app_results: Vec<SearchResult> = scored_apps
@@ -932,7 +773,6 @@ async fn get_suggestions(
 
     results.extend(app_results);
 
-    // Documents: pull a handful of indexed entries (dirs first) for smart suggestions
     let mut doc_results = files::search_index(&file_index, "", 12);
     doc_results.sort_by(|a, b| {
         let a_dir = a.icon.as_deref() == Some("dir");
@@ -944,7 +784,6 @@ async fn get_suggestions(
         results.push(doc);
     }
 
-    // Settings entry
     results.push(SearchResult {
         title: "Settings".to_string(),
         subtitle: Some("Open Vanta settings".to_string()),
@@ -1014,21 +853,28 @@ async fn show_window(window: tauri::WebviewWindow) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn get_scripts(
+async fn get_extensions(
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<ScriptEntry>, String> {
+) -> Result<Vec<ExtensionEntry>, String> {
     let cached = state
-        .scripts_cache
+        .extensions_cache
         .lock()
-        .map_err(|_| "Failed to access scripts cache".to_string())?;
+        .map_err(|_| "Failed to access extensions cache".to_string())?;
     Ok(cached.clone())
 }
 
 #[tauri::command]
-async fn check_bundle_update(url: String) -> Result<store::BundleUpdateStatus, String> {
-    tauri::async_runtime::spawn_blocking(move || store::check_bundle_update(&url))
-        .await
-        .map_err(|e| e.to_string())?
+async fn get_extension_bundle(
+    ext_id: String,
+) -> Result<String, String> {
+    extensions::load_extension_bundle(&ext_id)
+}
+
+#[tauri::command]
+async fn get_extension_styles(
+    ext_id: String,
+) -> Result<Option<String>, String> {
+    extensions::load_extension_styles(&ext_id)
 }
 
 #[tauri::command]
@@ -1058,70 +904,6 @@ async fn run_macro(
 }
 
 #[tauri::command]
-async fn execute_script(
-    keyword: String,
-    args: String,
-    caps: Option<Vec<Capability>>, // Optional to avoid breaking older callers
-    state: tauri::State<'_, AppState>,
-) -> Result<ScriptOutput, String> {
-    let (timeout_ms, strict_json) = {
-        let config = state
-            .config
-            .lock()
-            .map_err(|_| "Failed to access config".to_string())?;
-        (config.scripts.timeout_ms, config.scripts.strict_json)
-    };
-
-    let requested_caps = match caps {
-        Some(c) if !c.is_empty() => c,
-        _ => {
-            // Fallback: derive capabilities from the script cache/scan so permission prompts still fire.
-            let from_cache = {
-                let cached = state
-                    .scripts_cache
-                    .lock()
-                    .map(|scripts| {
-                        scripts
-                            .iter()
-                            .find(|s| s.keyword.eq_ignore_ascii_case(&keyword))
-                            .map(|s| s.capabilities.clone())
-                            .unwrap_or_default()
-                    })
-                    .unwrap_or_default();
-                cached
-            };
-
-            if !from_cache.is_empty() {
-                from_cache
-            } else {
-                let scanned = scripts::scan_scripts();
-                if let Ok(mut cached) = state.scripts_cache.lock() {
-                    *cached = scanned.clone();
-                }
-                scanned
-                    .iter()
-                    .find(|s| s.keyword.eq_ignore_ascii_case(&keyword))
-                    .map(|s| s.capabilities.clone())
-                    .unwrap_or_default()
-            }
-        }
-    };
-
-    tokio::task::spawn_blocking(move || {
-        let output = scripts::execute_script(&keyword, &args, timeout_ms, &requested_caps)?;
-
-        if strict_json {
-            scripts::validate_script_output(&output)
-                .map_err(|e| format!("Script output failed validation: {}", e))?;
-        }
-
-        Ok(output)
-    })
-    .await
-    .map_err(|e| format!("Script task failed: {}", e))?
-}
-
-#[tauri::command]
 async fn get_clipboard_history() -> Result<Vec<clipboard::ClipboardItem>, String> {
     clipboard::get_history().map_err(|e| format!("Failed to get history: {}", e))
 }
@@ -1138,14 +920,13 @@ async fn open_path(
     }
 
     let is_dir = path_obj.is_dir();
-    
+
     let config = {
         state.config.lock()
             .map_err(|_| "Failed to access config".to_string())?
             .files.clone()
     };
-    
-    // Choose which configured app to use
+
     let app_exec_id = if is_dir || config.open_docs_in_manager {
         config.file_manager
     } else {
@@ -1157,7 +938,6 @@ async fn open_path(
         return Ok(());
     }
 
-    // Attempt to find the full exec string from apps cache
     let matched_app = {
         let apps = state.apps.lock()
             .map_err(|_| "Failed to access apps cache".to_string())?;
@@ -1165,11 +945,8 @@ async fn open_path(
     };
 
     if let Some(app) = matched_app {
-        // Construct the execution string and send it to the launcher
-        // The exec string usually looks like `nautilus %U` or `code %F`
-        // We replace any % placeholders or just append the path.
         let mut final_exec = app.exec.clone();
-        
+
         if final_exec.contains("%u") || final_exec.contains("%U") || final_exec.contains("%f") || final_exec.contains("%F") {
             final_exec = final_exec.replace("%u", &format!("\"{}\"", path));
             final_exec = final_exec.replace("%U", &format!("\"{}\"", path));
@@ -1178,10 +955,9 @@ async fn open_path(
         } else {
             final_exec = format!("{} \"{}\"", final_exec, path);
         }
-        
+
         launcher::launch(&final_exec, Some(&app_handle)).map_err(|e| format!("Failed to launch custom opener: {}", e))?;
     } else {
-        // Fallback to default if app string was not found (maybe it was uninstalled)
         log::warn!("Custom opener '{}' not found, falling back to default.", app_exec_id);
         open::that(&path).map_err(|e| format!("Failed to open path: {}", e))?;
     }
@@ -1321,28 +1097,17 @@ async fn open_with_editor(
     Ok(())
 }
 
-#[tauri::command]
-async fn run_doctor_terminal() -> Result<(), String> {
-    launcher::launch_terminal_command("vanta doctor")
-}
-
-
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(start_hidden: bool, open_clipboard: bool) {
     env_logger::init();
 
-    // Init clipboard
     if let Err(e) = clipboard::init_db() {
         log::error!("Failed to init clipboard DB: {}", e);
     }
     clipboard::start_watcher();
 
-
     let mut vanta_config = config::load_or_create_default();
 
-    // Migrate legacy default (800x600) to the intended compact default (680x420)
-    // unless the user has explicitly customized the window size.
     if (vanta_config.window.width - 800.0).abs() < f64::EPSILON
         && (vanta_config.window.height - 600.0).abs() < f64::EPSILON
     {
@@ -1351,7 +1116,6 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
         let _ = vanta_config.save();
     }
 
-    // Clamp to sane bounds in case a previous config set extreme values.
     if clamp_window_size(&mut vanta_config.window) {
         let _ = vanta_config.save();
     }
@@ -1365,10 +1129,8 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
 
     let hotkey_str = vanta_config.general.hotkey.clone();
 
-
-    // Keep startup fast: initial scans run in background during setup.
     let apps: Vec<AppEntry> = Vec::new();
-    let discovered_scripts: Vec<ScriptEntry> = Vec::new();
+    let discovered_extensions: Vec<ExtensionEntry> = Vec::new();
 
     let history = if let Some(config_dir) = dirs::config_dir() {
         let vanta_dir = config_dir.join("vanta");
@@ -1380,20 +1142,18 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
         History::new()
     };
 
-    // Create an empty file index. Background thread will populate it shortly.
     let file_index: files::FileIndex = std::sync::Arc::new(Mutex::new(files::FileIndexState::default()));
 
     let app_state = AppState {
         apps: Mutex::new(apps),
         config: Mutex::new(vanta_config),
-        scripts_cache: Mutex::new(discovered_scripts),
+        extensions_cache: Mutex::new(discovered_extensions),
         history: Mutex::new(history),
         file_index: file_index.clone(),
     };
 
     let mut builder = tauri::Builder::default();
 
-    // Ensure clipboard mode fires after the frontend loads if requested.
     let start_clipboard_flag = open_clipboard;
     if start_clipboard_flag {
         builder = builder.on_page_load(|window, _payload| {
@@ -1401,7 +1161,6 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             let _ = window.emit("open_clipboard", ());
         });
     }
-
 
     #[cfg(desktop)]
     {
@@ -1442,19 +1201,18 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             rescan_apps,
             hide_window,
             show_window,
-            get_scripts,
-            check_bundle_update,
+            get_extensions,
+            get_extension_bundle,
+            get_extension_styles,
             get_workflows,
             dry_run_macro,
             run_macro,
-            execute_script,
             get_suggestions,
             get_search_diagnostics,
             get_clipboard_history,
             open_path,
             reveal_in_file_manager,
             open_with_editor,
-            run_doctor_terminal,
             permissions::get_permission_decision,
             permissions::set_permission_decision,
             get_apps,
@@ -1465,11 +1223,9 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
         .setup(move |app| {
             let app_handle = app.handle().clone();
 
-            // Initialize window (apply blur/transparency/size)
             if let Some(win) = app.get_webview_window("main") {
                 let _ = window::init_window(&win, &app_handle);
 
-                // Apply window size from config (clamped)
                 let (width, height) = current_window_dims(&app_handle);
                 println!(
                     "[vanta][window] applying size {}x{} from {:?}",
@@ -1492,7 +1248,6 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                 }
             }
 
-            // Fire another clipboard emit shortly after startup to ensure the frontend listener is mounted.
             if open_clipboard {
                 let handle_clone = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
@@ -1504,10 +1259,8 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                 });
             }
 
-            // Seed the default theme on first run
             themes::seed_default_theme(&app_handle);
 
-            // Register global hotkey (e.g. Alt+Space) AND Clipboard (Super+V)
             #[cfg(desktop)]
             {
                 use tauri_plugin_global_shortcut::{
@@ -1519,7 +1272,6 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                 let mut config_shortcut: Option<Shortcut> = None;
                 let mut clipboard_shortcut: Option<Shortcut> = None;
 
-                // 1. Config Hotkey
                 if let Ok(s) = Shortcut::from_str(&hotkey_str) {
                     config_shortcut = Some(s);
                     shortcuts.push(s);
@@ -1527,7 +1279,6 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                     log::error!("Invalid config hotkey: {}", hotkey_str);
                 }
 
-                // 2. Clipboard Hotkey
                 let clipboard_hotkey_str = "Super+V";
                 if let Ok(s) = Shortcut::from_str(clipboard_hotkey_str) {
                     clipboard_shortcut = Some(s);
@@ -1536,7 +1287,6 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                     log::error!("Invalid clipboard hotkey: {}", clipboard_hotkey_str);
                 }
 
-                // Clone for move into closure
                 let cfg_sc = config_shortcut.clone();
                 let clip_sc = clipboard_shortcut.clone();
 
@@ -1552,14 +1302,12 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                             }
                             if let Some(ref clip) = clip_sc {
                                 if sc == clip {
-                                    // Open window
                                     if let Some(win) = app.get_webview_window("main") {
                                         let dims = current_window_dims(app);
                                         let _ = win.set_size(tauri::LogicalSize::new(dims.0, dims.1));
                                         let _ = win.set_always_on_top(true);
                                         let _ = win.center();
                                         let _ = window::show_window(&win);
-                                        // Emit event for clipboard mode with retries
                                         println!("[vanta][clipboard] hotkey emit");
                                         emit_clipboard_with_retries(&win);
                                     }
@@ -1582,25 +1330,22 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                 }
             }
 
-            // Background watchers for config/apps/scripts
             let handle_for_watcher = app_handle.clone();
             std::thread::spawn(move || {
                 config::watch_config(handle_for_watcher);
             });
-
 
             let handle_for_scanner = app_handle.clone();
             std::thread::spawn(move || {
                 scanner::watch_desktop_entries(handle_for_scanner);
             });
 
-
-            let handle_for_scripts = app_handle.clone();
+            let handle_for_extensions = app_handle.clone();
             std::thread::spawn(move || {
-                scripts::watch_scripts(handle_for_scripts);
+                extensions::watch_extensions(handle_for_extensions);
             });
 
-            // Initial app/script scans in background (startup-critical path stays minimal)
+            // Initial app + extension scans in background
             {
                 let handle_for_initial_scan = app_handle.clone();
                 std::thread::spawn(move || {
@@ -1613,25 +1358,25 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                     }
                     let _ = handle_for_initial_scan.emit("apps-changed", ());
 
-                    let scripts = scripts::scan_scripts();
-                    let seeds: Vec<(String, Vec<Capability>)> = scripts
+                    let exts = extensions::scan_extensions();
+                    let seeds: Vec<(String, Vec<Capability>)> = exts
                         .iter()
-                        .map(|s| (s.keyword.clone(), s.capabilities.clone()))
+                        .map(|e| (e.manifest.name.clone(), e.manifest.permissions.clone()))
                         .collect();
                     if let Err(err) = permissions::seed_missing_decisions(&seeds) {
-                        log::warn!("Failed to seed permissions for new scripts: {}", err);
+                        log::warn!("Failed to seed permissions for extensions: {}", err);
                     }
-                    log::info!("Initial script scan complete: {} scripts", scripts.len());
+                    log::info!("Initial extension scan complete: {} extensions", exts.len());
                     if let Some(state) = handle_for_initial_scan.try_state::<AppState>() {
-                        if let Ok(mut cached_scripts) = state.scripts_cache.lock() {
-                            *cached_scripts = scripts.clone();
+                        if let Ok(mut cached_exts) = state.extensions_cache.lock() {
+                            *cached_exts = exts.clone();
                         }
                     }
-                    let _ = handle_for_initial_scan.emit("scripts-changed", &scripts);
+                    let _ = handle_for_initial_scan.emit("extensions-changed", &exts);
                 });
             }
 
-            // Build the file index in the background (so startup is instant)
+            // Build file index in background
             {
                 let index_clone = app_handle.state::<AppState>().file_index.clone();
                 let handle_for_index = app_handle.clone();

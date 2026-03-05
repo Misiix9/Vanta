@@ -38,6 +38,7 @@ pub enum ResultSource {
     Calculator,
     Window,
     File,
+    Extension { ext_id: String },
 }
 
 fn apply_weight(score: u32, weight: u32) -> u32 {

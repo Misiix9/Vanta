@@ -72,13 +72,13 @@
   tabindex="-1"
   onkeydown={handleKeydown}
 >
-  <div class="permission-modal" bind:this={modalEl} role="dialog" aria-modal="true" aria-label="Script permission request">
+  <div class="permission-modal" bind:this={modalEl} role="dialog" aria-modal="true" aria-label="Extension permission request">
     <div class="header">
       <div class="pill">Permission Needed</div>
       <div class="script-id">{scriptId}</div>
     </div>
 
-    <p class="lede">This script wants elevated capabilities. Choose how you want to proceed.</p>
+    <p class="lede">This extension wants elevated capabilities. Choose how you want to proceed.</p>
 
     <div class="cap-grid">
       {#each missingCaps as cap}

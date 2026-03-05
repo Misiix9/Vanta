@@ -30,10 +30,9 @@ export interface GeneralConfig {
     launch_on_login: boolean;
 }
 
-export interface ScriptsConfig {
+export interface ExtensionsConfig {
     directory: string;
-    timeout_ms: number;
-    strict_json: boolean;
+    dev_mode: boolean;
 }
 
 export interface WindowConfig {
@@ -75,7 +74,7 @@ export interface MacroArg {
 }
 
 export type MacroStep =
-    | { kind: "script"; script: string; args?: string[]; capabilities?: Capability[] }
+    | { kind: "extension"; ext_id: string; command: string; args?: string[]; capabilities?: Capability[] }
     | { kind: "system"; command: string; args?: string[]; capabilities?: Capability[] };
 
 export interface WorkflowMacro {
@@ -126,7 +125,7 @@ export interface VantaConfig {
     general: GeneralConfig;
     appearance: AppearanceConfig;
     window: WindowConfig;
-    scripts: ScriptsConfig;
+    extensions: ExtensionsConfig;
     files: FilesConfig;
     search: SearchConfig;
     workflows: WorkflowsConfig;
@@ -165,7 +164,13 @@ export interface SearchResult {
     section?: string;
 }
 
-export type ResultSource = "Application" | "Calculator" | "Window" | "Clipboard" | "File" | { Script: { keyword: string } };
+export type ResultSource =
+    | "Application"
+    | "Calculator"
+    | "Window"
+    | "File"
+    | "Clipboard"
+    | { Extension: { ext_id: string } };
 
 export interface ClipboardItem {
     id: number;
@@ -175,37 +180,6 @@ export interface ClipboardItem {
 
 export interface BlurStatus {
     mode: "native" | "fallback";
-}
-
-
-
-export interface ScriptAction {
-    type: "copy" | "open" | "run";
-    value: string;
-}
-
-export type Urgency = "low" | "normal" | "critical";
-
-export interface ScriptItem {
-    title: string;
-    subtitle?: string;
-    icon?: string;
-    action?: ScriptAction;
-    badge?: string;
-    urgency: Urgency;
-}
-
-export interface ScriptOutput {
-    items: ScriptItem[];
-}
-
-export interface ScriptEntry {
-    keyword: string;
-    name?: string;
-    description?: string;
-    icon?: string;
-    path: string;
-    capabilities?: Capability[];
 }
 
 export type Capability = "Network" | "Shell" | "Filesystem";
@@ -218,20 +192,28 @@ export interface PermissionNeededPayload {
     requested_caps?: Capability[];
 }
 
-export interface DownloadStatusPayload {
-    status: "downloading" | "success" | "failed";
-    error?: string;
+export interface ExtensionCommand {
+    name: string;
+    title: string;
+    subtitle?: string;
+    mode: "view" | "no-view";
+    icon?: string;
 }
 
-export interface BundleUpdateStatus {
-    status: "not_installed" | "up_to_date" | "update_available" | "error";
-    name?: string | null;
-    installed_version?: string | null;
-    remote_version?: string | null;
-    message?: string | null;
+export interface ExtensionManifest {
+    name: string;
+    title: string;
+    version: string;
+    description?: string;
+    author?: string;
+    icon?: string;
+    permissions: Capability[];
+    commands: ExtensionCommand[];
 }
 
-export interface PermissionDeniedPayload {
-    script_id: string;
-    requested_caps: Capability[];
+export interface ExtensionEntry {
+    manifest: ExtensionManifest;
+    path: string;
+    has_bundle: boolean;
+    has_styles: boolean;
 }

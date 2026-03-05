@@ -8,49 +8,36 @@
     VantaConfig,
     SearchResult,
     BlurStatus,
-    ScriptEntry,
-    ScriptItem,
-    ScriptOutput,
     ThemeMeta,
     Capability,
     PermissionNeededPayload,
-    PermissionDeniedPayload,
     WorkflowMacro,
     MacroDryRunResult,
-    BundleUpdateStatus,
+    ExtensionEntry,
   } from "$lib/types";
   import { applyTheme } from "$lib/theme";
   import SearchInput from "$lib/components/SearchInput.svelte";
   import ResultsList from "$lib/components/ResultsList.svelte";
   import StatusBar from "$lib/components/StatusBar.svelte";
-  import ScriptResultItem from "$lib/components/ScriptResultItem.svelte";
   import SettingsView from "$lib/components/SettingsView.svelte";
   import PermissionModal from "$lib/components/PermissionModal.svelte";
   import MacroPreview from "$lib/components/MacroPreview.svelte";
+  import ExtensionHost from "$lib/components/ExtensionHost.svelte";
 
   let query = $state("");
   let vantaConfig: VantaConfig | undefined = $state();
   let results: SearchResult[] = $state([]);
   let baseResults: SearchResult[] = $state([]);
   let view: "launcher" | "settings" = $state("launcher");
-  let scriptResults: ScriptItem[] = $state([]);
-  let isScriptMode = $state(false);
-  let activeScriptKeyword = $state("");
   let selectedIndex = $state(0);
   let searchTime: number | null = $state(null);
   let visibleRowCount = $state(0);
-  let bundleUpdateStatus = $state<
-    BundleUpdateStatus | { status: "idle" | "checking"; message?: string }
-  >({
-    status: "idle",
-    message: "",
-  });
-  let lastInstallTarget: string | null = $state(null);
   let currentMode: "launcher" | "clipboard" = $state("launcher");
   let blurMode: string = $state("fallback");
   let searchInputRef: SearchInput | undefined = $state();
   let resultsListRef: ResultsList | undefined = $state();
-  let availableScripts: ScriptEntry[] = $state([]);
+  let availableExtensions: ExtensionEntry[] = $state([]);
+  let extensionView: { extId: string; command: string; extPath: string } | null = $state(null);
   let availableMacros: WorkflowMacro[] = $state([]);
   let actionInFlight = $state(false); // guard: don't dismiss during actions
   let isVisible = $state(true);
@@ -59,8 +46,6 @@
     scriptId: string;
     missingCaps: Capability[];
     requestedCaps: Capability[];
-    keyword: string;
-    args: string;
   } | null>(null);
   let permissionBusy = $state(false);
   let activeMacroId = $state<string | null>(null);
@@ -91,9 +76,7 @@
   let searchRequestId = 0;
   const unlisteners: Array<() => void> = [];
 
-  let activeScriptCaps = $derived(
-    activeScriptKeyword ? capsForScript(activeScriptKeyword) : [],
-  );
+  
 
   const builtinCommands: SearchResult[] = [
     {
@@ -175,39 +158,10 @@
     });
   }
 
-  function buildScriptResults(q: string): SearchResult[] {
-    if (!availableScripts.length) return [];
-    const normalized = q.trim().toLowerCase();
-
-    return availableScripts
-      .filter((script) => {
-        if (!normalized) return true;
-        const name = script.name || script.keyword;
-        const desc = script.description || "";
-        return (
-          script.keyword.toLowerCase().includes(normalized) ||
-          name.toLowerCase().includes(normalized) ||
-          desc.toLowerCase().includes(normalized)
-        );
-      })
-      .map((script, index) => ({
-        title: script.name || script.keyword,
-        subtitle: script.description || script.path,
-        icon: script.icon || null,
-        exec: `run-script:${script.keyword}`,
-        score: 1_200_000 - index,
-        match_indices: [],
-        source: { Script: { keyword: script.keyword } },
-        id: `script-${script.keyword}`,
-        section: "Scripts",
-      }));
-  }
-
   function composeResults(base: SearchResult[], q: string): SearchResult[] {
     const commands = filterCommandResults(q);
-    const scripts = buildScriptResults(q);
     const macros = buildMacroResults(q);
-    return [...commands, ...macros, ...base, ...scripts];
+    return [...commands, ...macros, ...base];
   }
 
   onDestroy(() => {
@@ -233,23 +187,19 @@
   }
 
   // Derived: total item count for navigation
-  let totalItems = $derived(
-    isScriptMode ? scriptResults.length : visibleRowCount,
-  );
+  let totalItems = $derived(visibleRowCount);
 
   $effect(() => {
-    if (isScriptMode || currentMode !== "launcher") return;
-    const scriptsVersion = availableScripts.length;
+    if (extensionView || currentMode !== "launcher") return;
+    const extVersion = availableExtensions.length;
     results = composeResults(baseResults, query);
-    void scriptsVersion; // ensure reactivity when scripts change
+    void extVersion;
   });
 
-  // Clipboard State
   let clipboardHistory: any[] = [];
 
-  // Keep selection valid when result sets change
   $effect(() => {
-    const count = isScriptMode ? scriptResults.length : visibleRowCount;
+    const count = visibleRowCount;
     if (count === 0) {
       selectedIndex = 0;
       return;
@@ -261,13 +211,6 @@
 
   onMount(async () => {
     // ... existing onMount code ...
-
-    try {
-      const storedTarget = localStorage.getItem("vanta:last-install-target");
-      if (storedTarget) lastInstallTarget = storedTarget;
-    } catch (e) {
-      console.warn("Failed to load last install target", e);
-    }
 
     // Register clipboard listener ASAP so startup emits aren't missed.
     try {
@@ -311,12 +254,10 @@
       console.error("Failed to load config:", e);
     }
 
-    // Fetch available scripts
     try {
-      availableScripts = await invoke<ScriptEntry[]>("get_scripts");
-      console.log("Available scripts:", availableScripts);
+      availableExtensions = await invoke<ExtensionEntry[]>("get_extensions");
     } catch (e) {
-      console.error("Failed to load scripts:", e);
+      console.error("Failed to load extensions:", e);
     }
 
     try {
@@ -349,21 +290,9 @@
       }),
     );
 
-    // Listen for script changes (hot-reload)
     unlisteners.push(
-      await listen<ScriptEntry[]>("scripts-changed", (event) => {
-        availableScripts = event.payload;
-        console.log("Scripts updated:", availableScripts.length);
-      }),
-    );
-
-    // Refresh scripts after store installs finish
-    unlisteners.push(
-      await listen("download_status", (event) => {
-        const status = (event.payload as any)?.status;
-        if (status === "success") {
-          refreshScripts();
-        }
+      await listen<ExtensionEntry[]>("extensions-changed", (event) => {
+        availableExtensions = event.payload;
       }),
     );
 
@@ -410,53 +339,6 @@
     maybeRescanApps(true);
   });
 
-  function rememberInstallTarget(target: string) {
-    lastInstallTarget = target;
-    try {
-      localStorage.setItem("vanta:last-install-target", target);
-    } catch (e) {
-      console.warn("Failed to persist install target", e);
-    }
-  }
-
-  function resolveUpdateTarget(): string | null {
-    const trimmed = query.trim();
-    if (trimmed.toLowerCase().startsWith("install ")) {
-      const candidate = trimmed.slice("install ".length).trim();
-      if (candidate) return candidate;
-    }
-    return lastInstallTarget;
-  }
-
-  async function handleCheckBundleUpdate() {
-    const target = resolveUpdateTarget();
-    if (!target) {
-      bundleUpdateStatus = {
-        status: "error",
-        message: "Install a bundle first with install <url>",
-      };
-      return;
-    }
-
-    bundleUpdateStatus = { status: "checking", message: "Checking for updates…" };
-
-    try {
-      const status = await invoke<BundleUpdateStatus>("check_bundle_update", { url: target });
-      bundleUpdateStatus = {
-        ...status,
-        message:
-          status.message ||
-          (status.status === "update_available" &&
-          status.installed_version &&
-          status.remote_version
-            ? `Update ${status.installed_version} → ${status.remote_version}`
-            : status.status.split("_").join(" ")),
-      };
-    } catch (e) {
-      bundleUpdateStatus = { status: "error", message: String(e) };
-    }
-  }
-
   function updateClipboardSuggestions(q: string) {
     if (!q) {
       results = clipboardHistory.map((item) => ({
@@ -490,44 +372,6 @@
     selectedIndex = 0;
   }
 
-  /**
-            section: "Clipboard",
-   * Check if query begins with a known script keyword.
-   * Returns [keyword, args] if matched, or null.
-   */
-  function detectScriptQuery(q: string): [string, string] | null {
-    const trimmed = q.trim();
-    if (!trimmed) return null;
-
-    const firstSpace = trimmed.indexOf(" ");
-    const keyword = firstSpace > 0 ? trimmed.slice(0, firstSpace) : trimmed;
-    const args = firstSpace > 0 ? trimmed.slice(firstSpace + 1).trim() : "";
-
-    const script = availableScripts.find(
-      (s) => s.keyword.toLowerCase() === keyword.toLowerCase(),
-    );
-    if (script) return [script.keyword, args];
-    return null;
-  }
-
-  function capsForScript(keyword: string): Capability[] {
-    const match = availableScripts.find(
-      (s) => s.keyword.toLowerCase() === keyword.toLowerCase(),
-    );
-    return match?.capabilities ?? [];
-  }
-
-  function capIcon(cap: Capability): string {
-    switch (cap) {
-      case "Network":
-        return "network";
-      case "Shell":
-        return "shell";
-      case "Filesystem":
-        return "filesystem";
-    }
-  }
-
   function buildMacroResults(q: string): SearchResult[] {
     if (!availableMacros.length) return [];
     const needle = q.trim().toLowerCase();
@@ -556,7 +400,6 @@
 
   function parsePermissionError(err: unknown):
     | { type: "needed"; payload: PermissionNeededPayload }
-    | { type: "denied"; payload: PermissionDeniedPayload }
     | null {
     const raw =
       typeof err === "string"
@@ -577,20 +420,10 @@
       }
     }
 
-    const deniedPrefix = "PERMISSION_DENIED:";
-    if (raw.startsWith(deniedPrefix)) {
-      try {
-        const payload = JSON.parse(raw.slice(deniedPrefix.length));
-        return { type: "denied", payload } as any;
-      } catch (e) {
-        console.warn("Failed to parse PERMISSION_DENIED payload", e, raw);
-      }
-    }
-
     return null;
   }
 
-  function handlePermissionError(err: unknown, keyword: string, args: string) {
+  function handlePermissionError(err: unknown) {
     const parsed = parsePermissionError(err);
     if (!parsed) return false;
 
@@ -599,92 +432,14 @@
       const requestedCaps = parsed.payload.requested_caps || missingCaps;
 
       permissionPrompt = {
-        scriptId: parsed.payload.script_id || keyword,
+        scriptId: parsed.payload.script_id,
         missingCaps,
         requestedCaps,
-        keyword,
-        args,
       };
-      // Keep the script view active with a clear placeholder
-      isScriptMode = true;
-      activeScriptKeyword = keyword;
-      scriptResults = [
-        {
-          title: "Permission required",
-          subtitle: `Grant access to run ${keyword}`,
-          icon: "lock",
-          urgency: "critical",
-        },
-      ];
-      searchTime = null;
-      return true;
-    }
-
-    if (parsed.type === "denied") {
-      const caps = parsed.payload.requested_caps || [];
-      isScriptMode = true;
-      activeScriptKeyword = keyword;
-      scriptResults = [
-        {
-          title: "Permission denied",
-          subtitle: caps.length
-            ? `Requested: ${caps.join(", ")}`
-            : "Script denied by policy",
-          icon: "lock",
-          urgency: "critical",
-        },
-      ];
-      searchTime = null;
       return true;
     }
 
     return false;
-  }
-
-  async function runScriptWithCaps(
-    keyword: string,
-    args: string,
-    caps: Capability[],
-  ) {
-    const start = performance.now();
-    try {
-      const output = await invoke<ScriptOutput>("execute_script", {
-        keyword,
-        args,
-        caps,
-      });
-
-      scriptResults = output.items;
-      isScriptMode = true;
-      activeScriptKeyword = keyword;
-      selectedIndex = 0;
-      searchTime = performance.now() - start;
-      return true;
-    } catch (e) {
-      if (handlePermissionError(e, keyword, args)) return false;
-      console.error("Script execution failed (retry)", e);
-      scriptResults = [
-        {
-          title: `Script Error: ${keyword}`,
-          subtitle: String(e),
-          icon: "error",
-          urgency: "critical",
-        },
-      ];
-      searchTime = null;
-      return false;
-    }
-  }
-
-  async function refreshScripts() {
-    try {
-      availableScripts = await invoke<ScriptEntry[]>("get_scripts");
-      if (!isScriptMode && currentMode === "launcher") {
-        results = composeResults(baseResults, query);
-      }
-    } catch (e) {
-      console.error("Failed to refresh scripts", e);
-    }
   }
 
   function resetMacroState() {
@@ -720,7 +475,7 @@
       resetMacroState();
       resetAndHide();
     } catch (e) {
-      if (handlePermissionError(e, macro.id, "")) {
+      if (handlePermissionError(e)) {
         macroBusy = false;
         return;
       }
@@ -755,25 +510,10 @@
 
     try {
       await setDecision("Allow", caps, "allow-once");
-      const ran = await runScriptWithCaps(
-        permissionPrompt.keyword,
-        permissionPrompt.args,
-        caps,
-      );
-      if (ran) {
-        await setDecision("Ask", caps, "reset-after-once");
-        permissionPrompt = null;
-      }
+      await setDecision("Ask", caps, "reset-after-once");
+      permissionPrompt = null;
     } catch (e) {
       console.error("Allow once failed", e);
-      scriptResults = [
-        {
-          title: "Permission decision failed",
-          subtitle: String(e),
-          icon: "error",
-          urgency: "critical",
-        },
-      ];
     } finally {
       permissionBusy = false;
     }
@@ -789,24 +529,9 @@
 
     try {
       await setDecision("Allow", caps, "persist");
-      const ran = await runScriptWithCaps(
-        permissionPrompt.keyword,
-        permissionPrompt.args,
-        caps,
-      );
-      if (ran) {
-        permissionPrompt = null;
-      }
+      permissionPrompt = null;
     } catch (e) {
       console.error("Allow always failed", e);
-      scriptResults = [
-        {
-          title: "Permission decision failed",
-          subtitle: String(e),
-          icon: "error",
-          urgency: "critical",
-        },
-      ];
     } finally {
       permissionBusy = false;
     }
@@ -822,25 +547,8 @@
 
     try {
       await setDecision("Deny", caps, "user-deny");
-      scriptResults = [
-        {
-          title: "Blocked",
-          subtitle: "You denied this script's request.",
-          icon: "lock",
-          urgency: "critical",
-        },
-      ];
-      searchTime = null;
     } catch (e) {
       console.error("Deny failed", e);
-      scriptResults = [
-        {
-          title: "Permission decision failed",
-          subtitle: String(e),
-          icon: "error",
-          urgency: "critical",
-        },
-      ];
     } finally {
       permissionPrompt = null;
       permissionBusy = false;
@@ -892,42 +600,13 @@
     }
 
     if (!q.trim()) {
-      isScriptMode = false;
-      activeScriptKeyword = "";
-      scriptResults = [];
       resetMacroState();
       searchTime = null;
-      // Load suggestions instead of clearing results
       await loadSuggestions();
       return;
     }
 
-    // Check if query triggers a script
-    const scriptMatch = detectScriptQuery(q);
-    if (scriptMatch) {
-      const [keyword, args] = scriptMatch;
-      isScriptMode = true;
-      activeScriptKeyword = keyword;
-      baseResults = [];
-      results = [];
-      const caps = capsForScript(keyword);
-
-      const localRequestId = requestId;
-      const ran = await runScriptWithCaps(keyword, args, caps);
-      if (localRequestId !== searchRequestId) return;
-      if (ran) {
-        selectedIndex = 0;
-      }
-      return;
-    }
-
     resetMacroState();
-
-    // Normal app search
-    isScriptMode = false;
-    resetMacroState();
-    activeScriptKeyword = "";
-    scriptResults = [];
 
     try {
       const start = performance.now();
@@ -969,17 +648,26 @@
         }
         return;
       }
-      if (result.exec.startsWith("fill:")) {
+      if (result.exec.startsWith("ext-view:")) {
+        const parts = result.exec.slice(9).split(":");
+        const extId = parts[0];
+        const cmd = parts.slice(1).join(":");
+        const ext = availableExtensions.find((e) => e.manifest.name === extId);
+        extensionView = { extId, command: cmd, extPath: ext?.path ?? "" };
+        return;
+      } else if (result.exec.startsWith("ext-no-view:")) {
+        const parts = result.exec.slice(12).split(":");
+        const extId = parts[0];
+        const cmd = parts.slice(1).join(":");
+        const ext = availableExtensions.find((e) => e.manifest.name === extId);
+        extensionView = { extId, command: cmd, extPath: ext?.path ?? "" };
+        return;
+      } else if (result.exec.startsWith("fill:")) {
         query = result.exec.slice(5);
         await handleSearch(query);
         setTimeout(() => {
           document.querySelector("input")?.focus();
         }, 10);
-        return;
-      } else if (result.exec.startsWith("run-script:")) {
-        const keyword = result.exec.slice(11);
-        const caps = capsForScript(keyword);
-        await runScriptWithCaps(keyword, "", caps);
         return;
       } else if (result.exec.startsWith("system-action:")) {
         const action = result.exec.slice(14);
@@ -1005,24 +693,10 @@
         const target = result.exec.slice(10);
         await invoke("open_with_editor", { path: target });
         resetAndHide();
-      } else if (result.exec === "doctor:run") {
-        await invoke("run_doctor_terminal");
-        resetAndHide();
       } else if (result.exec.startsWith("copy:")) {
         const value = result.exec.slice(5);
         await navigator.clipboard.writeText(value);
         resetAndHide();
-      } else if (result.exec.startsWith("install:")) {
-        const target = result.exec.slice(8);
-        const ok = window.confirm(
-          `Install this script or package?\n${target}`,
-        );
-        if (!ok) return;
-        rememberInstallTarget(target);
-        bundleUpdateStatus = { status: "idle", message: "" };
-        await invoke("launch_app", { exec: result.exec });
-        refreshScripts();
-        // deliberately leaving window open to view progress
       } else if (result.source === "File") {
         await invoke("open_path", { path: result.exec });
         resetAndHide();
@@ -1037,47 +711,12 @@
     }
   }
 
-  async function handleScriptActivate(item: ScriptItem) {
-    if (permissionPrompt) return; // modal blocks background actions
-    if (actionInFlight) return;
-    if (!item.action) return;
-
-    actionInFlight = true;
-    try {
-      switch (item.action.type) {
-        case "copy":
-          await navigator.clipboard.writeText(item.action.value);
-          resetAndHide();
-          break;
-        case "open":
-          await invoke("plugin:opener|open_url", { url: item.action.value });
-          resetAndHide();
-          break;
-        case "run":
-          await invoke("launch_app", { exec: item.action.value });
-          resetAndHide();
-          break;
-      }
-    } catch (e) {
-      console.error("Script action failed:", e);
-    } finally {
-      actionInFlight = false;
-    }
-  }
-
-  /**
-   * Reset all state and hide the window.
-   */
   function resetAndHide() {
     query = "";
-    // Don't clear results immediately, so next open has something.
-    // Ideally we refresh them.
     loadSuggestions();
 
-    scriptResults = [];
-    isScriptMode = false;
-    currentMode = "launcher"; // Reset mode
-    activeScriptKeyword = "";
+    extensionView = null;
+    currentMode = "launcher";
     resetMacroState();
     selectedIndex = 0;
     searchTime = null;
@@ -1086,13 +725,16 @@
   }
 
   async function handleEscape() {
-    if (permissionPrompt) return; // hard-block: modal must be resolved
+    if (permissionPrompt) return;
+    if (extensionView) {
+      extensionView = null;
+      return;
+    }
     if (activeMacroId) {
       resetMacroState();
       return;
     }
     if (currentMode === "clipboard" && query === "") {
-      // Close the window entirely instead of staying in launcher
       resetAndHide();
       return;
     }
@@ -1136,17 +778,13 @@
       searchInputRef?.focus();
     }
 
-    // Launcher logic
     if (totalItems === 0) return;
 
-    const activeRow = !isScriptMode
-      ? resultsListRef?.getVisibleRow(selectedIndex)
-      : undefined;
+    const activeRow = resultsListRef?.getVisibleRow(selectedIndex);
     const activeResult =
       activeRow && activeRow.type === "item" ? activeRow.result : undefined;
 
-    // Secondary action shortcuts for normal results
-    if (!isScriptMode && activeResult && activeResult.actions?.length) {
+    if (activeResult && activeResult.actions?.length) {
       const findAction = (prefix: string) =>
         activeResult.actions?.find((a) => a.exec.startsWith(prefix));
 
@@ -1182,38 +820,25 @@
       case "ArrowDown":
         e.preventDefault();
         selectedIndex = (selectedIndex + 1) % totalItems;
-        // Manual scroll trigger
-        if (!isScriptMode)
-          setTimeout(() => resultsListRef?.scrollToSelected(), 0);
+        setTimeout(() => resultsListRef?.scrollToSelected(), 0);
         break;
       case "ArrowUp":
         e.preventDefault();
         selectedIndex = selectedIndex <= 0 ? totalItems - 1 : selectedIndex - 1;
-        // Manual scroll trigger
-        if (!isScriptMode)
-          setTimeout(() => resultsListRef?.scrollToSelected(), 0);
+        setTimeout(() => resultsListRef?.scrollToSelected(), 0);
         break;
       case "Enter":
         e.preventDefault();
-        if (isScriptMode && scriptResults[selectedIndex]) {
-          handleScriptActivate(scriptResults[selectedIndex]);
-        } else if (activeResult) {
+        if (activeResult) {
           handleActivate(activeResult);
         }
         break;
       case "Tab":
         e.preventDefault();
-        if (!isScriptMode && results[selectedIndex]) {
+        if (results[selectedIndex]) {
           const res = results[selectedIndex];
           if (res.exec.startsWith("fill:")) {
             handleActivate(res);
-            break;
-          } else if (res.exec.startsWith("install:")) {
-            query = "install " + res.exec.slice(8) + " ";
-            handleSearch(query);
-            setTimeout(() => {
-              document.querySelector("input")?.focus();
-            }, 10);
             break;
           }
         }
@@ -1225,9 +850,7 @@
           selectedIndex = (selectedIndex + 1) % totalItems;
         }
 
-        // Manual scroll trigger to track Tab navigation
-        if (!isScriptMode)
-          setTimeout(() => resultsListRef?.scrollToSelected(), 0);
+        setTimeout(() => resultsListRef?.scrollToSelected(), 0);
         break;
     }
   }
@@ -1276,6 +899,19 @@
         on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
       />
     </div>
+  {:else if extensionView}
+    <div
+      in:fade={{ duration: 150 }}
+      style="height: 100%; width: 100%;"
+    >
+      <ExtensionHost
+        extId={extensionView.extId}
+        commandName={extensionView.command}
+        extPath={extensionView.extPath}
+        onClose={() => { extensionView = null; }}
+        onToast={(opts) => console.log('[toast]', opts.title, opts.message)}
+      />
+    </div>
   {:else}
     <div
       in:fade={{ duration: 150 }}
@@ -1288,50 +924,7 @@
         onEscape={handleEscape}
       />
 
-      {#if isScriptMode}
-        <!-- Script results -->
-        <div
-          class="results-container"
-          role="listbox"
-          aria-label="Script results"
-        >
-          {#if activeScriptCaps.length}
-            <div class="cap-badges" aria-label="Capabilities required">
-              {#each activeScriptCaps as cap}
-                <span class="cap-badge">
-                  <span class={`cap-svg icon-${capIcon(cap)}`}></span>
-                  {cap}
-                </span>
-              {/each}
-              <span class="cap-note">Requires permission</span>
-            </div>
-          {/if}
-
-          {#if scriptResults.length === 0}
-            <div class="empty-state">
-              <span class="empty-icon">⚡</span>
-              <span>
-                Running {activeScriptKeyword}...
-                {#if activeScriptCaps.length}
-                  <small class="cap-footnote">
-                    Capabilities: {activeScriptCaps.join(", ")}
-                  </small>
-                {/if}
-              </span>
-            </div>
-          {:else}
-            {#each scriptResults as item, i}
-              <ScriptResultItem
-                {item}
-                index={i}
-                isSelected={i === selectedIndex}
-                onSelect={(idx) => (selectedIndex = idx)}
-                onActivate={handleScriptActivate}
-              />
-            {/each}
-          {/if}
-        </div>
-      {:else if currentMacro}
+      {#if currentMacro}
         <MacroPreview
           macro={currentMacro}
           args={macroArgs}
@@ -1346,7 +939,6 @@
       {:else if activeMacroId}
         <div class="empty-state">Macro not found</div>
       {:else}
-        <!-- Normal app results -->
         <ResultsList
           bind:this={resultsListRef}
           {results}
@@ -1357,16 +949,12 @@
       {/if}
 
       <StatusBar
-          resultCount={
-            isScriptMode
-              ? scriptResults.length
-              : activeMacroId
-                ? macroDryRun?.steps.length ?? 0
-                : visibleRowCount
-          }
+        resultCount={
+          activeMacroId
+            ? macroDryRun?.steps.length ?? 0
+            : visibleRowCount
+        }
         {searchTime}
-        updateStatus={bundleUpdateStatus}
-        onCheckUpdate={handleCheckBundleUpdate}
       />
     </div>
   {/if}
