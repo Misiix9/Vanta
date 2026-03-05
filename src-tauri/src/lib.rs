@@ -812,6 +812,52 @@ async fn get_suggestions(
         results.push(doc);
     }
 
+    if let Ok(ext_cache) = state.extensions_cache.lock() {
+        for ext in ext_cache.iter() {
+            if !ext.has_bundle {
+                continue;
+            }
+            for cmd in &ext.manifest.commands {
+                let exec_prefix = match cmd.mode {
+                    extensions::CommandMode::View => "ext-view",
+                    extensions::CommandMode::NoView => "ext-no-view",
+                };
+                results.push(SearchResult {
+                    title: cmd.title.clone(),
+                    subtitle: Some(ext.manifest.title.clone()),
+                    icon: extensions::resolve_ext_icon(
+                        cmd.icon.as_deref().or(ext.manifest.icon.as_deref()),
+                        &ext.path,
+                    ),
+                    exec: format!("{}:{}:{}", exec_prefix, ext.manifest.name, cmd.name),
+                    score: weighted_score(850_000, search_config.applications.weight),
+                    match_indices: vec![],
+                    source: ResultSource::Extension {
+                        ext_id: ext.manifest.name.clone(),
+                    },
+                    actions: None,
+                    id: Some(format!("ext:{}:{}", ext.manifest.name, cmd.name)),
+                    group: None,
+                    section: Some("Extensions".to_string()),
+                });
+            }
+        }
+    }
+
+    results.push(SearchResult {
+        title: "Vanta Store".to_string(),
+        subtitle: Some("Browse and install extensions".to_string()),
+        icon: Some("fa-solid fa-store".to_string()),
+        exec: "open-store".to_string(),
+        score: 800_000,
+        match_indices: vec![],
+        source: ResultSource::Application,
+        actions: None,
+        id: Some("vanta-store".to_string()),
+        group: None,
+        section: Some("Commands".to_string()),
+    });
+
     results.push(SearchResult {
         title: "Settings".to_string(),
         subtitle: Some("Open Vanta settings".to_string()),
@@ -934,6 +980,16 @@ async fn run_macro(
 #[tauri::command]
 async fn get_clipboard_history() -> Result<Vec<clipboard::ClipboardItem>, String> {
     clipboard::get_history().map_err(|e| format!("Failed to get history: {}", e))
+}
+
+#[tauri::command]
+async fn delete_clipboard_item(id: i64) -> Result<(), String> {
+    clipboard::delete_item(id).map_err(|e| format!("Failed to delete: {}", e))
+}
+
+#[tauri::command]
+async fn toggle_clipboard_pin(id: i64) -> Result<bool, String> {
+    clipboard::toggle_pin(id).map_err(|e| format!("Failed to toggle pin: {}", e))
 }
 
 #[tauri::command]
@@ -1245,6 +1301,8 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             get_suggestions,
             get_search_diagnostics,
             get_clipboard_history,
+            delete_clipboard_item,
+            toggle_clipboard_pin,
             open_path,
             reveal_in_file_manager,
             open_with_editor,

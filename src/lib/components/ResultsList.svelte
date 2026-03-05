@@ -27,10 +27,12 @@
     results = [],
     selectedIndex = $bindable(0),
     onActivate,
+    flat = false,
   }: {
     results: SearchResult[];
     selectedIndex: number;
     onActivate: (result: SearchResult) => void;
+    flat?: boolean;
   } = $props();
 
   let container: HTMLDivElement | null = $state(null);
@@ -92,7 +94,7 @@
     "Apps",
     "Documents",
     "Macros",
-    "Scripts",
+    "Extensions",
     "Calculator",
     "Clipboard",
     "Settings",
@@ -103,8 +105,11 @@
   function deriveSection(res: SearchResult): string {
     if (res.section && res.section.trim()) return res.section.trim();
 
+    if (typeof res.source === "object" && "Extension" in res.source) {
+      return "Extensions";
+    }
     if (typeof res.source === "object" && "Script" in res.source) {
-      return "Scripts";
+      return "Extensions";
     }
 
     switch (res.source) {
@@ -133,22 +138,14 @@
       seen.set(label, group);
     }
 
-    // Ensure every known section is present with at least an empty group so headers always render.
-    for (const label of sectionOrder) {
-      if (!seen.has(label)) {
-        seen.set(label, { label, items: [] });
-      }
-    }
-
-    // Preserve explicit section order, then append any additional labels alphabetically.
     const ordered: { label: string; items: SearchResult[] }[] = [];
     for (const label of sectionOrder) {
       const group = seen.get(label);
-      if (group) ordered.push(group);
+      if (group && group.items.length > 0) ordered.push(group);
     }
 
     const extras = Array.from(seen.values()).filter(
-      (g) => !sectionOrder.includes(g.label),
+      (g) => !sectionOrder.includes(g.label) && g.items.length > 0,
     );
     extras.sort((a, b) => a.label.localeCompare(b.label));
 
@@ -159,7 +156,31 @@
     const rows: VisibleRow[] = [];
     let flatItemIndex = 0;
 
+    if (flat) {
+      if (results.length > 0) {
+        rows.push({
+          type: "header",
+          label: "Recommended",
+          count: results.length,
+          key: "header-recommended",
+        });
+      }
+      results.forEach((result, i) => {
+        const keyBase = result.id ?? `${result.exec}-flat-${i}`;
+        rows.push({
+          type: "item",
+          result,
+          groupLabel: "Recommended",
+          itemIndex: flatItemIndex++,
+          key: `item-flat-${i}-${keyBase}`,
+        });
+      });
+      return rows;
+    }
+
     groupedResults.forEach((group, groupIndex) => {
+      if (group.items.length === 0) return;
+
       rows.push({
         type: "header",
         label: group.label,

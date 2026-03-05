@@ -82,6 +82,9 @@
     }
 
     function primaryActionLabel(): string {
+        if (typeof result.source === "object" && "Extension" in result.source) {
+            return "Open";
+        }
         if (typeof result.source === "object" && "Script" in result.source) {
             return "Run";
         }
@@ -108,7 +111,6 @@
     onclick={() => onActivate(result)}
     role="option"
     aria-selected={isSelected}
-    style="transition: opacity 140ms ease, transform 140ms ease"
 >
     <div class="item-icon">
         {#if result.source === "Calculator"}
@@ -151,33 +153,18 @@
     </div>
 
     {#if isSelected}
-        <div
-            class="action-hints"
-            style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap;justify-content:flex-end;"
-        >
-            <span
-                class="action-chip"
-                style="display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:12px;color:#ffffff;"
-            >
+        <div class="action-hints">
+            <span class="action-chip">
                 <span>{primaryActionLabel()}</span>
-                <kbd
-                    style="padding:2px 6px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.08);color:#ffffff;font-family:inherit;"
-                >
-                    ↵
-                </kbd>
+                <kbd>↵</kbd>
             </span>
 
             {#if result.actions}
                 {#each result.actions as action}
-                    <span
-                        class="action-chip"
-                        style="display:inline-flex;gap:6px;align-items:center;padding:4px 8px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:12px;color:#ffffff;"
-                    >
+                    <span class="action-chip">
                         <span>{action.label}</span>
                         {#if action.shortcut}
-                            <kbd
-                                style="padding:2px 6px;border:1px solid rgba(255,255,255,0.2);border-radius:6px;background:rgba(255,255,255,0.08);color:#ffffff;font-family:inherit;"
-                            >
+                            <kbd>
                                 {action.shortcut
                                     .replace("Shift+", "⇧ ")
                                     .replace("Ctrl+", "Ctrl ")

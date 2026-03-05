@@ -176,6 +176,8 @@ export interface ClipboardItem {
     id: number;
     content: string;
     timestamp: string;
+    pinned: boolean;
+    content_type: string;
 }
 
 export interface BlurStatus {

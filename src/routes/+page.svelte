@@ -24,6 +24,7 @@
   import MacroPreview from "$lib/components/MacroPreview.svelte";
   import ExtensionHost from "$lib/components/ExtensionHost.svelte";
   import StoreView from "$lib/components/StoreView.svelte";
+  import ClipboardView from "$lib/components/ClipboardView.svelte";
 
   let query = $state("");
   let vantaConfig: VantaConfig | undefined = $state();
@@ -835,15 +836,28 @@
       }
     }
 
+    function skipHeaders(idx: number, direction: 1 | -1): number {
+      let i = idx;
+      let safety = totalItems;
+      while (safety-- > 0 && resultsListRef?.getVisibleRow(i)?.type === "header") {
+        i = direction === 1
+          ? (i + 1) % totalItems
+          : (i <= 0 ? totalItems - 1 : i - 1);
+      }
+      return i;
+    }
+
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        selectedIndex = (selectedIndex + 1) % totalItems;
+        selectedIndex = skipHeaders((selectedIndex + 1) % totalItems, 1);
         setTimeout(() => resultsListRef?.scrollToSelected(), 0);
         break;
       case "ArrowUp":
         e.preventDefault();
-        selectedIndex = selectedIndex <= 0 ? totalItems - 1 : selectedIndex - 1;
+        selectedIndex = skipHeaders(
+          selectedIndex <= 0 ? totalItems - 1 : selectedIndex - 1, -1
+        );
         setTimeout(() => resultsListRef?.scrollToSelected(), 0);
         break;
       case "Enter":
@@ -863,10 +877,11 @@
         }
 
         if (e.shiftKey) {
-          selectedIndex =
-            selectedIndex <= 0 ? totalItems - 1 : selectedIndex - 1;
+          selectedIndex = skipHeaders(
+            selectedIndex <= 0 ? totalItems - 1 : selectedIndex - 1, -1
+          );
         } else {
-          selectedIndex = (selectedIndex + 1) % totalItems;
+          selectedIndex = skipHeaders((selectedIndex + 1) % totalItems, 1);
         }
 
         setTimeout(() => resultsListRef?.scrollToSelected(), 0);
@@ -906,23 +921,12 @@
       />
     </div>
   {:else if currentMode === "clipboard"}
-    <!-- Clipboard mode: full replace, no launcher behind it -->
     <div
       in:fade={{ duration: 150 }}
-      style="height: 100%; width: 100%; display: grid; grid-template-rows: auto 1fr auto;"
+      style="height: 100%; width: 100%;"
     >
-      <SearchInput
-        bind:this={searchInputRef}
-        bind:query
-        onSearch={(q) => updateClipboardSuggestions(q)}
+      <ClipboardView
         onEscape={handleEscape}
-      />
-      <ResultsList
-        bind:this={resultsListRef}
-        {results}
-        bind:selectedIndex
-        onActivate={handleActivate}
-        on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
       />
     </div>
   {:else if extensionView}
@@ -970,6 +974,7 @@
           {results}
           bind:selectedIndex
           onActivate={handleActivate}
+          flat={query.trim() === "" && currentMode === "launcher"}
           on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
         />
       {/if}

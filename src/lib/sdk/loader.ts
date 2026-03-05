@@ -25,34 +25,54 @@ export function setupHost(sdkComponents?: Record<string, unknown>): void {
 }
 
 /**
- * Loads an extension by injecting its bundle as an inline script.
- * Returns the extension's registration if successful, null otherwise.
- * All loading is wrapped in try/catch to prevent extension crashes from affecting the host.
- * Module scripts run asynchronously, so we wait for the extension to call registerExtension.
+ * Loads an extension by injecting its bundle as a classic inline script.
+ * Classic scripts execute synchronously, so the IIFE registers immediately.
+ * Falls back to a polling loop in case of async registration.
  */
 export async function loadExtension(
   extId: string,
   bundleCode: string,
   options?: { timeoutMs?: number }
 ): Promise<ExtensionRegistration | null> {
+  let scriptError: string | null = null;
+
+  const errorHandler = (ev: ErrorEvent) => {
+    scriptError = ev.message;
+  };
+  window.addEventListener('error', errorHandler);
+
   try {
     const script = document.createElement('script');
-    script.type = 'module';
-    script.textContent = bundleCode;
     script.dataset.vantaExtensionId = extId;
+    script.textContent = bundleCode;
+    script.onerror = () => { scriptError = 'Script failed to load'; };
     document.head.appendChild(script);
+
+    const immediate = registrations.get(extId);
+    if (immediate) return immediate;
+
+    if (scriptError) {
+      console.error(`[Vanta] Extension ${extId} threw during load:`, scriptError);
+      return null;
+    }
 
     const timeoutMs = options?.timeoutMs ?? 5000;
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const reg = registrations.get(extId);
       if (reg) return reg;
+      if (scriptError) {
+        console.error(`[Vanta] Extension ${extId} error:`, scriptError);
+        return null;
+      }
       await new Promise((r) => setTimeout(r, 50));
     }
     return registrations.get(extId) ?? null;
   } catch (err) {
     console.error(`[Vanta] Failed to load extension ${extId}:`, err);
     return null;
+  } finally {
+    window.removeEventListener('error', errorHandler);
   }
 }
 
