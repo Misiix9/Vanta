@@ -29,6 +29,7 @@
   import SpotifyMiniPlayer from "$lib/components/SpotifyMiniPlayer.svelte";
   import FirstRunWizard from "$lib/components/FirstRunWizard.svelte";
   import QuickTipsPanel from "$lib/components/QuickTipsPanel.svelte";
+  import SearchExplainPanel from "$lib/components/SearchExplainPanel.svelte";
 
   let isMiniPlayer = $state(false);
   let query = $state("");
@@ -1071,6 +1072,14 @@
           onActivate={handleActivate}
           on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
         />
+
+        {#if query.trim() !== "" && vantaConfig}
+          <SearchExplainPanel
+            query={query}
+            results={results}
+            searchConfig={vantaConfig.search}
+          />
+        {/if}
       {/if}
 
       <NowPlayingBar />

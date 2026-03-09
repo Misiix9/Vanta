@@ -139,6 +139,36 @@
         debouncedSave();
     }
 
+    function applySearchPreset(preset: "developer" | "creator" | "minimal") {
+        if (preset === "developer") {
+            config.search.applications.weight = 120;
+            config.search.windows.weight = 150;
+            config.search.files.weight = 170;
+            config.search.calculator.weight = 90;
+            config.search.windows.enabled = true;
+            config.search.files.enabled = true;
+            config.search.calculator.enabled = true;
+        } else if (preset === "creator") {
+            config.search.applications.weight = 160;
+            config.search.windows.weight = 120;
+            config.search.files.weight = 95;
+            config.search.calculator.weight = 130;
+            config.search.windows.enabled = true;
+            config.search.files.enabled = true;
+            config.search.calculator.enabled = true;
+        } else {
+            config.search.applications.weight = 180;
+            config.search.windows.weight = 80;
+            config.search.files.weight = 70;
+            config.search.calculator.weight = 100;
+            config.search.windows.enabled = false;
+            config.search.files.enabled = true;
+            config.search.calculator.enabled = true;
+        }
+
+        debouncedSave();
+    }
+
     async function rebuildIndex() {
         rebuilding = true;
         try {
@@ -565,6 +595,11 @@
             </button>
             {#if activeSection === "Search Ranking"}
                 <div class="accordion-content">
+<div class="preset-row">
+                <button class="preset-btn" onclick={() => applySearchPreset("developer")}>Developer</button>
+                <button class="preset-btn" onclick={() => applySearchPreset("creator")}>Creator</button>
+                <button class="preset-btn" onclick={() => applySearchPreset("minimal")}>Minimal</button>
+            </div>
 <div class="control-group">
                 <label>
                     Applications Enabled

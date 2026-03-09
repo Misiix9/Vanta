@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.0
+- Added Search Quality v2 source-weight presets in Settings (`Developer`, `Creator`, `Minimal`) for faster ranking tuning.
+- Added in-app ranking explainability panel that shows why top results rank where they do (source, weight, score, and match metadata).
+- Improved ranking visibility and tuning workflow without breaking existing search configuration compatibility.
+
 ## 2.4.0
 - Introduced Phase 04 semantic design tokens for color roles, typography scales, and spacing rhythm in the default theme.
 - Updated runtime theme application to publish both semantic and legacy CSS variables, preserving compatibility with existing themes.

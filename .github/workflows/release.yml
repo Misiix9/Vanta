@@ -1,4 +1,4 @@
-name: Release Vanta v2.4.0
+name: Release Vanta v2.5.0
 
 on:
   push:
@@ -83,16 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.4.0 -- Visual Design System v1
+            ## Vanta v2.5.0 -- Search Quality v2
 
-            Minor release focused on visual consistency, readability, and theming architecture.
+            Minor release focused on ranking quality, tuning workflows, and search transparency.
 
             ### Highlights
-            - Added semantic design-system tokens for color roles, typography, spacing, and surface hierarchy.
-            - Updated runtime theme mapping to export semantic and legacy CSS variables simultaneously.
-            - Improved visual hierarchy for section headers, result rows, and status metadata.
-            - Refined surface and border usage to improve consistency across launcher and settings.
-            - Includes all onboarding and first-run improvements from v2.3.0.
+            - Added Search Quality v2 presets for source weighting (`Developer`, `Creator`, `Minimal`).
+            - Added a ranking explainability panel that surfaces source, weight, score, and match metadata.
+            - Improved relevance tuning workflow directly from Settings.
+            - Includes all visual design-system improvements from v2.4.0.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

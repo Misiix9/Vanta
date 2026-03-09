@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_2.4.0_amd64.deb
+sudo dpkg -i vanta_2.5.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-2.4.0-1.x86_64.rpm
+sudo rpm -i vanta-2.5.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v2.4.0)
-- Semantic design system tokens for surfaces, text roles, spacing rhythm, and typography scale.
-- Visual hierarchy polish across launcher, section headers, and status rows.
-- Runtime theme bridge now sets both semantic and legacy CSS variables for theme compatibility.
-- Includes all onboarding and first-run improvements from v2.3.0.
+### Latest Minor (v2.5.0)
+- Search Quality v2 presets for source weighting: `Developer`, `Creator`, and `Minimal`.
+- Ranking explainability panel to show why top results are ordered as displayed.
+- Faster tuning loop for relevance without editing raw config by hand.
+- Includes all visual design-system improvements from v2.4.0.
 
 ---
 
