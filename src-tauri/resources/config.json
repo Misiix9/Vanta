@@ -1,4 +1,5 @@
 {
+  "schema_version": 3,
   "general": {
     "hotkey": "Alt+Space",
     "max_results": 8,
@@ -52,6 +53,7 @@
     "windows_max_results": 0
   },
   "workflows": {
+    "schema_version": 1,
     "macros": [
       {
         "id": "open-and-sync",

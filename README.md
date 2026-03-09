@@ -44,6 +44,12 @@ sudo rpm -i vanta-2.12.0-1.x86_64.rpm
 - Added async-safe macro execution path with permission preflight and status updates.
 - Includes all window/workspace intelligence upgrades from v2.11.0.
 
+### Phase 13 (v3.0.0) - Unified Command Contract (In Progress)
+- Added typed result/action contract (`search_v3`, `get_suggestions_v3`) with legacy `exec` fallback.
+- Added versioned extension manifest schema (`schema_version`) and automatic local migration.
+- Added versioned config/workflow schema fields and migration tooling (`run_contract_migration`).
+- Backward compatibility policy: legacy `exec` remains available during the v3 transition window.
+
 ---
 
 ## Features
@@ -99,6 +105,7 @@ Vanta v2.0 replaces the old JSON script system with a full Raycast-style extensi
 {
   "name": "my-extension",
   "title": "My Extension",
+  "schema_version": 1,
   "version": "1.0.0",
   "description": "What this extension does",
   "author": "your-name",
@@ -215,6 +222,13 @@ The v1.x JSON script system (`~/.config/vanta/scripts/`) has been fully removed.
 3. Convert your script logic to a JavaScript handler
 4. Build to `dist/index.js` (or write the IIFE directly)
 
+### v3 Contract Compatibility Policy
+
+- Search APIs: prefer `search_v3` and `get_suggestions_v3`.
+- Result/action execution: use typed `command.kind` when present, otherwise fall back to legacy `exec`.
+- Extension manifests: `schema_version` is required for new manifests; legacy manifests are auto-migrated to current schema on scan.
+- Config/workflows: `schema_version` and `workflows.schema_version` are maintained automatically on load or by running `run_contract_migration`.
+
 ---
 
 ## Settings & Theming
@@ -237,6 +251,7 @@ Configuration lives at `~/.config/vanta/config.json`, created automatically on f
 
 ```json
 {
+  "schema_version": 3,
   "general": {
     "hotkey": "Alt+Space",
     "max_results": 8,
@@ -272,6 +287,10 @@ Configuration lives at `~/.config/vanta/config.json`, created automatically on f
     "allowed_extensions": [],
     "type_filter": "any",
     "indexed_at": null
+  },
+  "workflows": {
+    "schema_version": 1,
+    "macros": []
   }
 }
 ```

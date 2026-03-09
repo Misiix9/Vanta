@@ -223,7 +223,10 @@ pub async fn install_store_extension(name: String) -> Result<(), String> {
     let manifest = validate_downloaded_manifest(&name, &manifest_bytes)
         .map_err(|e| format!("Install blocked by manifest validation: {}", e))?;
 
-    if let Err(e) = fs::write(ext_dir.join("manifest.json"), &manifest_bytes) {
+    let normalized_manifest = serde_json::to_string_pretty(&manifest)
+        .map_err(|e| format!("Failed to serialize normalized manifest: {}", e))?;
+
+    if let Err(e) = fs::write(ext_dir.join("manifest.json"), normalized_manifest) {
         let _ = fs::remove_dir_all(&ext_dir);
         return Err(format!(
             "Failed to write manifest.json: {}. Installation rolled back.",

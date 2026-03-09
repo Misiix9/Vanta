@@ -9,6 +9,15 @@ use tauri::Manager;
 use crate::config;
 use crate::permissions::{self, Capability, Decision};
 
+pub const EXTENSION_SCHEMA_VERSION: u32 = 1;
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ExtensionMigrationReport {
+    pub scanned: usize,
+    pub updated: usize,
+    pub failed: Vec<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum CommandMode {
@@ -31,6 +40,8 @@ pub struct ExtensionCommand {
 pub struct ExtensionManifest {
     pub name: String,
     pub title: String,
+    #[serde(default = "default_extension_schema_version")]
+    pub schema_version: u32,
     #[serde(default = "default_version")]
     pub version: String,
     #[serde(default)]
@@ -46,6 +57,10 @@ pub struct ExtensionManifest {
 
 fn default_version() -> String {
     "0.1.0".to_string()
+}
+
+fn default_extension_schema_version() -> u32 {
+    EXTENSION_SCHEMA_VERSION
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -137,6 +152,10 @@ pub fn scan_extensions() -> Vec<ExtensionEntry> {
             continue;
         }
 
+        if let Err(e) = migrate_manifest_file(&manifest_path) {
+            log::warn!("Manifest migration failed for {}: {}", manifest_path.display(), e);
+        }
+
         let manifest_str = match fs::read_to_string(&manifest_path) {
             Ok(s) => s,
             Err(e) => {
@@ -180,6 +199,73 @@ pub fn scan_extensions() -> Vec<ExtensionEntry> {
     entries.sort_by(|a, b| a.manifest.name.cmp(&b.manifest.name));
     log::info!("Discovered {} extensions", entries.len());
     entries
+}
+
+fn migrate_manifest_file(path: &Path) -> Result<bool, String> {
+    let raw = fs::read_to_string(path)
+        .map_err(|e| format!("failed to read manifest: {}", e))?;
+    let mut value: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|e| format!("failed to parse manifest json: {}", e))?;
+
+    let Some(obj) = value.as_object_mut() else {
+        return Err("manifest root is not an object".to_string());
+    };
+
+    let mut changed = false;
+    match obj.get("schema_version").and_then(|v| v.as_u64()) {
+        Some(v) if v >= EXTENSION_SCHEMA_VERSION as u64 => {}
+        _ => {
+            obj.insert(
+                "schema_version".to_string(),
+                serde_json::json!(EXTENSION_SCHEMA_VERSION),
+            );
+            changed = true;
+        }
+    }
+
+    if changed {
+        let serialized = serde_json::to_string_pretty(&value)
+            .map_err(|e| format!("failed to serialize migrated manifest: {}", e))?;
+        fs::write(path, serialized)
+            .map_err(|e| format!("failed to write migrated manifest: {}", e))?;
+    }
+
+    Ok(changed)
+}
+
+pub fn migrate_extension_manifests() -> ExtensionMigrationReport {
+    let dir = extensions_dir();
+    let mut report = ExtensionMigrationReport {
+        scanned: 0,
+        updated: 0,
+        failed: Vec::new(),
+    };
+
+    let Ok(read_dir) = fs::read_dir(&dir) else {
+        return report;
+    };
+
+    for entry in read_dir.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let manifest_path = path.join("manifest.json");
+        if !manifest_path.exists() {
+            continue;
+        }
+
+        report.scanned += 1;
+        match migrate_manifest_file(&manifest_path) {
+            Ok(true) => report.updated += 1,
+            Ok(false) => {}
+            Err(e) => report
+                .failed
+                .push(format!("{}: {}", manifest_path.display(), e)),
+        }
+    }
+
+    report
 }
 
 pub fn load_extension_bundle(ext_id: &str) -> Result<String, String> {
@@ -466,6 +552,7 @@ mod tests {
         let manifest: ExtensionManifest = serde_json::from_str(json).unwrap();
         assert_eq!(manifest.name, "test-ext");
         assert_eq!(manifest.title, "Test Extension");
+        assert_eq!(manifest.schema_version, 1);
         assert_eq!(manifest.version, "1.0.0");
         assert_eq!(manifest.commands.len(), 2);
         assert_eq!(manifest.commands[0].mode, CommandMode::NoView);
@@ -483,6 +570,7 @@ mod tests {
 
         let manifest: ExtensionManifest = serde_json::from_str(json).unwrap();
         assert_eq!(manifest.name, "minimal");
+        assert_eq!(manifest.schema_version, 1);
         assert_eq!(manifest.version, "0.1.0");
         assert!(manifest.description.is_none());
         assert!(manifest.permissions.is_empty());
@@ -493,6 +581,7 @@ mod tests {
         let manifest = ExtensionManifest {
             name: "".to_string(),
             title: "Test".to_string(),
+            schema_version: 1,
             version: "1.0.0".to_string(),
             description: None,
             author: None,
@@ -514,6 +603,7 @@ mod tests {
         let manifest = ExtensionManifest {
             name: "../escape".to_string(),
             title: "Bad".to_string(),
+            schema_version: 1,
             version: "1.0.0".to_string(),
             description: None,
             author: None,
@@ -535,6 +625,7 @@ mod tests {
         let manifest = ExtensionManifest {
             name: "empty".to_string(),
             title: "Empty".to_string(),
+            schema_version: 1,
             version: "1.0.0".to_string(),
             description: None,
             author: None,
@@ -551,6 +642,7 @@ mod tests {
             manifest: ExtensionManifest {
                 name: "test".to_string(),
                 title: "Test".to_string(),
+                schema_version: 1,
                 version: "1.0.0".to_string(),
                 description: None,
                 author: None,

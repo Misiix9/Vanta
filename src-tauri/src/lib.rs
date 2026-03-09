@@ -164,6 +164,12 @@ struct SearchDiagnostics {
 }
 
 #[derive(Clone, Debug, Serialize)]
+struct ContractMigrationReport {
+    config: config::ConfigMigrationReport,
+    extensions: extensions::ExtensionMigrationReport,
+}
+
+#[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum CommandV1 {
     LaunchApp { exec: String },
@@ -288,7 +294,13 @@ fn exec_to_command(exec: &str, source: &matcher::ResultSource) -> CommandV1 {
         };
     }
 
-    CommandV1::LaunchApp {
+    if matches!(source, matcher::ResultSource::Application) {
+        return CommandV1::LaunchApp {
+            exec: exec.to_string(),
+        };
+    }
+
+    CommandV1::Unknown {
         exec: exec.to_string(),
     }
 }
@@ -1158,6 +1170,41 @@ async fn get_suggestions_v3(
 }
 
 #[tauri::command]
+async fn run_contract_migration(
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<ContractMigrationReport, String> {
+    let config_report = config::migrate_config_on_disk()?;
+    let extension_report = extensions::migrate_extension_manifests();
+
+    let refreshed = config::load_or_create_default();
+    {
+        let mut cfg = state
+            .config
+            .lock()
+            .map_err(|_| "Failed to access config state".to_string())?;
+        *cfg = refreshed.clone();
+    }
+
+    let refreshed_exts = extensions::scan_extensions();
+    {
+        let mut exts = state
+            .extensions_cache
+            .lock()
+            .map_err(|_| "Failed to access extensions cache".to_string())?;
+        *exts = refreshed_exts.clone();
+    }
+
+    let _ = app_handle.emit("config-updated", &refreshed);
+    let _ = app_handle.emit("extensions-changed", &refreshed_exts);
+
+    Ok(ContractMigrationReport {
+        config: config_report,
+        extensions: extension_report,
+    })
+}
+
+#[tauri::command]
 async fn get_search_diagnostics() -> Result<SearchDiagnostics, String> {
     Ok(SearchDiagnostics {
         search: snapshot_perf(&SEARCH_CALLS, &SEARCH_TOTAL_MS, &SEARCH_MAX_MS),
@@ -1692,6 +1739,29 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
 
     let mut vanta_config = config::load_or_create_default();
 
+    if let Ok(report) = config::migrate_config_on_disk() {
+        if report.config_updated {
+            log::info!(
+                "Config contract migrated: schema {} -> {}, workflows {} -> {}",
+                report.schema_from,
+                report.schema_to,
+                report.workflows_schema_from,
+                report.workflows_schema_to,
+            );
+            vanta_config = config::load_or_create_default();
+        }
+    }
+
+    let extension_migration = extensions::migrate_extension_manifests();
+    if extension_migration.updated > 0 || !extension_migration.failed.is_empty() {
+        log::info!(
+            "Extension manifest migration: scanned={} updated={} failed={}",
+            extension_migration.scanned,
+            extension_migration.updated,
+            extension_migration.failed.len()
+        );
+    }
+
     if (vanta_config.window.width - 800.0).abs() < f64::EPSILON
         && (vanta_config.window.height - 600.0).abs() < f64::EPSILON
     {
@@ -1808,6 +1878,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             retry_macro_job,
             get_suggestions,
             get_suggestions_v3,
+            run_contract_migration,
             get_search_diagnostics,
             get_clipboard_history,
             delete_clipboard_item,

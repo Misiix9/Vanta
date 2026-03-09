@@ -5,8 +5,16 @@
   "description": "Check weather for any location with forecasts and saved locations",
   "author": "Vanta Team",
   "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='18' cy='6' r='3'/><path d='M18 1v2'/><path d='M23 6h-2'/><path d='M21 3l-1 1'/><path d='M21 9l-1-1'/><path d='M5 20a3 3 0 0 1 0-6 4.5 4.5 0 0 1 9 0 3 3 0 0 1 0 6z'/></svg>",
-  "permissions": ["Network"],
+  "permissions": [
+    "Network"
+  ],
   "commands": [
-    {"name": "current", "title": "Weather", "subtitle": "View current weather and forecast", "mode": "view"}
-  ]
+    {
+      "name": "current",
+      "title": "Weather",
+      "subtitle": "View current weather and forecast",
+      "mode": "view"
+    }
+  ],
+  "schema_version": 1
 }

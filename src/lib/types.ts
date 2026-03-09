@@ -93,6 +93,7 @@ export interface WorkflowMacro {
 }
 
 export interface WorkflowsConfig {
+    schema_version?: number;
     macros?: WorkflowMacro[];
 }
 
@@ -143,6 +144,7 @@ export interface MacroJobRecord {
 }
 
 export interface VantaConfig {
+    schema_version?: number;
     general: GeneralConfig;
     appearance: AppearanceConfig;
     window: WindowConfig;

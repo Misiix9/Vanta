@@ -7,10 +7,23 @@ use crate::permissions::Capability;
 
 // Embedded default config for fallback writes.
 const DEFAULT_CONFIG_JSON: &str = include_str!("../resources/config.json");
+pub const CONFIG_SCHEMA_VERSION: u32 = 3;
+pub const WORKFLOWS_SCHEMA_VERSION: u32 = 1;
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ConfigMigrationReport {
+    pub config_updated: bool,
+    pub schema_from: u32,
+    pub schema_to: u32,
+    pub workflows_schema_from: u32,
+    pub workflows_schema_to: u32,
+}
 
 //
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct VantaConfig {
+    #[serde(default = "default_config_schema_version")]
+    pub schema_version: u32,
     pub general: GeneralConfig,
     pub appearance: AppearanceConfig,
     pub window: WindowConfig,
@@ -268,13 +281,24 @@ impl Default for ExtensionsConfig {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct WorkflowsConfig {
+    #[serde(default = "default_workflows_schema_version")]
+    pub schema_version: u32,
     #[serde(default)]
     pub macros: Vec<WorkflowMacro>,
+}
+
+fn default_config_schema_version() -> u32 {
+    CONFIG_SCHEMA_VERSION
+}
+
+fn default_workflows_schema_version() -> u32 {
+    WORKFLOWS_SCHEMA_VERSION
 }
 
 impl Default for WorkflowsConfig {
     fn default() -> Self {
         Self {
+            schema_version: default_workflows_schema_version(),
             macros: default_workflow_macros(),
         }
     }
@@ -368,6 +392,7 @@ pub enum MacroStep {
 impl Default for VantaConfig {
     fn default() -> Self {
         Self {
+            schema_version: default_config_schema_version(),
             general: GeneralConfig {
                 hotkey: "Alt+Space".to_string(),
                 max_results: 8,
@@ -438,6 +463,14 @@ pub fn load_or_create_default() -> VantaConfig {
                     log::info!("Loaded config from {}", path.display());
                     // Clamp window bounds eagerly and persist if adjusted.
                     let mut changed = false;
+                    if config.schema_version < CONFIG_SCHEMA_VERSION {
+                        config.schema_version = CONFIG_SCHEMA_VERSION;
+                        changed = true;
+                    }
+                    if config.workflows.schema_version < WORKFLOWS_SCHEMA_VERSION {
+                        config.workflows.schema_version = WORKFLOWS_SCHEMA_VERSION;
+                        changed = true;
+                    }
                     if clamp_window_size(&mut config.window) {
                         changed = true;
                     }
@@ -479,6 +512,55 @@ pub fn load_or_create_default() -> VantaConfig {
     }
 
     rewrite_default_config()
+}
+
+pub fn migrate_config_on_disk() -> Result<ConfigMigrationReport, String> {
+    let path = config_path();
+    if !path.exists() {
+        return Ok(ConfigMigrationReport {
+            config_updated: false,
+            schema_from: CONFIG_SCHEMA_VERSION,
+            schema_to: CONFIG_SCHEMA_VERSION,
+            workflows_schema_from: WORKFLOWS_SCHEMA_VERSION,
+            workflows_schema_to: WORKFLOWS_SCHEMA_VERSION,
+        });
+    }
+
+    let raw = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read config for migration: {}", e))?;
+    let mut cfg: VantaConfig = serde_json::from_str(&raw)
+        .map_err(|e| format!("Failed to parse config for migration: {}", e))?;
+
+    let from = cfg.schema_version;
+    let wf_from = cfg.workflows.schema_version;
+    let mut changed = false;
+
+    if cfg.schema_version < CONFIG_SCHEMA_VERSION {
+        cfg.schema_version = CONFIG_SCHEMA_VERSION;
+        changed = true;
+    }
+    if cfg.workflows.schema_version < WORKFLOWS_SCHEMA_VERSION {
+        cfg.workflows.schema_version = WORKFLOWS_SCHEMA_VERSION;
+        changed = true;
+    }
+    if clamp_window_size(&mut cfg.window) {
+        changed = true;
+    }
+    if clamp_accessibility(&mut cfg.accessibility) {
+        changed = true;
+    }
+
+    if changed {
+        write_config(&cfg)?;
+    }
+
+    Ok(ConfigMigrationReport {
+        config_updated: changed,
+        schema_from: from,
+        schema_to: cfg.schema_version,
+        workflows_schema_from: wf_from,
+        workflows_schema_to: cfg.workflows.schema_version,
+    })
 }
 
 impl VantaConfig {
@@ -599,9 +681,11 @@ mod tests {
         #[test]
         fn accessibility_defaults_and_legacy_backcompat() {
                 let cfg = VantaConfig::default();
+                assert_eq!(cfg.schema_version, CONFIG_SCHEMA_VERSION);
                 assert!(!cfg.accessibility.reduced_motion);
                 assert_eq!(cfg.accessibility.text_scale, 1.0);
                 assert_eq!(cfg.accessibility.spacing_preset, "comfortable");
+                assert_eq!(cfg.workflows.schema_version, WORKFLOWS_SCHEMA_VERSION);
 
                 // Legacy payload without accessibility should still deserialize.
                 let legacy = r##"{
@@ -642,9 +726,11 @@ mod tests {
                 }"##;
 
                 let parsed: VantaConfig = serde_json::from_str(legacy).expect("legacy config parse");
+                assert_eq!(parsed.schema_version, CONFIG_SCHEMA_VERSION);
                 assert!(!parsed.accessibility.reduced_motion);
                 assert_eq!(parsed.accessibility.text_scale, 1.0);
                 assert_eq!(parsed.accessibility.spacing_preset, "comfortable");
+                assert_eq!(parsed.workflows.schema_version, WORKFLOWS_SCHEMA_VERSION);
         }
 
         #[test]
@@ -693,6 +779,7 @@ mod tests {
     #[test]
     fn workflows_macro_round_trip() {
         let cfg = WorkflowsConfig {
+            schema_version: WORKFLOWS_SCHEMA_VERSION,
             macros: vec![WorkflowMacro {
                 id: "open-and-sync".to_string(),
                 name: "Open and Sync".to_string(),
@@ -731,6 +818,7 @@ mod tests {
         let serialized = serde_json::to_string(&cfg).expect("serialize workflows config");
         let parsed: WorkflowsConfig = serde_json::from_str(&serialized).expect("deserialize workflows config");
 
+        assert_eq!(parsed.schema_version, WORKFLOWS_SCHEMA_VERSION);
         assert_eq!(parsed.macros.len(), 1);
         let macro_def = &parsed.macros[0];
         assert!(macro_def.enabled);
