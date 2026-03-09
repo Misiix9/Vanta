@@ -20,7 +20,7 @@
     font-size: 12px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--text-secondary);
+    color: var(--ds-text-secondary);
     background: linear-gradient(90deg, rgba(123, 53, 240, 0.08), rgba(255, 255, 255, 0.02));
     border-bottom: 1px solid var(--border-separator);
     border-top: 1px solid rgba(255, 255, 255, 0.02);
@@ -41,7 +41,7 @@
 
 .group-header.selected {
     background: linear-gradient(90deg, rgba(123, 53, 240, 0.16), rgba(255, 255, 255, 0.04));
-    color: var(--text-primary);
+    color: var(--ds-text-primary);
     border-color: var(--vanta-border, rgba(123, 53, 240, 0.2));
 }
 
@@ -49,7 +49,7 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    font-weight: 500;
+    font-weight: 520;
     letter-spacing: 0.12em;
 }
 
@@ -71,7 +71,7 @@
     border-radius: 999px;
     border: 1px solid var(--border-separator, rgba(255, 255, 255, 0.08));
     font-size: 11px;
-    color: var(--text-primary);
+    color: var(--ds-text-primary);
     background: var(--purple-ghost, rgba(123, 53, 240, 0.12));
     box-shadow: 0 0 0 1px rgba(123, 53, 240, 0.05) inset;
     font-weight: 600;
@@ -212,10 +212,35 @@ kbd {
     /* Palette */
     --bg: #000000;
     --surface: #0c0c0c;
-    --surface-hover: rgba(123, 53, 240, 0.07);
-    --text-primary: #ebebeb;
-    --text-secondary: #555555;
-    --text-tertiary: #3a3a3a;
+    --surface-hover: rgba(123, 53, 240, 0.10);
+    --text-primary: #ececf7;
+    --text-secondary: #9a9cb3;
+    --text-tertiary: #6f7188;
+
+    /* Semantic design-system tokens (Phase 04) */
+    --ds-surface-0: var(--bg);
+    --ds-surface-1: var(--surface);
+    --ds-surface-2: #141420;
+    --ds-accent: #7b35f0;
+    --ds-accent-glow: rgba(123, 53, 240, 0.30);
+    --ds-text-primary: var(--text-primary);
+    --ds-text-secondary: var(--text-secondary);
+    --ds-border: rgba(149, 118, 206, 0.30);
+
+    /* Typography */
+    --font-ui: 'SN Pro', 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    --type-display: 26px;
+    --type-title: 14px;
+    --type-body: 12.5px;
+    --type-caption: 11px;
+
+    /* Spacing rhythm */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
 
     /* Purple System */
     --purple: #7B35F0;
@@ -225,13 +250,13 @@ kbd {
     --purple-ghost: rgba(123, 53, 240, 0.06);
 
     /* Borders */
-    --border-window: rgba(123, 53, 240, 0.20);
+    --border-window: var(--ds-border);
     --border-separator: rgba(255, 255, 255, 0.05);
 
     /* Legacy aliases for settings/misc components */
     --vanta-bg: #000000;
-    --vanta-text: #ebebeb;
-    --vanta-text-dim: #555555;
+    --vanta-text: var(--text-primary);
+    --vanta-text-dim: var(--text-secondary);
     --vanta-accent: #7B35F0;
     --vanta-purple: #7B35F0;
     --vanta-purple-bright: #9B5FF8;
@@ -266,8 +291,8 @@ body {
     height: 100%;
     overflow: hidden;
     background: transparent;
-    font-family: 'SN Pro', 'Inter', system-ui, sans-serif;
-    color: var(--text-primary);
+    font-family: var(--font-ui);
+    color: var(--ds-text-primary);
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
 }
@@ -336,7 +361,7 @@ a:hover {
     display: grid;
     grid-template-rows: auto 1fr auto;
     overflow: hidden;
-    background: var(--bg);
+    background: var(--ds-surface-0);
     border-radius: var(--radius);
     border: 1px solid var(--border-window);
     position: relative;
@@ -397,7 +422,7 @@ a:hover {
     display: flex;
     flex-direction: column;
     position: relative;
-    background: var(--bg);
+    background: var(--ds-surface-0);
     border-radius: var(--radius);
     overflow: hidden;
 }
@@ -442,7 +467,7 @@ a:hover {
     justify-content: flex-start;
     gap: 12px;
     /* Minimal padding so input spans edge to edge */
-    padding: 5px 0px 10px 0px;
+    padding: var(--space-1) 0 var(--space-3) 0;
     /* Single hairline separator from results */
     border: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -465,8 +490,8 @@ a:hover {
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
-    font-family: 'SN Pro', 'Inter', system-ui, sans-serif;
-    font-size: 28px !important;
+    font-family: var(--font-ui);
+    font-size: var(--type-display) !important;
     font-weight: 700 !important;
     letter-spacing: -0.3px;
     color: var(--text-primary);
@@ -553,12 +578,12 @@ a:hover {
 }
 
 .results-container {
-    padding: 6px 6px;
+    padding: var(--space-1) var(--space-1);
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: var(--space-1);
     scroll-behavior: smooth;
     flex: 1;
     height: 100%;
@@ -700,7 +725,7 @@ a:hover {
 }
 
 .item-title {
-    font-size: 14px;
+    font-size: var(--type-title);
     font-weight: 500;
     letter-spacing: -0.1px;
     color: var(--text-primary);
@@ -715,7 +740,7 @@ a:hover {
 }
 
 .item-subtitle {
-    font-size: 11.5px;
+    font-size: var(--type-body);
     font-weight: 400;
     color: var(--text-secondary);
     white-space: nowrap;
@@ -942,7 +967,7 @@ a:hover {
     padding: 0px 14px;
     height: 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.04);
-    font-size: 11px;
+    font-size: var(--type-caption);
     position: relative;
     z-index: 1;
 }
@@ -992,7 +1017,7 @@ a:hover {
 }
 
 .status-info {
-    color: var(--text-secondary);
+    color: var(--ds-text-secondary);
     opacity: 0.5;
     font-size: 11px;
     font-weight: 400;
@@ -1030,7 +1055,7 @@ a:hover {
     position: absolute;
     inset: 0;
     z-index: 50;
-    background: var(--bg);
+    background: var(--ds-surface-0);
     border-radius: var(--radius);
     padding: 20px 24px;
     height: 100%;

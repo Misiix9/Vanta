@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_2.3.0_amd64.deb
+sudo dpkg -i vanta_2.4.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-2.3.0-1.x86_64.rpm
+sudo rpm -i vanta-2.4.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v2.3.0)
-- First-run onboarding wizard with guided command discovery and setup.
-- Personalized onboarding controls for hotkey, theme selection, and file-search defaults.
-- Quick tips command chips in idle launcher view for faster feature discovery.
-- Includes all reliability improvements from v2.2.2.
+### Latest Minor (v2.4.0)
+- Semantic design system tokens for surfaces, text roles, spacing rhythm, and typography scale.
+- Visual hierarchy polish across launcher, section headers, and status rows.
+- Runtime theme bridge now sets both semantic and legacy CSS variables for theme compatibility.
+- Includes all onboarding and first-run improvements from v2.3.0.
 
 ---
 

@@ -1,4 +1,4 @@
-name: Release Vanta v2.3.0
+name: Release Vanta v2.4.0
 
 on:
   push:
@@ -83,17 +83,16 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.3.0 -- First-Run And Onboarding UX
+            ## Vanta v2.4.0 -- Visual Design System v1
 
-            Minor release focused on first-run activation and discoverability.
+            Minor release focused on visual consistency, readability, and theming architecture.
 
             ### Highlights
-            - Added a first-run onboarding wizard with guided setup for common commands and launcher behavior.
-            - Added quick-start command chips and onboarding shortcuts for faster initial success.
-            - Added onboarding personalization for hotkey, theme, and file-search defaults.
-            - Added guided permission explanations for extension/script capabilities.
-            - Added idle quick tips panel for ongoing command discovery.
-            - Includes all reliability improvements from v2.2.2.
+            - Added semantic design-system tokens for color roles, typography, spacing, and surface hierarchy.
+            - Updated runtime theme mapping to export semantic and legacy CSS variables simultaneously.
+            - Improved visual hierarchy for section headers, result rows, and status metadata.
+            - Refined surface and border usage to improve consistency across launcher and settings.
+            - Includes all onboarding and first-run improvements from v2.3.0.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

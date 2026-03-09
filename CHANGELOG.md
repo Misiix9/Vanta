@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.0
+- Introduced Phase 04 semantic design tokens for color roles, typography scales, and spacing rhythm in the default theme.
+- Updated runtime theme application to publish both semantic and legacy CSS variables, preserving compatibility with existing themes.
+- Improved visual hierarchy across launcher surfaces by aligning section labels, item typography, and status text to the new token system.
+- Refined surface and border role usage to improve consistency across launcher and settings views.
+
 ## 2.3.0
 - Added a first-run onboarding wizard with guided setup for quick-start commands, hotkey/theme personalization, file-search defaults, and permission guidance.
 - Added an idle quick tips panel with seeded command chips to help new users discover launcher capabilities faster.
