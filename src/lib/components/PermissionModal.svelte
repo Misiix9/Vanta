@@ -58,10 +58,11 @@
       event.preventDefault();
     }
 
-    // Hard-block: do not close on Escape
+    // Escape maps to deny, which is the safest default action.
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
+      if (!busy) onDeny();
     }
   }
 </script>
@@ -107,7 +108,7 @@
       <button class="btn danger" onclick={onDeny} disabled={busy}>Deny</button>
     </div>
 
-    <p class="footnote">Hard block: you must choose. Close/escape are disabled until you decide.</p>
+    <p class="footnote">Press Esc to deny quickly, or choose an explicit permission action.</p>
   </div>
 </div>
 

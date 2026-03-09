@@ -233,7 +233,9 @@
             console.error("Failed to fetch history", e);
           }
           await invoke("show_window");
-          setTimeout(() => searchInputRef?.focus?.(), 50);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => searchInputRef?.focus?.());
+          });
         }),
       );
     } catch (e) {
@@ -983,7 +985,6 @@
           {results}
           bind:selectedIndex
           onActivate={handleActivate}
-          flat={query.trim() === "" && currentMode === "launcher"}
           on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
         />
       {/if}

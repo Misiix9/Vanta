@@ -29,14 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_2.2.0_amd64.deb
+sudo dpkg -i vanta_2.2.1_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-2.2.0-1.x86_64.rpm
+sudo rpm -i vanta-2.2.1-1.x86_64.rpm
 ```
+
+### Latest Patch (v2.2.1)
+- Hidden empty result sections: only sections with matches are shown.
+- Improved release icon rendering consistency (no black fallback for inline SVG icons).
+- Better extension/store error recovery UX with clearer feedback and retry paths.
+- Clipboard focus timing and permission modal interaction polish.
 
 ---
 

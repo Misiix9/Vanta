@@ -1,4 +1,4 @@
-name: Release Vanta v2.2.0
+name: Release Vanta v2.2.1
 
 on:
   push:
@@ -83,58 +83,24 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.2.0 -- Raycast-Style Extensions, Vanta Store, Auto-Refresh & 10 Extensions
+            ## Vanta v2.2.1 -- Stability Baseline Lock
 
-            This is a major release that replaces the old JSON script system with a full Raycast-style extension engine, introduces the Vanta Store, and ships 10 polished default extensions.
+            Patch release focused on reliability and UX consistency.
 
-            ---
+            ### Fixes
+            - Launcher now hides sections with zero matches and preserves stable section ordering for active results.
+            - Improved selection/index clamping to prevent navigation jumps when result sets change.
+            - Inline SVG icon rendering is now release-safe, preventing black fallback icons in packaged builds.
+            - Section header styling refined for clearer visual hierarchy and non-interactive behavior.
+            - Store UX now surfaces install/uninstall success and failure messages directly in the UI.
+            - Extension host error state now includes a retry action for faster recovery.
+            - Permission modal now supports `Esc` as a safe deny shortcut.
+            - Clipboard mode focus timing improved for more reliable keyboard readiness.
 
-            ### Raycast-Style Extension Engine (v2.0)
-
-            - **Complete architecture overhaul**: Removed the old JSON script system entirely. Extensions now use TypeScript/Svelte IIFE bundles loaded dynamically at runtime.
-            - **Multi-command extensions**: Each extension can declare multiple commands with `no-view` (handler + toast) or `view` (custom UI screen) modes.
-            - **Extension SDK**: Full API available to extensions -- `navigation.push/pop`, `clipboard.copy`, `toast`, `network.fetch`, `shell.execute`, `storage.get/set`.
-            - **Pre-built UI components**: `ExtList`, `ExtForm`, `ExtGrid`, `ExtDetail`, `ExtActionPanel` Svelte components available via `window.__vanta_sdk`.
-            - **Permission system**: Extensions declare required capabilities (`Network`, `Shell`, `Filesystem`) and users are prompted before granting access.
-
-            ### Vanta Store (v2.1)
-
-            - **Built-in extension marketplace**: Search "store" or "install" in the launcher to browse available extensions.
-            - **One-click install/uninstall**: Extensions are downloaded from [vanta-extensions](https://github.com/Misiix9/vanta-extensions) and installed to `~/.config/vanta/extensions/`.
-            - **Live install status**: The store UI updates immediately when extensions are added or removed.
-
-            ### Auto-Refresh (v2.2)
-
-            - **Settings changes apply instantly**: Clicking "Done" flushes any pending config save and reloads the launcher immediately.
-            - **Live extension cache sync**: The file watcher updates `AppState.extensions_cache` in memory, so newly installed extensions appear in search results without restarting.
-            - **Smart reload on apps-changed**: Desktop entry changes trigger a search refresh even when there's an active query.
-
-            ### 10 Default Extensions
-
-            All extensions use custom SVG icons, `--vanta-*` CSS variables with fallbacks, and unique class prefixes to prevent style collisions.
-
-            | Extension | Description |
-            | --- | --- |
-            | **Weather** | Current conditions and 3-day forecast via Open-Meteo. City search, saved locations. |
-            | **Smart Calculator** | Shunting-yard math evaluator (no `eval`), unit conversions, calculation history. |
-            | **Color Picker** | HEX/RGB/HSL display, complementary colors, click-to-copy, recent colors. |
-            | **Process Manager** | Real-time process table with CPU/RAM %, sortable columns, kill/force-kill. |
-            | **Network Test** | Local/public IP, DNS servers, gateway, ping test. |
-            | **Timer** | Preset and custom countdown timers with progress bar and toast notification. |
-            | **System Info** | OS, CPU, RAM, disk usage with animated usage bars. |
-            | **Spotify** | 2-step OAuth wizard, now playing with seekable progress bar, playback controls, search. |
-            | **Clipboard Tools** | 14 text transforms: case conversion, URL/Base64 encode/decode, JSON prettify/minify. |
-            | **Password Generator** | Length 8-128, character set options, strength meter with entropy estimate. |
-
-            ### Bug Fixes
-
-            - Fixed store registry parsing to accept both plain JSON array and wrapped format.
-            - Fixed StoreView to render inline SVG icons instead of attempting PNG downloads.
-            - Fixed all CSS variables in StoreView to use `--vanta-*` with proper fallbacks.
-            - Fixed `watch_extensions` to update `AppState.extensions_cache` so new extensions appear in search immediately.
+            ### Packaging
+            - Deb and RPM bundles are published for this release.
 
             ### Known Issues
-
-            - AppImage bundling is temporarily disabled due to linuxdeploy strip failures on RELR ELF sections.
+            - AppImage bundling remains disabled due to linuxdeploy strip failures on RELR ELF sections.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

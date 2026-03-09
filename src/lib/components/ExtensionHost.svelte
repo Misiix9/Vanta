@@ -187,7 +187,10 @@
     <div class="ext-error">
       <i class="fa-solid fa-triangle-exclamation"></i>
       <p>{error}</p>
-      <button onclick={() => onClose?.()}>Close</button>
+      <div class="ext-error-actions">
+        <button onclick={initExtension}>Retry</button>
+        <button onclick={() => onClose?.()}>Close</button>
+      </div>
     </div>
   {:else}
     <div class="ext-header">

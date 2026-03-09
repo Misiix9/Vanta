@@ -1,17 +1,19 @@
 # Changelog
 
-<<<<<<< Updated upstream
+## 2.2.1
+- Search results now hide sections that have `0` matches; only populated sections are shown.
+- Launcher section headers remain always open and non-interactive, with improved selection stability.
+- Inline SVG icons now use sanitized markup with `currentColor`-based theming so release builds no longer fall back to black icons.
+- Theme updates in `default.css`: thinner section header labels, white extension icons, and light-gray back/refresh/control icons.
+- Clipboard mode focus behavior is now frame-synchronized for more reliable keyboard readiness.
+- Permission modal UX now supports `Esc` as a safe deny shortcut.
+- Store extension actions now show install/uninstall success and failure notices.
+- Extension host error UI now includes a retry action.
+
 ## 1.16.0
 - Workflow macros beta: define multi-step macros with variables, optional step prompts, dry-run previews, and per-macro enable toggles.
 - Launcher UI for macros: shows macro search results with script details, status bar prompts, and argument editing before run.
 - Default workflow sample macro shipped for easier onboarding and testing.
-=======
-## 1.18.0
-- Launcher sections are always visible with static headers; no expand/collapse, all items shown per section.
-- Section headers stay selectable without jumping back to Apps when navigating.
-- Rust backend tests (`cargo test`) pass.
-- Known issue: AppImage bundling via linuxdeploy fails to strip RELR ELF sections; `deb`/`rpm` builds not yet verified in this run.
->>>>>>> Stashed changes
 
 ## 1.14.0
 - Window Switcher v2: grouped per app/class with recency ordering and focus/close actions.

@@ -21,7 +21,7 @@
 
     let loadFailed = $state(false);
     let iconUrl = $derived(result.icon ? convertFileSrc(result.icon) : "");
-    let safeInlineSvgUrl = $derived(svgToDataUri(result.icon));
+    let safeInlineSvgMarkup = $derived(sanitizeInlineSvg(result.icon));
 
     /**
      * Highlight matching characters in the title based on match_indices.
@@ -59,16 +59,36 @@
         loadFailed = true;
     }
 
-    function isTrustedInlineSvg(icon: string | null | undefined): boolean {
-        if (!icon) return false;
-        const trimmed = icon.trim().toLowerCase();
-        return (
-            trimmed.startsWith("<svg") &&
-            !trimmed.includes("<script") &&
-            !trimmed.includes("onload=") &&
-            !trimmed.includes("onerror=") &&
-            !trimmed.includes("javascript:")
-        );
+    function sanitizeInlineSvg(icon: string | null | undefined): string {
+        if (!icon) return "";
+
+        const trimmed = icon.trim();
+        if (!trimmed.toLowerCase().startsWith("<svg")) return "";
+
+        // Remove risky tags/attributes and force color inheritance for release-safe theming.
+        let cleaned = trimmed
+            .replace(/<script[\s\S]*?<\/script>/gi, "")
+            .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "")
+            .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+            .replace(/javascript:/gi, "")
+            .replace(/\s(fill|stroke)\s*=\s*("([^"]*)"|'([^']*)')/gi, (_m, attr, _quoted, dq, sq) => {
+                const value = (dq ?? sq ?? "").trim().toLowerCase();
+                if (value === "none" || value === "currentcolor") {
+                    return ` ${attr}="${value}"`;
+                }
+                return ` ${attr}="currentColor"`;
+            });
+
+        if (!cleaned.toLowerCase().includes("<svg")) return "";
+
+        if (!/\sviewBox=/i.test(cleaned)) {
+            cleaned = cleaned.replace(
+                /<svg/i,
+                '<svg viewBox="0 0 24 24"',
+            );
+        }
+
+        return cleaned;
     }
 
     function isFontAwesome(icon: string | null | undefined): boolean {
@@ -76,11 +96,9 @@
         return icon.includes("fa-");
     }
 
-    function svgToDataUri(icon: string | null | undefined): string {
-        if (!isTrustedInlineSvg(icon)) return "";
-        const themed = icon!.trim().replace(/currentColor/g, '#ebebeb');
-        return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(themed)}`;
-    }
+    let isExtensionResult = $derived(
+        typeof result.source === "object" && "Extension" in result.source,
+    );
 
     function primaryActionLabel(): string {
         if (typeof result.source === "object" && "Extension" in result.source) {
@@ -120,8 +138,14 @@
             <span class="icon-emoji">⚡</span>
         {:else if isFontAwesome(result.icon)}
             <i class="{result.icon} icon-fa"></i>
-        {:else if safeInlineSvgUrl}
-            <img src={safeInlineSvgUrl} alt={result.title} class="icon-img" />
+        {:else if safeInlineSvgMarkup}
+            <span
+                class="icon-svg"
+                class:extension-svg={isExtensionResult}
+                aria-label={result.title}
+            >
+                {@html safeInlineSvgMarkup}
+            </span>
         {:else if result.icon && (result.icon === "dir" || result.icon.startsWith("file"))}
             <FileIcon type={result.icon} />
         {:else if result.icon && !loadFailed}
