@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.10.0
+- Added first-class accessibility settings with reduced-motion toggle, text-scale control, and spacing presets.
+- Added accessibility preset shortcuts in Settings (`Focus`, `Readability`, `Balanced`) for faster setup.
+- Added backend config compatibility for legacy configs with safe clamping of accessibility values.
+- Improved keyboard accessibility visibility with stronger global `:focus-visible` treatment and reduced-motion-safe transitions.
+
 ## 2.9.0
 - Added Vanta Store discoverability metadata support for categories, ratings, install counts, trust badges, and changelog previews.
 - Added category filtering and richer store cards with permission risk labels (`Low`/`Medium`/`High`) for clearer install decisions.

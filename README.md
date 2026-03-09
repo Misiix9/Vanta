@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_2.9.0_amd64.deb
+sudo dpkg -i vanta_2.10.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-2.9.0-1.x86_64.rpm
+sudo rpm -i vanta-2.10.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v2.9.0)
-- Store now surfaces categories, trust badges, risk labels, install counts, ratings, and latest changelog snippets.
-- Added category filter chips for faster extension discovery.
-- Store installs now perform stronger manifest validation and show actionable error messages on failure.
-- Added rollback safeguards to prevent partially installed extensions when download/write steps fail.
+### Latest Minor (v2.10.0)
+- Accessibility panel now includes reduced-motion, text-scale, and spacing controls.
+- Added one-click accessibility presets (`Focus`, `Readability`, `Balanced`) for keyboard-first workflows.
+- Improved focus-ring visibility across controls and tightened motion safety when reduced-motion is enabled.
+- Includes all store discoverability and install-trust upgrades from v2.9.0.
 
 ---
 

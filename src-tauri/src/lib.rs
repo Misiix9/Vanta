@@ -31,7 +31,7 @@ use extensions::ExtensionEntry;
 use permissions::Capability;
 use workflows::{MacroDryRunResult, MacroRunResult};
 use windows::{list_windows_grouped, WindowGroup};
-use config::clamp_window_size;
+use config::{clamp_accessibility, clamp_window_size};
 
 use files::FileIndex;
 use tokio::time::sleep;
@@ -492,6 +492,7 @@ async fn save_config(
     let new_files_config = new_config.files.clone();
 
     let _ = clamp_window_size(&mut new_config.window);
+    let _ = clamp_accessibility(&mut new_config.accessibility);
 
     {
         let mut config = state

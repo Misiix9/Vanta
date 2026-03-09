@@ -3,6 +3,7 @@ import type { VantaConfig, VantaColors, AppearanceConfig } from "./types";
 // Applies theme CSS variables to :root.
 export function applyTheme(config: VantaConfig): void {
     const { colors, blur_radius, opacity, border_radius } = config.appearance;
+    const { reduced_motion, text_scale, spacing_preset } = config.accessibility;
     const root = document.documentElement;
 
     // Legacy color variables
@@ -35,4 +36,17 @@ export function applyTheme(config: VantaConfig): void {
     root.style.setProperty("--vanta-blur", `${blur_radius}px`);
     root.style.setProperty("--vanta-opacity", `${opacity}`);
     root.style.setProperty("--vanta-radius", `${border_radius}px`);
+
+    const clampedTextScale = Math.max(0.85, Math.min(1.4, text_scale || 1));
+    root.style.setProperty("--vanta-text-scale", `${clampedTextScale}`);
+
+    const spacingScale =
+        spacing_preset === "compact"
+            ? 0.88
+            : spacing_preset === "relaxed"
+              ? 1.16
+              : 1;
+    root.style.setProperty("--vanta-space-scale", `${spacingScale}`);
+    root.style.setProperty("--vanta-motion-scale", reduced_motion ? "0" : "1");
+    root.dataset.reducedMotion = reduced_motion ? "true" : "false";
 }

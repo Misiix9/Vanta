@@ -90,6 +90,7 @@
   let onboardingOpen = $state(false);
   let quickTipsVisible = $state(false);
   let pendingConfirmResult = $state<SearchResult | null>(null);
+  let fadeDuration = $derived(vantaConfig?.accessibility?.reduced_motion ? 0 : 150);
 
   function scheduleScrollToSelected() {
     if (pendingScrollFrame !== null) return;
@@ -1066,14 +1067,14 @@
 >
   {#if view === "store"}
     <div
-      in:fade={{ duration: 150 }}
+      in:fade={{ duration: fadeDuration }}
       style="height: 100%; width: 100%; position: relative;"
     >
       <StoreView onClose={() => (view = "launcher")} />
     </div>
   {:else if view === "settings" && vantaConfig}
     <div
-      in:fade={{ duration: 150 }}
+      in:fade={{ duration: fadeDuration }}
       style="height: 100%; width: 100%; position: relative;"
     >
       <SettingsView
@@ -1084,7 +1085,7 @@
     </div>
   {:else if currentMode === "clipboard"}
     <div
-      in:fade={{ duration: 150 }}
+      in:fade={{ duration: fadeDuration }}
       style="height: 100%; width: 100%;"
     >
       <ClipboardView
@@ -1093,7 +1094,7 @@
     </div>
   {:else if extensionView}
     <div
-      in:fade={{ duration: 150 }}
+      in:fade={{ duration: fadeDuration }}
       style="height: 100%; width: 100%;"
     >
       <ExtensionHost
@@ -1106,7 +1107,7 @@
     </div>
   {:else}
     <div
-      in:fade={{ duration: 150 }}
+      in:fade={{ duration: fadeDuration }}
       style="height: 100%; width: 100%; display: grid; grid-template-rows: auto 1fr auto;"
     >
       <SearchInput

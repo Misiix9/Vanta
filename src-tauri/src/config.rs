@@ -15,6 +15,8 @@ pub struct VantaConfig {
     pub appearance: AppearanceConfig,
     pub window: WindowConfig,
     #[serde(default)]
+    pub accessibility: AccessibilityConfig,
+    #[serde(default)]
     pub extensions: ExtensionsConfig,
     #[serde(default)]
     pub files: FilesConfig,
@@ -147,6 +149,51 @@ pub struct GeneralConfig {
 pub struct WindowConfig {
     pub width: f64,
     pub height: f64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AccessibilityConfig {
+    #[serde(default)]
+    pub reduced_motion: bool,
+    #[serde(default = "default_text_scale")]
+    pub text_scale: f64,
+    #[serde(default = "default_spacing_preset")]
+    pub spacing_preset: String,
+}
+
+fn default_text_scale() -> f64 {
+    1.0
+}
+
+fn default_spacing_preset() -> String {
+    "comfortable".to_string()
+}
+
+impl Default for AccessibilityConfig {
+    fn default() -> Self {
+        Self {
+            reduced_motion: false,
+            text_scale: default_text_scale(),
+            spacing_preset: default_spacing_preset(),
+        }
+    }
+}
+
+pub fn clamp_accessibility(cfg: &mut AccessibilityConfig) -> bool {
+    let mut changed = false;
+
+    let clamped = cfg.text_scale.clamp(0.85, 1.4);
+    if (clamped - cfg.text_scale).abs() > f64::EPSILON {
+        cfg.text_scale = clamped;
+        changed = true;
+    }
+
+    if !matches!(cfg.spacing_preset.as_str(), "compact" | "comfortable" | "relaxed") {
+        cfg.spacing_preset = "comfortable".to_string();
+        changed = true;
+    }
+
+    changed
 }
 
 /// Clamp window dimensions to reasonable bounds to avoid oversized popups.
@@ -330,6 +377,7 @@ impl Default for VantaConfig {
                 width: 680.0,
                 height: 420.0,
             },
+            accessibility: AccessibilityConfig::default(),
             appearance: AppearanceConfig {
                 blur_radius: 40,
                 opacity: 0.85,
@@ -389,7 +437,14 @@ pub fn load_or_create_default() -> VantaConfig {
                 Ok(mut config) => {
                     log::info!("Loaded config from {}", path.display());
                     // Clamp window bounds eagerly and persist if adjusted.
+                    let mut changed = false;
                     if clamp_window_size(&mut config.window) {
+                        changed = true;
+                    }
+                    if clamp_accessibility(&mut config.accessibility) {
+                        changed = true;
+                    }
+                    if changed {
                         let _ = write_config(&config);
                     }
                     println!(
@@ -451,6 +506,7 @@ fn rewrite_default_config() -> VantaConfig {
 
     // Clamp before writing defaults.
     let _ = clamp_window_size(&mut default_config.window);
+    let _ = clamp_accessibility(&mut default_config.accessibility);
 
     // First try normal serialization+write.
     if let Err(write_err) = write_config(&default_config) {
@@ -539,6 +595,70 @@ pub fn watch_config(app_handle: tauri::AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+        #[test]
+        fn accessibility_defaults_and_legacy_backcompat() {
+                let cfg = VantaConfig::default();
+                assert!(!cfg.accessibility.reduced_motion);
+                assert_eq!(cfg.accessibility.text_scale, 1.0);
+                assert_eq!(cfg.accessibility.spacing_preset, "comfortable");
+
+                // Legacy payload without accessibility should still deserialize.
+                let legacy = r##"{
+                        "general": {"hotkey":"Alt+Space","max_results":8,"launch_on_login":false},
+                        "appearance": {
+                            "blur_radius":40,
+                            "opacity":0.85,
+                            "border_radius":24,
+                            "theme":"default",
+                            "colors": {
+                                "background":"#000000","surface":"#0A0A0A","accent":"#FFFFFF",
+                                "accent_glow":"rgba(255, 255, 255, 0.25)","text_primary":"#F5F5F5",
+                                "text_secondary":"#888888","border":"rgba(255, 255, 255, 0.08)"
+                            }
+                        },
+                        "window": {"width":680.0,"height":420.0},
+                        "extensions": {"directory":"~/.config/vanta/extensions","dev_mode":false},
+                        "files": {
+                            "include_hidden":false,
+                            "max_depth":3,
+                            "file_manager":"default",
+                            "file_editor":"default",
+                            "open_docs_in_manager":false,
+                            "include_globs":[],
+                            "exclude_globs":[],
+                            "allowed_extensions":[],
+                            "type_filter":"any",
+                            "indexed_at":null
+                        },
+                        "search": {
+                            "applications": {"enabled":true,"weight":100},
+                            "windows": {"enabled":true,"weight":100},
+                            "calculator": {"enabled":true,"weight":100},
+                            "files": {"enabled":true,"weight":100},
+                            "windows_max_results":0
+                        },
+                        "workflows": {"macros":[]}
+                }"##;
+
+                let parsed: VantaConfig = serde_json::from_str(legacy).expect("legacy config parse");
+                assert!(!parsed.accessibility.reduced_motion);
+                assert_eq!(parsed.accessibility.text_scale, 1.0);
+                assert_eq!(parsed.accessibility.spacing_preset, "comfortable");
+        }
+
+        #[test]
+        fn accessibility_clamp_enforces_safe_ranges() {
+                let mut cfg = AccessibilityConfig {
+                        reduced_motion: false,
+                        text_scale: 2.4,
+                        spacing_preset: "unknown".to_string(),
+                };
+
+                assert!(clamp_accessibility(&mut cfg));
+                assert_eq!(cfg.text_scale, 1.4);
+                assert_eq!(cfg.spacing_preset, "comfortable");
+        }
 
     #[test]
     fn files_config_defaults_and_serde_round_trip() {

@@ -1,4 +1,4 @@
-name: Release Vanta v2.9.0
+name: Release Vanta v2.10.0
 
 on:
   push:
@@ -83,15 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.9.0 -- Store Discoverability And Trust
+            ## Vanta v2.10.0 -- Accessibility Completion
 
-            Minor release focused on safer extension installs and stronger store discoverability.
+            Minor release focused on keyboard-first readability and motion-safe interactions.
 
             ### Highlights
-            - Added store metadata support for categories, ratings, install counts, trust badges, and changelog previews.
-            - Added category filters and permission risk labels for clearer install decisions.
-            - Added stricter install-time manifest validation with actionable errors.
-            - Added rollback safeguards to prevent partial extension installs.
+            - Added accessibility controls for reduced motion, text scale, and spacing presets.
+            - Added quick accessibility presets (`Focus`, `Readability`, `Balanced`).
+            - Improved focus-visible styling for clearer keyboard navigation cues.
+            - Added safe backend clamping/defaulting for accessibility config compatibility.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

@@ -40,6 +40,12 @@ export interface WindowConfig {
     height: number;
 }
 
+export interface AccessibilityConfig {
+    reduced_motion: boolean;
+    text_scale: number;
+    spacing_preset: "compact" | "comfortable" | "relaxed" | string;
+}
+
 export interface FilesConfig {
     include_hidden: boolean;
     max_depth: number;
@@ -125,6 +131,7 @@ export interface VantaConfig {
     general: GeneralConfig;
     appearance: AppearanceConfig;
     window: WindowConfig;
+    accessibility: AccessibilityConfig;
     extensions: ExtensionsConfig;
     files: FilesConfig;
     search: SearchConfig;

@@ -224,6 +224,29 @@
         debouncedSave();
     }
 
+    function applyAccessibilityPreset(preset: "focus" | "readability" | "balanced") {
+        if (preset === "focus") {
+            config.accessibility.reduced_motion = true;
+            config.accessibility.text_scale = 1.05;
+            config.accessibility.spacing_preset = "compact";
+        } else if (preset === "readability") {
+            config.accessibility.reduced_motion = true;
+            config.accessibility.text_scale = 1.2;
+            config.accessibility.spacing_preset = "relaxed";
+        } else {
+            config.accessibility.reduced_motion = false;
+            config.accessibility.text_scale = 1.0;
+            config.accessibility.spacing_preset = "comfortable";
+        }
+
+        debouncedSave();
+    }
+
+    function onTextScaleChange(value: number) {
+        config.accessibility.text_scale = Math.max(0.85, Math.min(1.4, value));
+        debouncedSave();
+    }
+
     function exportThemeProfile() {
         const payload = {
             version: 1,
@@ -602,6 +625,68 @@
                     />
                 </label>
             </div>
+                </div>
+            {/if}
+        </div>
+
+        <!-- Accessibility Section -->
+        <div class="accordion-item" class:active={activeSection === "Accessibility"}>
+            <button
+                class="accordion-header"
+                type="button"
+                onclick={() => toggleSection("Accessibility")}
+                aria-expanded={activeSection === "Accessibility"}
+            >
+                <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <h3>Accessibility</h3>
+            </button>
+            {#if activeSection === "Accessibility"}
+                <div class="accordion-content">
+                    <div class="preset-row">
+                        <button class="preset-btn" onclick={() => applyAccessibilityPreset("focus")}>Focus</button>
+                        <button class="preset-btn" onclick={() => applyAccessibilityPreset("readability")}>Readability</button>
+                        <button class="preset-btn" onclick={() => applyAccessibilityPreset("balanced")}>Balanced</button>
+                    </div>
+
+                    <div class="control-group">
+                        <label>
+                            Reduced Motion
+                            <input
+                                type="checkbox"
+                                bind:checked={config.accessibility.reduced_motion}
+                                onchange={debouncedSave}
+                            />
+                        </label>
+                    </div>
+
+                    <div class="control-group">
+                        <label>
+                            Text Scale ({config.accessibility.text_scale.toFixed(2)}x)
+                            <input
+                                type="range"
+                                min="0.85"
+                                max="1.40"
+                                step="0.05"
+                                value={config.accessibility.text_scale}
+                                oninput={(e) => onTextScaleChange(Number((e.target as HTMLInputElement).value))}
+                            />
+                        </label>
+                    </div>
+
+                    <div class="control-group">
+                        <label>
+                            Spacing Preset
+                            <select
+                                class="vanta-select"
+                                bind:value={config.accessibility.spacing_preset}
+                                onchange={debouncedSave}
+                            >
+                                <option value="compact">Compact</option>
+                                <option value="comfortable">Comfortable</option>
+                                <option value="relaxed">Relaxed</option>
+                            </select>
+                        </label>
+                    </div>
                 </div>
             {/if}
         </div>

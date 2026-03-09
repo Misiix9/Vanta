@@ -23,6 +23,11 @@
     "width": 680.0,
     "height": 420.0
   },
+  "accessibility": {
+    "reduced_motion": false,
+    "text_scale": 1.0,
+    "spacing_preset": "comfortable"
+  },
   "extensions": {
     "directory": "~/.config/vanta/extensions",
     "dev_mode": false
