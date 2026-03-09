@@ -13,6 +13,7 @@ pub struct WindowEntry {
     pub class: String,
     pub address: String, // "address" in Hyprland, "id" in Sway (as string for uniformity)
     pub workspace: String,
+    pub backend: String,
     pub last_active: u64,
 }
 
@@ -80,6 +81,7 @@ fn list_windows_uncached(recency: &RecencyStore) -> Vec<WindowEntry> {
                     class: c.class,
                     address: addr.clone(),
                     workspace: c.workspace.name,
+                    backend: "hyprland".to_string(),
                     last_active: recency.stamp(&addr),
                 }
             })
@@ -132,6 +134,7 @@ fn list_windows_uncached(recency: &RecencyStore) -> Vec<WindowEntry> {
                         class,
                         address: address.clone(),
                         workspace: ws.to_string(),
+                        backend: "x11".to_string(),
                         last_active: recency.stamp(&address),
                     });
                 }
@@ -353,6 +356,7 @@ mod tests {
                 class: "AppA".into(),
                 address: "1".into(),
                 workspace: "1".into(),
+                backend: "hyprland".into(),
                 last_active: now - 10,
             },
             WindowEntry {
@@ -360,6 +364,7 @@ mod tests {
                 class: "AppA".into(),
                 address: "2".into(),
                 workspace: "1".into(),
+                backend: "hyprland".into(),
                 last_active: now - 5,
             },
             WindowEntry {
@@ -367,6 +372,7 @@ mod tests {
                 class: "AppB".into(),
                 address: "3".into(),
                 workspace: "2".into(),
+                backend: "sway".into(),
                 last_active: now - 2,
             },
         ];
@@ -387,6 +393,7 @@ mod tests {
                 class: "AppA".into(),
                 address: "1".into(),
                 workspace: "1".into(),
+                backend: "hyprland".into(),
                 last_active: now - 1,
             },
             WindowEntry {
@@ -394,6 +401,7 @@ mod tests {
                 class: "AppA".into(),
                 address: "2".into(),
                 workspace: "1".into(),
+                backend: "hyprland".into(),
                 last_active: now - 2,
             },
             WindowEntry {
@@ -401,6 +409,7 @@ mod tests {
                 class: "AppB".into(),
                 address: "3".into(),
                 workspace: "2".into(),
+                backend: "sway".into(),
                 last_active: now - 3,
             },
         ];
@@ -506,6 +515,7 @@ fn collect_sway_windows(
                 class: app_id,
                 address: address.clone(), // Sway uses distinct integer IDs
                 workspace: ws,
+                backend: "sway".to_string(),
                 last_active: recency.stamp(&address),
             });
         }

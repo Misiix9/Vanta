@@ -181,6 +181,23 @@ fn build_window_results<F>(
 where
     F: Fn(usize) -> Vec<WindowGroup>,
 {
+    fn backend_label(backend: &str) -> &str {
+        match backend {
+            "hyprland" => "Hyprland",
+            "sway" => "Sway",
+            "x11" => "X11",
+            _ => "Unknown",
+        }
+    }
+
+    fn supports_minimize(backend: &str) -> bool {
+        matches!(backend, "sway" | "x11")
+    }
+
+    fn supports_workspace_move(backend: &str) -> bool {
+        backend == "sway"
+    }
+
     let mut window_groups = provider(window_cap);
 
     if !query_lower.is_empty() {
@@ -251,15 +268,40 @@ where
 
             let icon = matched_app.and_then(|a| a.icon.clone());
 
-            let actions = vec![matcher::ActionHint {
+            let mut actions = vec![matcher::ActionHint {
                 label: "Close".to_string(),
                 exec: format!("close-window:{}", win.address),
                 shortcut: Some("Alt+Enter".to_string()),
             }];
 
+            if supports_minimize(&win.backend) {
+                actions.push(matcher::ActionHint {
+                    label: "Minimize".to_string(),
+                    exec: format!("minimize-window:{}", win.address),
+                    shortcut: Some("Ctrl+M".to_string()),
+                });
+            }
+
+            if supports_workspace_move(&win.backend) {
+                actions.push(matcher::ActionHint {
+                    label: "Move To Current WS".to_string(),
+                    exec: format!("move-window-current:{}", win.address),
+                    shortcut: Some("Ctrl+Shift+M".to_string()),
+                });
+            }
+
+            let mut subtitle = format!(
+                "Workspace {} • {}",
+                win.workspace,
+                backend_label(&win.backend)
+            );
+            if !supports_minimize(&win.backend) && !supports_workspace_move(&win.backend) {
+                subtitle.push_str(" • Limited actions");
+            }
+
             results.push(SearchResult {
                 title: win.title,
-                subtitle: Some(format!("Workspace {}", win.workspace)),
+                subtitle: Some(subtitle),
                 icon,
                 exec: format!("focus:{}", win.address),
                 score: weighted_score(950_000, weight),
@@ -395,6 +437,7 @@ mod window_search_tests {
             class: class.to_string(),
             address: addr.to_string(),
             workspace: workspace.to_string(),
+            backend: "sway".to_string(),
             last_active,
         }
     }
@@ -461,7 +504,7 @@ mod window_search_tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title, "Terminal");
-        assert_eq!(results[0].subtitle.as_deref(), Some("Workspace 1"));
+        assert_eq!(results[0].subtitle.as_deref(), Some("Workspace 1 • Sway"));
         assert_eq!(results[0].group.as_deref(), Some("Alpha"));
 
         let actions = results[0]
@@ -470,6 +513,8 @@ mod window_search_tests {
             .expect("window result should expose actions");
         assert_eq!(actions[0].label, "Close");
         assert_eq!(actions[0].exec, "close-window:a1");
+        assert_eq!(actions[1].label, "Minimize");
+        assert_eq!(actions[2].label, "Move To Current WS");
     }
 }
 

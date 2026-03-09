@@ -994,6 +994,24 @@
           return;
         }
       }
+
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "m") {
+        const action = findAction("move-window-current:");
+        if (action) {
+          e.preventDefault();
+          handleActivate({ ...activeResult, exec: action.exec });
+          return;
+        }
+      }
+
+      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "m") {
+        const action = findAction("minimize-window:");
+        if (action) {
+          e.preventDefault();
+          handleActivate({ ...activeResult, exec: action.exec });
+          return;
+        }
+      }
     }
 
     function skipHeaders(idx: number, direction: 1 | -1): number {

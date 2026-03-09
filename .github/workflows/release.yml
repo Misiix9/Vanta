@@ -1,4 +1,4 @@
-name: Release Vanta v2.10.0
+name: Release Vanta v2.11.0
 
 on:
   push:
@@ -83,15 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.10.0 -- Accessibility Completion
+            ## Vanta v2.11.0 -- Window And Workspace Intelligence
 
-            Minor release focused on keyboard-first readability and motion-safe interactions.
+            Minor release focused on compositor-aware window actions and workspace workflows.
 
             ### Highlights
-            - Added accessibility controls for reduced motion, text scale, and spacing presets.
-            - Added quick accessibility presets (`Focus`, `Readability`, `Balanced`).
-            - Improved focus-visible styling for clearer keyboard navigation cues.
-            - Added safe backend clamping/defaulting for accessibility config compatibility.
+            - Added backend-aware window action hints with graceful capability degradation.
+            - Added move-to-current-workspace quick action where compositor support exists.
+            - Added minimize support for Sway/X11 and X11 close fallback.
+            - Improved window switcher context with workspace + backend subtitles.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

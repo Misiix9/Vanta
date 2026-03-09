@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.11.0
+- Added compositor-aware window action model in launcher results with explicit backend context (`Hyprland`, `Sway`, `X11`).
+- Added workspace-aware quick action to move windows to the current workspace on supported compositors.
+- Added minimize action support for Sway and X11, plus X11 window-close fallback.
+- Improved graceful degradation by showing limited-action context when compositor capabilities are restricted.
+
 ## 2.10.0
 - Added first-class accessibility settings with reduced-motion toggle, text-scale control, and spacing presets.
 - Added accessibility preset shortcuts in Settings (`Focus`, `Readability`, `Balanced`) for faster setup.

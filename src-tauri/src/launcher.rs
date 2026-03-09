@@ -47,6 +47,10 @@ pub fn launch(exec: &str, _app_handle: Option<&tauri::AppHandle>) -> Result<(), 
         return minimize_window(exec.trim_start_matches("minimize-window:"));
     }
 
+    if exec.starts_with("move-window-current:") {
+        return move_window_to_current_workspace(exec.trim_start_matches("move-window-current:"));
+    }
+
     let cleaned = strip_field_codes(exec);
 
     if cleaned.is_empty() {
@@ -198,6 +202,12 @@ fn close_window(address: &str) -> Result<(), String> {
         ok = true;
     }
 
+    if let Err(e) = spawn_cmd("wmctrl", &["-i".into(), "-c".into(), address.to_string()]) {
+        log::warn!("X11 close failed: {}", e);
+    } else {
+        ok = true;
+    }
+
     if ok {
         Ok(())
     } else {
@@ -206,9 +216,56 @@ fn close_window(address: &str) -> Result<(), String> {
 }
 
 fn minimize_window(address: &str) -> Result<(), String> {
-    // Minimize is compositor-specific; not reliably supported on Hyprland/Sway.
-    let _ = address; // unused
-    Err("Minimize not supported on this compositor".to_string())
+    let mut ok = false;
+
+    // Sway equivalent for minimizing/hiding the container.
+    if let Err(e) = spawn_cmd("swaymsg", &[format!("[con_id={}] move scratchpad", address)]) {
+        log::warn!("Sway minimize failed: {}", e);
+    } else {
+        ok = true;
+    }
+
+    // X11 fallback.
+    if let Err(e) = spawn_cmd(
+        "wmctrl",
+        &[
+            "-i".into(),
+            "-r".into(),
+            address.to_string(),
+            "-b".into(),
+            "add,hidden".into(),
+        ],
+    ) {
+        log::warn!("X11 minimize failed: {}", e);
+    } else {
+        ok = true;
+    }
+
+    if ok {
+        Ok(())
+    } else {
+        Err("Minimize not supported on this compositor".to_string())
+    }
+}
+
+fn move_window_to_current_workspace(address: &str) -> Result<(), String> {
+    let mut ok = false;
+
+    // Sway supports moving focused/target container to the active workspace.
+    if let Err(e) = spawn_cmd(
+        "swaymsg",
+        &[format!("[con_id={}] move container to workspace current", address)],
+    ) {
+        log::warn!("Sway workspace move failed: {}", e);
+    } else {
+        ok = true;
+    }
+
+    if ok {
+        Ok(())
+    } else {
+        Err("Move-to-workspace is not supported on this compositor".to_string())
+    }
 }
 
 /// Launches a terminal emulator and runs the provided shell command.
@@ -299,6 +356,7 @@ mod tests {
         // With test stub, commands won't spawn; ensure routing surfaces as Ok
         assert!(launch("focus:abc", None).is_ok());
         assert!(launch("close-window:abc", None).is_ok());
-        assert!(launch("minimize-window:abc", None).is_err());
+        assert!(launch("minimize-window:abc", None).is_ok());
+        assert!(launch("move-window-current:abc", None).is_ok());
     }
 }
