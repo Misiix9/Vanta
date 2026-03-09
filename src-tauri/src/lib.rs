@@ -163,10 +163,164 @@ struct SearchDiagnostics {
     launch: PerfStats,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum CommandV1 {
+    LaunchApp { exec: String },
+    OpenFile { path: String },
+    OpenSettings,
+    OpenStore,
+    CopyText { value: String },
+    CopyPath { value: String },
+    RevealPath { path: String },
+    OpenWithEditor { path: String },
+    FocusWindow { id: String },
+    CloseWindow { id: String },
+    MinimizeWindow { id: String },
+    MoveWindowCurrentWorkspace { id: String },
+    SystemAction { action: String },
+    MacroOpen { id: String },
+    ExtensionView { ext_id: String, command: String },
+    ExtensionAction { ext_id: String, command: String },
+    QueryFill { value: String },
+    Unknown { exec: String },
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct ResultActionV3 {
+    label: String,
+    shortcut: Option<String>,
+    command: CommandV1,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct SearchResultV3 {
+    title: String,
+    subtitle: Option<String>,
+    icon: Option<String>,
+    score: u32,
+    match_indices: Vec<u32>,
+    source: matcher::ResultSource,
+    id: Option<String>,
+    group: Option<String>,
+    section: Option<String>,
+    version: u8,
+    command: CommandV1,
+    actions: Option<Vec<ResultActionV3>>,
+    // Keep legacy compatibility during v3 migration.
+    exec: String,
+}
+
 fn weighted_score(base: u32, weight: u32) -> u32 {
     let clamped = weight.clamp(10, 300);
     let scaled = (base as u128 * clamped as u128) / 100;
     scaled.min(u32::MAX as u128) as u32
+}
+
+fn exec_to_command(exec: &str, source: &matcher::ResultSource) -> CommandV1 {
+    if let Some(v) = exec.strip_prefix("system-action:") {
+        return CommandV1::SystemAction {
+            action: v.to_string(),
+        };
+    }
+    if exec == "open-settings" {
+        return CommandV1::OpenSettings;
+    }
+    if exec == "open-store" {
+        return CommandV1::OpenStore;
+    }
+    if let Some(v) = exec.strip_prefix("copy:") {
+        return CommandV1::CopyText {
+            value: v.to_string(),
+        };
+    }
+    if let Some(v) = exec.strip_prefix("copy-path:") {
+        return CommandV1::CopyPath {
+            value: v.to_string(),
+        };
+    }
+    if let Some(v) = exec.strip_prefix("reveal:") {
+        return CommandV1::RevealPath {
+            path: v.to_string(),
+        };
+    }
+    if let Some(v) = exec.strip_prefix("open-with:") {
+        return CommandV1::OpenWithEditor {
+            path: v.to_string(),
+        };
+    }
+    if let Some(v) = exec.strip_prefix("focus:") {
+        return CommandV1::FocusWindow { id: v.to_string() };
+    }
+    if let Some(v) = exec.strip_prefix("close-window:") {
+        return CommandV1::CloseWindow { id: v.to_string() };
+    }
+    if let Some(v) = exec.strip_prefix("minimize-window:") {
+        return CommandV1::MinimizeWindow { id: v.to_string() };
+    }
+    if let Some(v) = exec.strip_prefix("move-window-current:") {
+        return CommandV1::MoveWindowCurrentWorkspace { id: v.to_string() };
+    }
+    if let Some(v) = exec.strip_prefix("fill:") {
+        return CommandV1::QueryFill {
+            value: v.to_string(),
+        };
+    }
+    if let Some(v) = exec.strip_prefix("macro:") {
+        return CommandV1::MacroOpen { id: v.to_string() };
+    }
+    if let Some(v) = exec.strip_prefix("ext-view:") {
+        let mut parts = v.splitn(2, ':');
+        let ext_id = parts.next().unwrap_or_default().to_string();
+        let command = parts.next().unwrap_or_default().to_string();
+        return CommandV1::ExtensionView { ext_id, command };
+    }
+    if let Some(v) = exec.strip_prefix("ext-no-view:") {
+        let mut parts = v.splitn(2, ':');
+        let ext_id = parts.next().unwrap_or_default().to_string();
+        let command = parts.next().unwrap_or_default().to_string();
+        return CommandV1::ExtensionAction { ext_id, command };
+    }
+
+    if matches!(source, matcher::ResultSource::File) {
+        return CommandV1::OpenFile {
+            path: exec.to_string(),
+        };
+    }
+
+    CommandV1::LaunchApp {
+        exec: exec.to_string(),
+    }
+}
+
+fn to_v3_result(src: matcher::SearchResult) -> SearchResultV3 {
+    let command = exec_to_command(&src.exec, &src.source);
+    let actions = src.actions.as_ref().map(|items| {
+        items
+            .iter()
+            .map(|a| ResultActionV3 {
+                label: a.label.clone(),
+                shortcut: a.shortcut.clone(),
+                command: exec_to_command(&a.exec, &src.source),
+            })
+            .collect::<Vec<_>>()
+    });
+
+    SearchResultV3 {
+        title: src.title,
+        subtitle: src.subtitle,
+        icon: src.icon,
+        score: src.score,
+        match_indices: src.match_indices,
+        source: src.source,
+        id: src.id,
+        group: src.group,
+        section: src.section,
+        version: 1,
+        command,
+        actions,
+        exec: src.exec,
+    }
 }
 
 fn snapshot_perf(calls: &AtomicU64, total_ms: &AtomicU64, max_ms: &AtomicU64) -> PerfStats {
@@ -807,6 +961,15 @@ async fn search(
 }
 
 #[tauri::command]
+async fn search_v3(
+    query: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<SearchResultV3>, String> {
+    let legacy = search(query, state).await?;
+    Ok(legacy.into_iter().map(to_v3_result).collect())
+}
+
+#[tauri::command]
 async fn launch_app(
     exec: String,
     state: tauri::State<'_, AppState>,
@@ -984,6 +1147,14 @@ async fn get_suggestions(
         &SUGGEST_MAX_MS,
     );
     Ok(results)
+}
+
+#[tauri::command]
+async fn get_suggestions_v3(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<SearchResultV3>, String> {
+    let legacy = get_suggestions(state).await?;
+    Ok(legacy.into_iter().map(to_v3_result).collect())
 }
 
 #[tauri::command]
@@ -1612,6 +1783,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             get_config,
             save_config,
             search,
+            search_v3,
             launch_app,
             system_action,
             rescan_apps,
@@ -1635,6 +1807,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             cancel_macro_job,
             retry_macro_job,
             get_suggestions,
+            get_suggestions_v3,
             get_search_diagnostics,
             get_clipboard_history,
             delete_clipboard_item,

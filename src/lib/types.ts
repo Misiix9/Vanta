@@ -168,9 +168,30 @@ export interface SearchDiagnostics {
 
 export interface ResultAction {
     label: string;
-    exec: string;
+    exec?: string;
     shortcut?: string;
+    command?: CommandContract;
 }
+
+export type CommandContract =
+    | { kind: "launch_app"; exec: string }
+    | { kind: "open_file"; path: string }
+    | { kind: "open_settings" }
+    | { kind: "open_store" }
+    | { kind: "copy_text"; value: string }
+    | { kind: "copy_path"; value: string }
+    | { kind: "reveal_path"; path: string }
+    | { kind: "open_with_editor"; path: string }
+    | { kind: "focus_window"; id: string }
+    | { kind: "close_window"; id: string }
+    | { kind: "minimize_window"; id: string }
+    | { kind: "move_window_current_workspace"; id: string }
+    | { kind: "system_action"; action: string }
+    | { kind: "macro_open"; id: string }
+    | { kind: "extension_view"; ext_id: string; command: string }
+    | { kind: "extension_action"; ext_id: string; command: string }
+    | { kind: "query_fill"; value: string }
+    | { kind: "unknown"; exec: string };
 
 export interface SearchResult {
     title: string;
@@ -184,6 +205,8 @@ export interface SearchResult {
     actions?: ResultAction[];
     group?: string;
     section?: string;
+    version?: number;
+    command?: CommandContract;
 }
 
 export type ResultSource =

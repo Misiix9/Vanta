@@ -7,6 +7,7 @@
   import type {
     VantaConfig,
     SearchResult,
+    CommandContract,
     BlurStatus,
     ThemeMeta,
     Capability,
@@ -485,6 +486,94 @@
     return null;
   }
 
+  function commandToExec(command: CommandContract): string {
+    switch (command.kind) {
+      case "launch_app":
+        return command.exec;
+      case "open_file":
+        return command.path;
+      case "open_settings":
+        return "open-settings";
+      case "open_store":
+        return "open-store";
+      case "copy_text":
+        return `copy:${command.value}`;
+      case "copy_path":
+        return `copy-path:${command.value}`;
+      case "reveal_path":
+        return `reveal:${command.path}`;
+      case "open_with_editor":
+        return `open-with:${command.path}`;
+      case "focus_window":
+        return `focus:${command.id}`;
+      case "close_window":
+        return `close-window:${command.id}`;
+      case "minimize_window":
+        return `minimize-window:${command.id}`;
+      case "move_window_current_workspace":
+        return `move-window-current:${command.id}`;
+      case "system_action":
+        return `system-action:${command.action}`;
+      case "macro_open":
+        return `macro:${command.id}`;
+      case "extension_view":
+        return `ext-view:${command.ext_id}:${command.command}`;
+      case "extension_action":
+        return `ext-no-view:${command.ext_id}:${command.command}`;
+      case "query_fill":
+        return `fill:${command.value}`;
+      case "unknown":
+        return command.exec;
+    }
+  }
+
+  function inferCommandFromResult(result: SearchResult): CommandContract {
+    const exec = result.exec;
+    if (exec.startsWith("system-action:")) {
+      return { kind: "system_action", action: exec.slice(14) };
+    }
+    if (exec === "open-settings") return { kind: "open_settings" };
+    if (exec === "open-store") return { kind: "open_store" };
+    if (exec.startsWith("copy:")) return { kind: "copy_text", value: exec.slice(5) };
+    if (exec.startsWith("copy-path:")) return { kind: "copy_path", value: exec.slice(10) };
+    if (exec.startsWith("reveal:")) return { kind: "reveal_path", path: exec.slice(7) };
+    if (exec.startsWith("open-with:")) {
+      return { kind: "open_with_editor", path: exec.slice(10) };
+    }
+    if (exec.startsWith("focus:")) return { kind: "focus_window", id: exec.slice(6) };
+    if (exec.startsWith("close-window:")) {
+      return { kind: "close_window", id: exec.slice(13) };
+    }
+    if (exec.startsWith("minimize-window:")) {
+      return { kind: "minimize_window", id: exec.slice(16) };
+    }
+    if (exec.startsWith("move-window-current:")) {
+      return { kind: "move_window_current_workspace", id: exec.slice(20) };
+    }
+    if (exec.startsWith("fill:")) return { kind: "query_fill", value: exec.slice(5) };
+    if (exec.startsWith("macro:")) return { kind: "macro_open", id: exec.slice(6) };
+    if (exec.startsWith("ext-view:")) {
+      const [ext_id, ...rest] = exec.slice(9).split(":");
+      return { kind: "extension_view", ext_id, command: rest.join(":") };
+    }
+    if (exec.startsWith("ext-no-view:")) {
+      const [ext_id, ...rest] = exec.slice(12).split(":");
+      return { kind: "extension_action", ext_id, command: rest.join(":") };
+    }
+    if (result.source === "File") return { kind: "open_file", path: exec };
+    return { kind: "launch_app", exec };
+  }
+
+  function commandForResult(result: SearchResult): CommandContract {
+    return result.command ?? inferCommandFromResult(result);
+  }
+
+  function execForAction(result: SearchResult, action: { exec?: string; command?: CommandContract }): string {
+    if (action.exec) return action.exec;
+    if (action.command) return commandToExec(action.command);
+    return result.exec;
+  }
+
   function handlePermissionError(err: unknown) {
     const parsed = parsePermissionError(err);
     if (!parsed) return false;
@@ -636,12 +725,12 @@
   async function loadSuggestions() {
     const requestId = ++searchRequestId;
     try {
-      const suggestions = await invoke<SearchResult[]>("get_suggestions");
+      const suggestions = await invoke<SearchResult[]>("get_suggestions_v3");
       if (requestId !== searchRequestId) return;
       console.info("suggestions", suggestions?.length ?? 0);
       if (suggestions.length === 0) {
         // Fallback to a real search to avoid blank UI if suggestions fail.
-        const searchFallback = await invoke<SearchResult[]>("search", { query: "" });
+        const searchFallback = await invoke<SearchResult[]>("search_v3", { query: "" });
         if (requestId !== searchRequestId) return;
         baseResults = searchFallback;
       } else {
@@ -657,7 +746,7 @@
       console.error("Failed to load suggestions:", e);
       // Fallback to empty search results to keep UI populated
       try {
-        const searchFallback = await invoke<SearchResult[]>("search", { query: "" });
+        const searchFallback = await invoke<SearchResult[]>("search_v3", { query: "" });
         if (requestId === searchRequestId) {
           baseResults = searchFallback;
           results = composeResults(baseResults, "");
@@ -688,7 +777,7 @@
 
     try {
       const start = performance.now();
-      const searchResults = await invoke<SearchResult[]>("search", {
+      const searchResults = await invoke<SearchResult[]>("search_v3", {
         query: q,
       });
       if (requestId !== searchRequestId) return;
@@ -763,7 +852,8 @@
   }
 
   function getConfirmSpec(result: SearchResult): { title: string; description: string; confirmLabel: string } | null {
-    if (result.exec.startsWith("close-window:")) {
+    const command = commandForResult(result);
+    if (command.kind === "close_window") {
       return {
         title: "Close Window?",
         description: `This will close \"${result.title}\" immediately.`,
@@ -771,9 +861,9 @@
       };
     }
 
-    if (!result.exec.startsWith("system-action:")) return null;
+    if (command.kind !== "system_action") return null;
 
-    const action = result.exec.slice(14);
+    const action = command.action;
     if (action === "shutdown") {
       return {
         title: "Shut Down System?",
@@ -830,8 +920,9 @@
     if (actionInFlight) return;
     actionInFlight = true;
     try {
-      if (result.exec.startsWith("macro:")) {
-        const id = result.exec.slice(6);
+      const command = commandForResult(result);
+      if (command.kind === "macro_open") {
+        const id = command.id;
         const macro = availableMacros.find((m) => m.id === id);
         if (macro) {
           activeMacroId = id;
@@ -843,29 +934,27 @@
         }
         return;
       }
-      if (result.exec.startsWith("ext-view:")) {
-        const parts = result.exec.slice(9).split(":");
-        const extId = parts[0];
-        const cmd = parts.slice(1).join(":");
+      if (command.kind === "extension_view") {
+        const extId = command.ext_id;
+        const cmd = command.command;
         const ext = availableExtensions.find((e) => e.manifest.name === extId);
         extensionView = { extId, command: cmd, extPath: ext?.path ?? "" };
         return;
-      } else if (result.exec.startsWith("ext-no-view:")) {
-        const parts = result.exec.slice(12).split(":");
-        const extId = parts[0];
-        const cmd = parts.slice(1).join(":");
+      } else if (command.kind === "extension_action") {
+        const extId = command.ext_id;
+        const cmd = command.command;
         const ext = availableExtensions.find((e) => e.manifest.name === extId);
         extensionView = { extId, command: cmd, extPath: ext?.path ?? "" };
         return;
-      } else if (result.exec.startsWith("fill:")) {
-        query = result.exec.slice(5);
+      } else if (command.kind === "query_fill") {
+        query = command.value;
         await handleSearch(query);
         requestAnimationFrame(() => {
           requestAnimationFrame(() => searchInputRef?.focus?.());
         });
         return;
-      } else if (result.exec.startsWith("system-action:")) {
-        const action = result.exec.slice(14);
+      } else if (command.kind === "system_action") {
+        const action = command.action;
         try {
           await invoke("system_action", { action });
           resetAndHide();
@@ -873,33 +962,33 @@
           console.error("System action failed", e);
         }
         return;
-      } else if (result.exec === "open-settings") {
+      } else if (command.kind === "open_settings") {
         view = "settings";
         return;
-      } else if (result.exec === "open-store") {
+      } else if (command.kind === "open_store") {
         view = "store";
         return;
-      } else if (result.exec.startsWith("copy-path:")) {
-        const value = result.exec.slice(10);
+      } else if (command.kind === "copy_path") {
+        const value = command.value;
         await navigator.clipboard.writeText(value);
         resetAndHide();
-      } else if (result.exec.startsWith("reveal:")) {
-        const target = result.exec.slice(7);
+      } else if (command.kind === "reveal_path") {
+        const target = command.path;
         await invoke("reveal_in_file_manager", { path: target });
         resetAndHide();
-      } else if (result.exec.startsWith("open-with:")) {
-        const target = result.exec.slice(10);
+      } else if (command.kind === "open_with_editor") {
+        const target = command.path;
         await invoke("open_with_editor", { path: target });
         resetAndHide();
-      } else if (result.exec.startsWith("copy:")) {
-        const value = result.exec.slice(5);
+      } else if (command.kind === "copy_text") {
+        const value = command.value;
         await navigator.clipboard.writeText(value);
         resetAndHide();
-      } else if (result.source === "File") {
-        await invoke("open_path", { path: result.exec });
+      } else if (command.kind === "open_file") {
+        await invoke("open_path", { path: command.path });
         resetAndHide();
       } else {
-        await invoke("launch_app", { exec: result.exec });
+        await invoke("launch_app", { exec: commandToExec(command) });
         resetAndHide();
       }
     } catch (e) {
@@ -997,13 +1086,17 @@
 
     if (activeResult && activeResult.actions?.length) {
       const findAction = (prefix: string) =>
-        activeResult.actions?.find((a) => a.exec.startsWith(prefix));
+        activeResult.actions?.find((a) => execForAction(activeResult, a).startsWith(prefix));
 
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "c") {
         const action = findAction("copy-path:");
         if (action) {
           e.preventDefault();
-          handleActivate({ ...activeResult, exec: action.exec });
+          handleActivate({
+            ...activeResult,
+            exec: execForAction(activeResult, action),
+            command: action.command,
+          });
           return;
         }
       }
@@ -1012,7 +1105,11 @@
         const action = findAction("reveal:") || activeResult.actions[0];
         if (action) {
           e.preventDefault();
-          handleActivate({ ...activeResult, exec: action.exec });
+          handleActivate({
+            ...activeResult,
+            exec: execForAction(activeResult, action),
+            command: action.command,
+          });
           return;
         }
       }
@@ -1021,7 +1118,11 @@
         const action = findAction("open-with:") || activeResult.actions[0];
         if (action) {
           e.preventDefault();
-          handleActivate({ ...activeResult, exec: action.exec });
+          handleActivate({
+            ...activeResult,
+            exec: execForAction(activeResult, action),
+            command: action.command,
+          });
           return;
         }
       }
@@ -1030,7 +1131,11 @@
         const action = findAction("move-window-current:");
         if (action) {
           e.preventDefault();
-          handleActivate({ ...activeResult, exec: action.exec });
+          handleActivate({
+            ...activeResult,
+            exec: execForAction(activeResult, action),
+            command: action.command,
+          });
           return;
         }
       }
@@ -1039,7 +1144,11 @@
         const action = findAction("minimize-window:");
         if (action) {
           e.preventDefault();
-          handleActivate({ ...activeResult, exec: action.exec });
+          handleActivate({
+            ...activeResult,
+            exec: execForAction(activeResult, action),
+            command: action.command,
+          });
           return;
         }
       }
