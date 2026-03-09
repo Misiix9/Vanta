@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_2.2.2_amd64.deb
+sudo dpkg -i vanta_2.3.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-2.2.2-1.x86_64.rpm
+sudo rpm -i vanta-2.3.0-1.x86_64.rpm
 ```
 
-### Latest Patch (v2.2.2)
-- Deterministic keyboard navigation under rapid input with frame-coalesced selected-row scrolling.
-- Launcher focus transitions now use frame-based scheduling (show/fill flows), reducing timing-related focus misses.
-- Additional lifecycle safety for pending scroll frames during teardown.
-- Phase 01 reliability improvements from v2.2.1 remain included.
+### Latest Minor (v2.3.0)
+- First-run onboarding wizard with guided command discovery and setup.
+- Personalized onboarding controls for hotkey, theme selection, and file-search defaults.
+- Quick tips command chips in idle launcher view for faster feature discovery.
+- Includes all reliability improvements from v2.2.2.
 
 ---
 

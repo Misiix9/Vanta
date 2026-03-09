@@ -1,4 +1,4 @@
-name: Release Vanta v2.2.2
+name: Release Vanta v2.3.0
 
 on:
   push:
@@ -83,16 +83,17 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.2.2 -- Performance And Input Reliability
+            ## Vanta v2.3.0 -- First-Run And Onboarding UX
 
-            Patch release focused on deterministic keyboard interaction and focus reliability.
+            Minor release focused on first-run activation and discoverability.
 
-            ### Fixes
-            - Replaced timeout-based selection scrolling with frame-coalesced scrolling for smoother rapid keyboard navigation.
-            - Added teardown-safe cancellation for pending animation-frame scroll callbacks.
-            - Replaced timing-based launcher focus transitions with frame-based scheduling in show/fill flows.
-            - Reduced timing races between result updates and selected-row visibility under stress typing.
-            - Includes all reliability fixes from v2.2.1 (section rendering, icon theming parity, store/extension UX hardening).
+            ### Highlights
+            - Added a first-run onboarding wizard with guided setup for common commands and launcher behavior.
+            - Added quick-start command chips and onboarding shortcuts for faster initial success.
+            - Added onboarding personalization for hotkey, theme, and file-search defaults.
+            - Added guided permission explanations for extension/script capabilities.
+            - Added idle quick tips panel for ongoing command discovery.
+            - Includes all reliability improvements from v2.2.2.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

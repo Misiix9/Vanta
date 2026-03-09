@@ -27,6 +27,8 @@
   import ClipboardView from "$lib/components/ClipboardView.svelte";
   import NowPlayingBar from "$lib/components/NowPlayingBar.svelte";
   import SpotifyMiniPlayer from "$lib/components/SpotifyMiniPlayer.svelte";
+  import FirstRunWizard from "$lib/components/FirstRunWizard.svelte";
+  import QuickTipsPanel from "$lib/components/QuickTipsPanel.svelte";
 
   let isMiniPlayer = $state(false);
   let query = $state("");
@@ -81,6 +83,10 @@
   let searchRequestId = 0;
   const unlisteners: Array<() => void> = [];
   let pendingScrollFrame: number | null = null;
+  const ONBOARDING_SEEN_KEY = "vanta.onboarding.v2_3_seen";
+  const QUICK_TIPS_HIDDEN_KEY = "vanta.quick_tips.hidden";
+  let onboardingOpen = $state(false);
+  let quickTipsVisible = $state(false);
 
   function scheduleScrollToSelected() {
     if (pendingScrollFrame !== null) return;
@@ -228,6 +234,9 @@
   });
 
   onMount(async () => {
+    onboardingOpen = localStorage.getItem(ONBOARDING_SEEN_KEY) !== "1";
+    quickTipsVisible = localStorage.getItem(QUICK_TIPS_HIDDEN_KEY) !== "1";
+
     if (window.location.search.includes('view=mini-player')) {
       isMiniPlayer = true;
       return;
@@ -664,6 +673,60 @@
     }
   }
 
+  async function saveConfigUpdate(mutator: (cfg: VantaConfig) => void) {
+    if (!vantaConfig) return;
+    mutator(vantaConfig);
+    applyTheme(vantaConfig);
+
+    const themeId = vantaConfig.appearance.theme || "default";
+    const targetTheme =
+      availableThemes.find((t) => t.id === themeId) ||
+      availableThemes.find((t) => t.id === "default");
+    if (targetTheme) {
+      injectThemeCss(targetTheme.css_content);
+    }
+
+    try {
+      await invoke("save_config", { newConfig: vantaConfig });
+    } catch (e) {
+      console.error("Failed to save onboarding update", e);
+    }
+  }
+
+  async function applyOnboardingHotkey(hotkey: string) {
+    await saveConfigUpdate((cfg) => {
+      cfg.general.hotkey = hotkey;
+    });
+  }
+
+  async function applyOnboardingTheme(themeId: string) {
+    await saveConfigUpdate((cfg) => {
+      cfg.appearance.theme = themeId;
+    });
+  }
+
+  async function applyOnboardingIncludeHidden(includeHidden: boolean) {
+    await saveConfigUpdate((cfg) => {
+      cfg.files.include_hidden = includeHidden;
+    });
+  }
+
+  function completeOnboarding() {
+    onboardingOpen = false;
+    localStorage.setItem(ONBOARDING_SEEN_KEY, "1");
+  }
+
+  function dismissQuickTips() {
+    quickTipsVisible = false;
+    localStorage.setItem(QUICK_TIPS_HIDDEN_KEY, "1");
+  }
+
+  function applyTipQuery(text: string) {
+    query = text;
+    void handleSearch(text);
+    requestAnimationFrame(() => searchInputRef?.focus?.());
+  }
+
   async function handleActivate(result: SearchResult) {
     if (permissionPrompt) return; // modal blocks background actions
     if (actionInFlight) return;
@@ -784,6 +847,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (onboardingOpen) return;
     if (permissionPrompt) {
       return; // modal owns keyboard focus
     }
@@ -978,6 +1042,13 @@
         onEscape={handleEscape}
       />
 
+      {#if !onboardingOpen && quickTipsVisible && query.trim() === ""}
+        <QuickTipsPanel
+          onTry={applyTipQuery}
+          onDismiss={dismissQuickTips}
+        />
+      {/if}
+
       {#if currentMacro}
         <MacroPreview
           macro={currentMacro}
@@ -1011,6 +1082,26 @@
         }
         {searchTime}
       />
+
+      {#if onboardingOpen && vantaConfig}
+        <FirstRunWizard
+          hotkey={vantaConfig.general.hotkey}
+          themeId={vantaConfig.appearance.theme}
+          includeHidden={vantaConfig.files.include_hidden}
+          themes={availableThemes}
+          on:tryquery={(event) => applyTipQuery(event.detail.query)}
+          on:sethotkey={(event) => void applyOnboardingHotkey(event.detail.hotkey)}
+          on:settheme={(event) => void applyOnboardingTheme(event.detail.themeId)}
+          on:setincludehidden={(event) =>
+            void applyOnboardingIncludeHidden(event.detail.includeHidden)}
+          on:opensettings={() => {
+            completeOnboarding();
+            view = "settings";
+          }}
+          on:skip={completeOnboarding}
+          on:complete={completeOnboarding}
+        />
+      {/if}
     </div>
   {/if}
 

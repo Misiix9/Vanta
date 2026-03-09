@@ -2263,3 +2263,181 @@ input[type="range"] {
     font-size: 12px;
     padding: 12px;
 }
+
+/* ── Phase 03: First-Run Onboarding ────────────────────────── */
+.quick-tips {
+    margin: 8px 14px 4px;
+    padding: 10px 12px;
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.08));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--vanta-surface, #0a0a0a) 82%, transparent);
+}
+
+.quick-tips-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.quick-tips-header h4 {
+    margin: 0;
+    border: 0;
+    padding: 0;
+    font-size: 12px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--vanta-text-dim, #888);
+}
+
+.quick-tips-copy {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: var(--vanta-text-dim, #888);
+}
+
+.quick-tips-row,
+.onboarding-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chip-btn {
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(123, 53, 240, 0.3);
+    background: var(--purple-faint);
+    color: var(--purple-bright);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all var(--t-fast) var(--ease-std);
+}
+
+.chip-btn:hover {
+    transform: translateY(-1px);
+    background: rgba(123, 53, 240, 0.22);
+}
+
+.onboarding-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(3px);
+}
+
+.onboarding-modal {
+    width: min(560px, 100%);
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 14px;
+    padding: 18px;
+    background: color-mix(in srgb, var(--vanta-bg, #000) 90%, #10131b 10%);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.onboarding-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.onboarding-progress {
+    font-size: 12px;
+    color: var(--vanta-text-dim, #888);
+}
+
+.onboarding-modal h3 {
+    margin: 0;
+    border: 0;
+    padding: 0;
+    font-size: 1.05rem;
+    color: var(--vanta-text, #f5f5f5);
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.onboarding-copy {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--vanta-text-dim, #888);
+}
+
+.onboarding-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.onboarding-grid label,
+.inline-toggle {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--vanta-text-dim, #888);
+}
+
+.inline-toggle {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    color: var(--vanta-text, #f5f5f5);
+}
+
+.onboarding-permission-note {
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.08));
+    border-radius: 10px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    font-size: 12px;
+    color: var(--vanta-text-dim, #888);
+}
+
+.onboarding-permission-note ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 4px;
+}
+
+.onboarding-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.onboarding-actions .btn {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.08));
+    background: var(--vanta-surface, #0a0a0a);
+    color: var(--vanta-text, #f5f5f5);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.onboarding-actions .btn.primary {
+    border-color: rgba(123, 53, 240, 0.38);
+    background: var(--purple-faint);
+    color: var(--purple-bright);
+}
+
+@media (max-width: 720px) {
+    .onboarding-modal {
+        padding: 14px;
+    }
+
+    .onboarding-grid {
+        grid-template-columns: 1fr;
+    }
+}

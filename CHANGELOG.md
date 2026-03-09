@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0
+- Added a first-run onboarding wizard with guided setup for quick-start commands, hotkey/theme personalization, file-search defaults, and permission guidance.
+- Added an idle quick tips panel with seeded command chips to help new users discover launcher capabilities faster.
+- Added persisted onboarding/tips state so onboarding runs once and tips can be dismissed.
+- Added mobile-safe styling for onboarding surfaces and integrated them with the existing theme system.
+
 ## 2.2.2
 - Replaced timeout-based keyboard scroll synchronization with frame-coalesced selection scrolling for more deterministic navigation under rapid input.
 - Added teardown-safe cancellation for pending animation-frame scroll work to avoid stale callbacks during view lifecycle changes.
