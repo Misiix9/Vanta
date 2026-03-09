@@ -5,8 +5,17 @@
   "description": "View network info, test connectivity and speed",
   "author": "Vanta Team",
   "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='10' cy='13' r='8'/><path d='M2 13h16'/><path d='M10 5c1.7 2.5 2.7 5 2.7 8s-1 5.5-2.7 8'/><path d='M10 5c-1.7 2.5-2.7 5-2.7 8s1 5.5 2.7 8'/><path d='M19 7a2.5 2.5 0 0 0 0-4'/><path d='M21 8.5a4.5 4.5 0 0 0 0-7'/></svg>",
-  "permissions": ["Network", "Shell"],
+  "permissions": [
+    "Network",
+    "Shell"
+  ],
   "commands": [
-    {"name": "info", "title": "Network Info", "subtitle": "View IP, DNS, and interfaces", "mode": "view"}
-  ]
+    {
+      "name": "info",
+      "title": "Network Info",
+      "subtitle": "View IP, DNS, and interfaces",
+      "mode": "view"
+    }
+  ],
+  "schema_version": 1
 }
