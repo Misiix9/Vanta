@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.7.0
+- Clipboard view now supports dedupe controls, grouping modes, and privacy masking for sensitive entries.
+- Added grouped clipboard sections (`Pinned`/`Recent` with optional type grouping) for faster scanning at scale.
+- Added keyboard-friendly clipboard actions (`C` copy, `P` pin/unpin, `Delete` delete, `R` reveal masked content).
+- Added persistent user preferences for clipboard dedupe/grouping/masking toggles.
+
 ## 2.6.0
 - Added a safe confirmation layer for destructive actions (system power actions and window close actions).
 - Added a dedicated action confirmation modal with keyboard support (`Enter` confirm, `Esc` cancel).

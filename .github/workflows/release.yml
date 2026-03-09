@@ -1,4 +1,4 @@
-name: Release Vanta v2.6.0
+name: Release Vanta v2.7.0
 
 on:
   push:
@@ -83,15 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.6.0 -- Action Model v3
+            ## Vanta v2.7.0 -- Clipboard And History Excellence
 
-            Minor release focused on safer secondary actions and better execution guardrails.
+            Minor release focused on clipboard productivity, scanning speed, and privacy controls.
 
             ### Highlights
-            - Added confirmation gates for destructive actions (power operations and window close).
-            - Added a dedicated action confirmation modal with keyboard support.
-            - Preserved existing shortcut-driven secondary actions while reducing accidental execution risk.
-            - Includes all Search Quality v2 improvements from v2.5.0.
+            - Added clipboard dedupe controls and grouped browsing modes.
+            - Added sensitive-content masking controls with reveal-on-demand behavior.
+            - Added keyboard-first clipboard actions for copy, pin, delete, and reveal.
+            - Includes all Action Model v3 safety improvements from v2.6.0.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

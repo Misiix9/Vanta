@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_2.6.0_amd64.deb
+sudo dpkg -i vanta_2.7.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-2.6.0-1.x86_64.rpm
+sudo rpm -i vanta-2.7.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v2.6.0)
-- Safe confirmation flow for destructive launcher actions (shutdown/restart/sleep/logout/firmware and window close).
-- Dedicated action confirmation modal with keyboard-first controls.
-- Maintains existing fast secondary-action shortcuts while adding guardrails.
-- Includes all Search Quality v2 improvements from v2.5.0.
+### Latest Minor (v2.7.0)
+- Clipboard view upgrades: dedupe toggle, grouping modes, and sensitive-content masking.
+- Faster large-history browsing with grouped sections and clearer clipboard metadata.
+- Keyboard-first clipboard actions for copy/pin/delete/reveal workflows.
+- Includes all Action Model v3 safety improvements from v2.6.0.
 
 ---
 
