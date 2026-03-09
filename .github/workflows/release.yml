@@ -88,11 +88,11 @@ jobs:
             Patch release focused on deterministic keyboard interaction and focus reliability.
 
             ### Fixes
-- Replaced timeout-based selection scrolling with frame-coalesced scrolling for smoother rapid keyboard navigation.
-- Added teardown-safe cancellation for pending animation-frame scroll callbacks.
-- Replaced timing-based launcher focus transitions with frame-based scheduling in show/fill flows.
-- Reduced timing races between result updates and selected-row visibility under stress typing.
-- Includes all reliability fixes from v2.2.1 (section rendering, icon theming parity, store/extension UX hardening).
+            - Replaced timeout-based selection scrolling with frame-coalesced scrolling for smoother rapid keyboard navigation.
+            - Added teardown-safe cancellation for pending animation-frame scroll callbacks.
+            - Replaced timing-based launcher focus transitions with frame-based scheduling in show/fill flows.
+            - Reduced timing races between result updates and selected-row visibility under stress typing.
+            - Includes all reliability fixes from v2.2.1 (section rendering, icon theming parity, store/extension UX hardening).
 
             ### Packaging
             - Deb and RPM bundles are published for this release.
