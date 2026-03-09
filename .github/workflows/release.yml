@@ -1,4 +1,4 @@
-name: Release Vanta v2.2.1
+name: Release Vanta v2.2.2
 
 on:
   push:
@@ -83,19 +83,16 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.2.1 -- Stability Baseline Lock
+            ## Vanta v2.2.2 -- Performance And Input Reliability
 
-            Patch release focused on reliability and UX consistency.
+            Patch release focused on deterministic keyboard interaction and focus reliability.
 
             ### Fixes
-            - Launcher now hides sections with zero matches and preserves stable section ordering for active results.
-            - Improved selection/index clamping to prevent navigation jumps when result sets change.
-            - Inline SVG icon rendering is now release-safe, preventing black fallback icons in packaged builds.
-            - Section header styling refined for clearer visual hierarchy and non-interactive behavior.
-            - Store UX now surfaces install/uninstall success and failure messages directly in the UI.
-            - Extension host error state now includes a retry action for faster recovery.
-            - Permission modal now supports `Esc` as a safe deny shortcut.
-            - Clipboard mode focus timing improved for more reliable keyboard readiness.
+- Replaced timeout-based selection scrolling with frame-coalesced scrolling for smoother rapid keyboard navigation.
+- Added teardown-safe cancellation for pending animation-frame scroll callbacks.
+- Replaced timing-based launcher focus transitions with frame-based scheduling in show/fill flows.
+- Reduced timing races between result updates and selected-row visibility under stress typing.
+- Includes all reliability fixes from v2.2.1 (section rendering, icon theming parity, store/extension UX hardening).
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.2
+- Replaced timeout-based keyboard scroll synchronization with frame-coalesced selection scrolling for more deterministic navigation under rapid input.
+- Added teardown-safe cancellation for pending animation-frame scroll work to avoid stale callbacks during view lifecycle changes.
+- Reworked launcher focus transitions (`tauri://show` and query-fill actions) to use frame-based focus scheduling instead of timing hacks.
+- Improved stress-typing stability by reducing timing races between result updates and selected-row visibility.
+
 ## 2.2.1
 - Search results now hide sections that have `0` matches; only populated sections are shown.
 - Launcher section headers remain always open and non-interactive, with improved selection stability.

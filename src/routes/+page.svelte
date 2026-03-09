@@ -80,6 +80,15 @@
   let availableThemes: ThemeMeta[] = $state([]);
   let searchRequestId = 0;
   const unlisteners: Array<() => void> = [];
+  let pendingScrollFrame: number | null = null;
+
+  function scheduleScrollToSelected() {
+    if (pendingScrollFrame !== null) return;
+    pendingScrollFrame = requestAnimationFrame(() => {
+      pendingScrollFrame = null;
+      resultsListRef?.scrollToSelected();
+    });
+  }
 
   
 
@@ -170,6 +179,10 @@
   }
 
   onDestroy(() => {
+    if (pendingScrollFrame !== null) {
+      cancelAnimationFrame(pendingScrollFrame);
+      pendingScrollFrame = null;
+    }
     for (const unlisten of unlisteners) {
       try {
         unlisten();
@@ -346,12 +359,12 @@
       await listen("tauri://show", () => {
         isVisible = true;
         maybeRescanApps();
-        setTimeout(() => {
+        requestAnimationFrame(() => {
           searchInputRef?.focus?.();
           if (query.trim() === "" && currentMode === "launcher") {
             loadSuggestions();
           }
-        }, 50);
+        });
       }),
     );
 
@@ -686,9 +699,9 @@
       } else if (result.exec.startsWith("fill:")) {
         query = result.exec.slice(5);
         await handleSearch(query);
-        setTimeout(() => {
-          document.querySelector("input")?.focus();
-        }, 10);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => searchInputRef?.focus?.());
+        });
         return;
       } else if (result.exec.startsWith("system-action:")) {
         const action = result.exec.slice(14);
@@ -859,14 +872,14 @@
       case "ArrowDown":
         e.preventDefault();
         selectedIndex = skipHeaders((selectedIndex + 1) % totalItems, 1);
-        setTimeout(() => resultsListRef?.scrollToSelected(), 0);
+        scheduleScrollToSelected();
         break;
       case "ArrowUp":
         e.preventDefault();
         selectedIndex = skipHeaders(
           selectedIndex <= 0 ? totalItems - 1 : selectedIndex - 1, -1
         );
-        setTimeout(() => resultsListRef?.scrollToSelected(), 0);
+        scheduleScrollToSelected();
         break;
       case "Enter":
         e.preventDefault();
@@ -892,7 +905,7 @@
           selectedIndex = skipHeaders((selectedIndex + 1) % totalItems, 1);
         }
 
-        setTimeout(() => resultsListRef?.scrollToSelected(), 0);
+        scheduleScrollToSelected();
         break;
     }
   }

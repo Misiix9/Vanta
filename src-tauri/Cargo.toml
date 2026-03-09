@@ -1,6 +1,6 @@
 [package]
 name = "vanta"
-version = "2.2.1"
+version = "2.2.2"
 description = "Liquid Glass command palette for Linux"
 authors = ["onxy"]
 edition = "2021"
