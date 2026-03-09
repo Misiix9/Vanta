@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.6.0
+- Added a safe confirmation layer for destructive actions (system power actions and window close actions).
+- Added a dedicated action confirmation modal with keyboard support (`Enter` confirm, `Esc` cancel).
+- Improved action model safety while preserving existing shortcut-driven secondary action flow.
+
 ## 2.5.0
 - Added Search Quality v2 source-weight presets in Settings (`Developer`, `Creator`, `Minimal`) for faster ranking tuning.
 - Added in-app ranking explainability panel that shows why top results rank where they do (source, weight, score, and match metadata).

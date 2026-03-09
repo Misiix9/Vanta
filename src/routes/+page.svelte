@@ -30,6 +30,7 @@
   import FirstRunWizard from "$lib/components/FirstRunWizard.svelte";
   import QuickTipsPanel from "$lib/components/QuickTipsPanel.svelte";
   import SearchExplainPanel from "$lib/components/SearchExplainPanel.svelte";
+  import ActionConfirmModal from "$lib/components/ActionConfirmModal.svelte";
 
   let isMiniPlayer = $state(false);
   let query = $state("");
@@ -88,6 +89,7 @@
   const QUICK_TIPS_HIDDEN_KEY = "vanta.quick_tips.hidden";
   let onboardingOpen = $state(false);
   let quickTipsVisible = $state(false);
+  let pendingConfirmResult = $state<SearchResult | null>(null);
 
   function scheduleScrollToSelected() {
     if (pendingScrollFrame !== null) return;
@@ -728,8 +730,71 @@
     requestAnimationFrame(() => searchInputRef?.focus?.());
   }
 
-  async function handleActivate(result: SearchResult) {
+  function getConfirmSpec(result: SearchResult): { title: string; description: string; confirmLabel: string } | null {
+    if (result.exec.startsWith("close-window:")) {
+      return {
+        title: "Close Window?",
+        description: `This will close \"${result.title}\" immediately.`,
+        confirmLabel: "Close",
+      };
+    }
+
+    if (!result.exec.startsWith("system-action:")) return null;
+
+    const action = result.exec.slice(14);
+    if (action === "shutdown") {
+      return {
+        title: "Shut Down System?",
+        description: "This powers off the device immediately.",
+        confirmLabel: "Shut Down",
+      };
+    }
+
+    if (action === "restart") {
+      return {
+        title: "Restart System?",
+        description: "This reboots the device and closes active sessions.",
+        confirmLabel: "Restart",
+      };
+    }
+
+    if (action === "sleep") {
+      return {
+        title: "Sleep System?",
+        description: "This suspends the current session.",
+        confirmLabel: "Sleep",
+      };
+    }
+
+    if (action === "logout") {
+      return {
+        title: "Log Out Session?",
+        description: "This terminates the current user session.",
+        confirmLabel: "Log Out",
+      };
+    }
+
+    if (action === "bios") {
+      return {
+        title: "Reboot To Firmware Setup?",
+        description: "This restarts the machine and enters firmware setup if supported.",
+        confirmLabel: "Reboot",
+      };
+    }
+
+    return null;
+  }
+
+  async function handleActivate(result: SearchResult, bypassConfirm = false) {
     if (permissionPrompt) return; // modal blocks background actions
+    if (!bypassConfirm) {
+      const confirm = getConfirmSpec(result);
+      if (confirm) {
+        pendingConfirmResult = result;
+        return;
+      }
+    }
+
     if (actionInFlight) return;
     actionInFlight = true;
     try {
@@ -848,6 +913,14 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (pendingConfirmResult) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        pendingConfirmResult = null;
+      }
+      return;
+    }
+
     if (onboardingOpen) return;
     if (permissionPrompt) {
       return; // modal owns keyboard focus
@@ -1091,6 +1164,25 @@
         }
         {searchTime}
       />
+
+      {#if pendingConfirmResult}
+        {@const confirmSpec = getConfirmSpec(pendingConfirmResult)}
+        {#if confirmSpec}
+          <ActionConfirmModal
+            title={confirmSpec.title}
+            description={confirmSpec.description}
+            confirmLabel={confirmSpec.confirmLabel}
+            onCancel={() => (pendingConfirmResult = null)}
+            onConfirm={() => {
+              const confirmed = pendingConfirmResult;
+              pendingConfirmResult = null;
+              if (confirmed) {
+                void handleActivate(confirmed, true);
+              }
+            }}
+          />
+        {/if}
+      {/if}
 
       {#if onboardingOpen && vantaConfig}
         <FirstRunWizard

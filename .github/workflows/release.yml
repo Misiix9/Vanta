@@ -1,4 +1,4 @@
-name: Release Vanta v2.5.0
+name: Release Vanta v2.6.0
 
 on:
   push:
@@ -83,15 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.5.0 -- Search Quality v2
+            ## Vanta v2.6.0 -- Action Model v3
 
-            Minor release focused on ranking quality, tuning workflows, and search transparency.
+            Minor release focused on safer secondary actions and better execution guardrails.
 
             ### Highlights
-            - Added Search Quality v2 presets for source weighting (`Developer`, `Creator`, `Minimal`).
-            - Added a ranking explainability panel that surfaces source, weight, score, and match metadata.
-            - Improved relevance tuning workflow directly from Settings.
-            - Includes all visual design-system improvements from v2.4.0.
+            - Added confirmation gates for destructive actions (power operations and window close).
+            - Added a dedicated action confirmation modal with keyboard support.
+            - Preserved existing shortcut-driven secondary actions while reducing accidental execution risk.
+            - Includes all Search Quality v2 improvements from v2.5.0.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

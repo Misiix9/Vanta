@@ -2542,6 +2542,69 @@ input[type="range"] {
     text-overflow: ellipsis;
 }
 
+/* ── Phase 06: Action Confirmation ─────────────────────────── */
+.action-confirm-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 55;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(2, 4, 10, 0.62);
+    backdrop-filter: blur(3px);
+}
+
+.action-confirm-modal {
+    width: min(440px, 100%);
+    border: 1px solid var(--ds-border, rgba(149, 118, 206, 0.3));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--ds-surface-1, #0c0c0c) 90%, #101322 10%);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+    padding: 14px;
+    display: grid;
+    gap: 10px;
+}
+
+.action-confirm-modal h3 {
+    margin: 0;
+    border: 0;
+    padding: 0;
+    color: var(--ds-text-primary, #ececf7);
+    font-size: 1rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+}
+
+.action-confirm-modal p {
+    margin: 0;
+    color: var(--ds-text-secondary, #9a9cb3);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.action-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.action-confirm-actions .btn {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.08));
+    background: var(--vanta-surface, #0a0a0a);
+    color: var(--vanta-text, #f5f5f5);
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.action-confirm-actions .btn.danger {
+    border-color: rgba(255, 94, 94, 0.45);
+    background: rgba(255, 94, 94, 0.12);
+    color: #ffb0b0;
+}
+
 @media (max-width: 720px) {
     .onboarding-modal {
         padding: 14px;
