@@ -1,4 +1,4 @@
-name: Release Vanta v2.7.0
+name: Release Vanta v2.8.0
 
 on:
   push:
@@ -83,15 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.7.0 -- Clipboard And History Excellence
+            ## Vanta v2.8.0 -- Theme Studio And Presets
 
-            Minor release focused on clipboard productivity, scanning speed, and privacy controls.
+            Minor release focused on customization workflows, safety, and preset-driven theme editing.
 
             ### Highlights
-            - Added clipboard dedupe controls and grouped browsing modes.
-            - Added sensitive-content masking controls with reveal-on-demand behavior.
-            - Added keyboard-first clipboard actions for copy, pin, delete, and reveal.
-            - Includes all Action Model v3 safety improvements from v2.6.0.
+            - Added Theme Studio preset packs (`Minimal`, `Vivid`, `High Contrast`, `Compact`).
+            - Added import/export theme profile controls with JSON validation.
+            - Added reset-to-default profile action for safe recovery.
+            - Includes all clipboard productivity improvements from v2.7.0.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

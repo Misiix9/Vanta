@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.8.0
+- Added Theme Studio controls in Settings with preset packs (`Minimal`, `Vivid`, `High Contrast`, `Compact`).
+- Added theme profile import/export workflow with JSON validation and copy support.
+- Added one-click reset to safe default appearance values.
+- Improved customization safety by clamping imported appearance and window values.
+
 ## 2.7.0
 - Clipboard view now supports dedupe controls, grouping modes, and privacy masking for sensitive entries.
 - Added grouped clipboard sections (`Pinned`/`Recent` with optional type grouping) for faster scanning at scale.
