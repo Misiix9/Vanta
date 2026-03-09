@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.12.0
+- Added async macro job lifecycle with persisted history (`running`, `succeeded`, `failed`, `canceled`).
+- Added background jobs panel in launcher with retry/cancel controls and live updates.
+- Added new workflow job commands: start/list/retry/cancel job, with permission preflight and action-safe status tracking.
+- Added blocking system-step execution path for macro jobs to improve completion reporting.
+
 ## 2.11.0
 - Added compositor-aware window action model in launcher results with explicit backend context (`Hyprland`, `Sway`, `X11`).
 - Added workspace-aware quick action to move windows to the current workspace on supported compositors.

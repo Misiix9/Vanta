@@ -1,4 +1,4 @@
-name: Release Vanta v2.11.0
+name: Release Vanta v2.12.0
 
 on:
   push:
@@ -83,15 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.11.0 -- Window And Workspace Intelligence
+            ## Vanta v2.12.0 -- Jobs And Async Workflows
 
-            Minor release focused on compositor-aware window actions and workspace workflows.
+            Minor release focused on long-running workflow visibility and lifecycle control.
 
             ### Highlights
-            - Added backend-aware window action hints with graceful capability degradation.
-            - Added move-to-current-workspace quick action where compositor support exists.
-            - Added minimize support for Sway/X11 and X11 close fallback.
-            - Improved window switcher context with workspace + backend subtitles.
+            - Added background macro jobs with `running/succeeded/failed/canceled` lifecycle states.
+            - Added persisted job history and live `macro-jobs-updated` event updates.
+            - Added job controls for retry and cancel in launcher UI.
+            - Added blocking system-step execution path for clearer macro completion reporting.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

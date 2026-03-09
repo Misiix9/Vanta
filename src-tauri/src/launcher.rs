@@ -84,6 +84,30 @@ pub fn launch(exec: &str, _app_handle: Option<&tauri::AppHandle>) -> Result<(), 
     Ok(())
 }
 
+pub fn launch_blocking(
+    command: &str,
+    args: &[String],
+    _app_handle: Option<&tauri::AppHandle>,
+) -> Result<(), String> {
+    let status = Command::new(command)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map_err(|e| format!("Failed to run '{}' in blocking mode: {}", command, e))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Blocking command '{}' failed with status {:?}",
+            command,
+            status.code()
+        ))
+    }
+}
+
 pub fn system_action(action: &str) -> Result<(), String> {
     let normalized = action.to_lowercase();
 
@@ -358,5 +382,11 @@ mod tests {
         assert!(launch("close-window:abc", None).is_ok());
         assert!(launch("minimize-window:abc", None).is_ok());
         assert!(launch("move-window-current:abc", None).is_ok());
+    }
+
+    #[test]
+    fn blocking_launch_invalid_command_errors() {
+        let err = launch_blocking("definitely-not-a-real-command", &[], None).unwrap_err();
+        assert!(err.contains("Failed to run"));
     }
 }

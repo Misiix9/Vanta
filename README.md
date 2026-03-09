@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_2.11.0_amd64.deb
+sudo dpkg -i vanta_2.12.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-2.11.0-1.x86_64.rpm
+sudo rpm -i vanta-2.12.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v2.11.0)
-- Window switcher now adapts actions by compositor backend (Hyprland/Sway/X11) for safer behavior.
-- Added move-to-current-workspace quick action where supported.
-- Added minimize support on Sway/X11 and improved X11 close fallback behavior.
-- Includes all accessibility completion upgrades from v2.10.0.
+### Latest Minor (v2.12.0)
+- Added background workflow jobs with lifecycle states and persisted history.
+- Added in-launcher jobs panel with quick retry/cancel controls.
+- Added async-safe macro execution path with permission preflight and status updates.
+- Includes all window/workspace intelligence upgrades from v2.11.0.
 
 ---
 

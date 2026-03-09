@@ -127,6 +127,21 @@ export interface MacroRunResult {
     steps: MacroRunStepResult[];
 }
 
+export type MacroJobStatus = "running" | "succeeded" | "failed" | "canceled";
+
+export interface MacroJobRecord {
+    id: string;
+    macro_id: string;
+    macro_name: string;
+    args: Record<string, string>;
+    status: MacroJobStatus;
+    created_at: number;
+    updated_at: number;
+    completed_at?: number | null;
+    steps: MacroRunStepResult[];
+    error?: string | null;
+}
+
 export interface VantaConfig {
     general: GeneralConfig;
     appearance: AppearanceConfig;

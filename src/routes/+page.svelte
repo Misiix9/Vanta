@@ -13,6 +13,7 @@
     PermissionNeededPayload,
     WorkflowMacro,
     MacroDryRunResult,
+    MacroJobRecord,
     ExtensionEntry,
   } from "$lib/types";
   import { applyTheme } from "$lib/theme";
@@ -22,6 +23,7 @@
   import SettingsView from "$lib/components/SettingsView.svelte";
   import PermissionModal from "$lib/components/PermissionModal.svelte";
   import MacroPreview from "$lib/components/MacroPreview.svelte";
+  import JobsPanel from "$lib/components/JobsPanel.svelte";
   import ExtensionHost from "$lib/components/ExtensionHost.svelte";
   import StoreView from "$lib/components/StoreView.svelte";
   import ClipboardView from "$lib/components/ClipboardView.svelte";
@@ -62,6 +64,7 @@
   let macroDryRun = $state<MacroDryRunResult | null>(null);
   let macroBusy = $state(false);
   let macroError = $state<string | null>(null);
+  let macroJobs = $state<MacroJobRecord[]>([]);
   let currentMacro = $derived(
     activeMacroId ? availableMacros.find((m) => m.id === activeMacroId) : null,
   );
@@ -302,6 +305,12 @@
       console.error("Failed to load macros:", e);
     }
 
+    try {
+      macroJobs = await invoke<MacroJobRecord[]>("list_macro_jobs");
+    } catch (e) {
+      console.error("Failed to load macro jobs:", e);
+    }
+
     // Listen for config hot-reload events
     unlisteners.push(
       await listen<VantaConfig>("config-updated", (event) => {
@@ -356,6 +365,12 @@
     unlisteners.push(
       await listen<WorkflowMacro[]>("macros-changed", (event) => {
         availableMacros = event.payload;
+      }),
+    );
+
+    unlisteners.push(
+      await listen<MacroJobRecord[]>("macro-jobs-updated", (event) => {
+        macroJobs = event.payload;
       }),
     );
 
@@ -518,7 +533,7 @@
     macroBusy = true;
     macroError = null;
     try {
-      await invoke("run_macro", { macroId: macro.id, args: macroArgs });
+      await invoke("start_macro_job", { macroId: macro.id, args: macroArgs });
       resetMacroState();
       resetAndHide();
     } catch (e) {
@@ -530,6 +545,22 @@
       console.error("Run macro failed", e);
     } finally {
       macroBusy = false;
+    }
+  }
+
+  async function retryMacroJob(jobId: string) {
+    try {
+      await invoke("retry_macro_job", { jobId });
+    } catch (e) {
+      console.error("Retry job failed", e);
+    }
+  }
+
+  async function cancelMacroJob(jobId: string) {
+    try {
+      await invoke("cancel_macro_job", { jobId });
+    } catch (e) {
+      console.error("Cancel job failed", e);
     }
   }
 
@@ -1221,6 +1252,14 @@
           on:skip={completeOnboarding}
           on:complete={completeOnboarding}
         />
+
+        {#if query.trim() === ""}
+          <JobsPanel
+            jobs={macroJobs}
+            onRetry={retryMacroJob}
+            onCancel={cancelMacroJob}
+          />
+        {/if}
       {/if}
     </div>
   {/if}

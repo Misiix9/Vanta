@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use regex::Regex;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::State;
 
@@ -29,7 +29,7 @@ pub struct MacroDryRunResult {
     pub steps: Vec<MacroDryRunStep>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MacroRunStepResult {
     pub index: usize,
     pub kind: String,
@@ -39,7 +39,7 @@ pub struct MacroRunStepResult {
     pub status: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MacroRunResult {
     pub macro_id: String,
     pub steps: Vec<MacroRunStepResult>,
@@ -198,6 +198,92 @@ pub fn run_macro(
                     std::iter::once(command.clone()).chain(step.args.clone().into_iter()),
                 );
                 launcher::launch(&exec, Some(app_handle)).map_err(|e| format!("{}", e))?;
+
+                steps.push(MacroRunStepResult {
+                    index: idx,
+                    kind: "system".to_string(),
+                    command: command.clone(),
+                    args: step.args,
+                    capabilities: step.capabilities,
+                    status: "ok".to_string(),
+                });
+            }
+        }
+    }
+
+    Ok(MacroRunResult {
+        macro_id: macro_def.id,
+        steps,
+    })
+}
+
+pub fn run_macro_blocking(
+    macro_id: &str,
+    provided_args: HashMap<String, String>,
+    state: &State<'_, AppState>,
+    app_handle: &tauri::AppHandle,
+) -> Result<MacroRunResult, String> {
+    let macro_def = fetch_macro(state, macro_id)?;
+    let arg_map = resolve_args(&macro_def.args, &provided_args)?;
+    let resolved_steps = resolve_steps(&macro_def, &arg_map)?;
+
+    let mut steps = Vec::new();
+
+    for (idx, step) in resolved_steps.into_iter().enumerate() {
+        match step.kind {
+            ResolvedKind::Extension {
+                ref ext_id,
+                ref command,
+            } => {
+                match extensions::check_extension_permissions(&step.id, &step.capabilities) {
+                    Ok(()) => {}
+                    Err(extensions::PermissionError::NeedsPrompt { missing_caps }) => {
+                        let payload = json!({
+                            "script_id": step.id,
+                            "missing_caps": missing_caps,
+                            "requested_caps": step.capabilities,
+                        });
+                        return Err(format!("PERMISSION_NEEDED:{}", payload));
+                    }
+                    Err(extensions::PermissionError::Deny) => {
+                        let payload = json!({
+                            "script_id": step.id,
+                            "requested_caps": step.capabilities,
+                        });
+                        return Err(format!("PERMISSION_DENIED:{}", payload));
+                    }
+                }
+
+                steps.push(MacroRunStepResult {
+                    index: idx,
+                    kind: "extension".to_string(),
+                    command: format!("{}:{}", ext_id, command),
+                    args: step.args,
+                    capabilities: step.capabilities,
+                    status: "ok".to_string(),
+                });
+            }
+            ResolvedKind::System { ref command } => {
+                match extensions::check_extension_permissions(&step.id, &step.capabilities) {
+                    Ok(()) => {}
+                    Err(extensions::PermissionError::NeedsPrompt { missing_caps }) => {
+                        let payload = json!({
+                            "script_id": step.id,
+                            "missing_caps": missing_caps,
+                            "requested_caps": step.capabilities,
+                        });
+                        return Err(format!("PERMISSION_NEEDED:{}", payload));
+                    }
+                    Err(extensions::PermissionError::Deny) => {
+                        let payload = json!({
+                            "script_id": step.id,
+                            "requested_caps": step.capabilities,
+                        });
+                        return Err(format!("PERMISSION_DENIED:{}", payload));
+                    }
+                }
+
+                launcher::launch_blocking(command, &step.args, Some(app_handle))?;
 
                 steps.push(MacroRunStepResult {
                     index: idx,

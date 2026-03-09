@@ -15,12 +15,12 @@ pub mod themes;
 pub mod permissions;
 pub mod workflows;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::{Manager, Emitter};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use clap::Parser;
 
 use config::{VantaConfig, WorkflowMacro};
@@ -43,6 +43,31 @@ pub struct AppState {
     pub extensions_cache: Mutex<Vec<ExtensionEntry>>,
     pub history: Mutex<History>,
     pub file_index: FileIndex,
+    macro_jobs: Mutex<Vec<MacroJobRecord>>,
+    canceled_jobs: Mutex<HashSet<String>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum MacroJobStatus {
+    Running,
+    Succeeded,
+    Failed,
+    Canceled,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct MacroJobRecord {
+    id: String,
+    macro_id: String,
+    macro_name: String,
+    args: HashMap<String, String>,
+    status: MacroJobStatus,
+    created_at: i64,
+    updated_at: i64,
+    completed_at: Option<i64>,
+    steps: Vec<workflows::MacroRunStepResult>,
+    error: Option<String>,
 }
 
 static SEARCH_CALLS: AtomicU64 = AtomicU64::new(0);
@@ -78,6 +103,39 @@ fn emit_clipboard_with_retries(win: &WebviewWindow) {
         sleep(Duration::from_millis(300)).await;
         let _ = w2.emit("open_clipboard", ());
     });
+}
+
+fn now_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+fn jobs_path() -> std::path::PathBuf {
+    config::config_dir().join("macro-jobs.json")
+}
+
+fn load_jobs_from_disk() -> Vec<MacroJobRecord> {
+    let path = jobs_path();
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    serde_json::from_str::<Vec<MacroJobRecord>>(&raw).unwrap_or_default()
+}
+
+fn save_jobs_to_disk(jobs: &[MacroJobRecord]) {
+    let path = jobs_path();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(serialized) = serde_json::to_string_pretty(jobs) {
+        let _ = std::fs::write(path, serialized);
+    }
+}
+
+fn emit_jobs_updated(app_handle: &tauri::AppHandle, jobs: &[MacroJobRecord]) {
+    let _ = app_handle.emit("macro-jobs-updated", jobs);
 }
 
 #[derive(Parser, Debug)]
@@ -1024,6 +1082,203 @@ async fn run_macro(
 }
 
 #[tauri::command]
+async fn start_macro_job(
+    macro_id: String,
+    args: HashMap<String, String>,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<MacroJobRecord, String> {
+    let preflight = workflows::dry_run_macro(&macro_id, args.clone(), &state)?;
+    if let Some(step) = preflight
+        .steps
+        .iter()
+        .find(|s| !s.missing_caps.is_empty())
+    {
+        let payload = serde_json::json!({
+            "script_id": format!("macro:{}:step:{}", preflight.macro_id, step.index),
+            "missing_caps": step.missing_caps,
+            "requested_caps": step.capabilities,
+        });
+        return Err(format!("PERMISSION_NEEDED:{}", payload));
+    }
+    if preflight
+        .steps
+        .iter()
+        .any(|s| s.decision == permissions::Decision::Deny)
+    {
+        let payload = serde_json::json!({
+            "script_id": format!("macro:{}", preflight.macro_id),
+            "requested_caps": preflight.steps.into_iter().flat_map(|s| s.capabilities).collect::<Vec<_>>(),
+        });
+        return Err(format!("PERMISSION_DENIED:{}", payload));
+    }
+
+    let macros = workflows::list_macros(&state)?;
+    let macro_name = macros
+        .iter()
+        .find(|m| m.id == macro_id)
+        .map(|m| m.name.clone())
+        .unwrap_or_else(|| macro_id.clone());
+
+    let ts = now_millis();
+    let job_id = format!("job-{}-{}", ts, SEARCH_CALLS.fetch_add(1, Ordering::Relaxed));
+    let record = MacroJobRecord {
+        id: job_id.clone(),
+        macro_id: macro_id.clone(),
+        macro_name,
+        args: args.clone(),
+        status: MacroJobStatus::Running,
+        created_at: ts,
+        updated_at: ts,
+        completed_at: None,
+        steps: Vec::new(),
+        error: None,
+    };
+
+    {
+        let mut jobs = state
+            .macro_jobs
+            .lock()
+            .map_err(|_| "Failed to access macro jobs".to_string())?;
+        jobs.insert(0, record.clone());
+        if jobs.len() > 200 {
+            jobs.truncate(200);
+        }
+        save_jobs_to_disk(&jobs);
+        emit_jobs_updated(&app_handle, &jobs);
+    }
+
+    let app_for_task = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        let run_result = {
+            let app_for_block = app_for_task.clone();
+            let macro_id_for_block = macro_id.clone();
+            let args_for_block = args.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let app_state = app_for_block.state::<AppState>();
+                workflows::run_macro_blocking(&macro_id_for_block, args_for_block, &app_state, &app_for_block)
+            })
+            .await
+        };
+
+        let now = now_millis();
+        let canceled = {
+            let app_state = app_for_task.state::<AppState>();
+            app_state
+                .canceled_jobs
+                .lock()
+                .ok()
+                .map(|mut s| s.remove(&job_id))
+                .unwrap_or(false)
+        };
+
+        {
+            let app_state = app_for_task.state::<AppState>();
+            let mut jobs = match app_state.macro_jobs.lock() {
+                Ok(guard) => guard,
+                Err(_) => return,
+            };
+            if let Some(job) = jobs.iter_mut().find(|j| j.id == job_id) {
+                job.updated_at = now;
+                job.completed_at = Some(now);
+
+                if canceled {
+                    job.status = MacroJobStatus::Canceled;
+                    job.error = Some("Canceled by user".to_string());
+                } else {
+                    match run_result {
+                        Ok(Ok(result)) => {
+                            job.status = MacroJobStatus::Succeeded;
+                            job.steps = result.steps;
+                            job.error = None;
+                        }
+                        Ok(Err(err)) => {
+                            job.status = MacroJobStatus::Failed;
+                            job.error = Some(err);
+                        }
+                        Err(join_err) => {
+                            job.status = MacroJobStatus::Failed;
+                            job.error = Some(format!("Job execution join failure: {}", join_err));
+                        }
+                    }
+                }
+            }
+
+            save_jobs_to_disk(&jobs);
+            emit_jobs_updated(&app_for_task, &jobs);
+        }
+    });
+
+    Ok(record)
+}
+
+#[tauri::command]
+async fn list_macro_jobs(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<MacroJobRecord>, String> {
+    let jobs = state
+        .macro_jobs
+        .lock()
+        .map_err(|_| "Failed to access macro jobs".to_string())?;
+    Ok(jobs.clone())
+}
+
+#[tauri::command]
+async fn cancel_macro_job(
+    job_id: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    {
+        let mut canceled = state
+            .canceled_jobs
+            .lock()
+            .map_err(|_| "Failed to access canceled jobs".to_string())?;
+        canceled.insert(job_id.clone());
+    }
+
+    let now = now_millis();
+    let mut jobs = state
+        .macro_jobs
+        .lock()
+        .map_err(|_| "Failed to access macro jobs".to_string())?;
+
+    if let Some(job) = jobs.iter_mut().find(|j| j.id == job_id) {
+        if matches!(job.status, MacroJobStatus::Running) {
+            job.status = MacroJobStatus::Canceled;
+            job.updated_at = now;
+            job.completed_at = Some(now);
+            job.error = Some("Canceled by user".to_string());
+        }
+    }
+
+    save_jobs_to_disk(&jobs);
+    emit_jobs_updated(&app_handle, &jobs);
+    Ok(())
+}
+
+#[tauri::command]
+async fn retry_macro_job(
+    job_id: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<MacroJobRecord, String> {
+    let (macro_id, args) = {
+        let jobs = state
+            .macro_jobs
+            .lock()
+            .map_err(|_| "Failed to access macro jobs".to_string())?;
+        let job = jobs
+            .iter()
+            .find(|j| j.id == job_id)
+            .ok_or_else(|| format!("Job '{}' not found", job_id))?;
+        (job.macro_id.clone(), job.args.clone())
+    };
+
+    start_macro_job(macro_id, args, state, app_handle).await
+}
+
+#[tauri::command]
 async fn get_clipboard_history() -> Result<Vec<clipboard::ClipboardItem>, String> {
     clipboard::get_history().map_err(|e| format!("Failed to get history: {}", e))
 }
@@ -1301,6 +1556,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
     };
 
     let file_index: files::FileIndex = std::sync::Arc::new(Mutex::new(files::FileIndexState::default()));
+    let macro_jobs = load_jobs_from_disk();
 
     let app_state = AppState {
         apps: Mutex::new(apps),
@@ -1308,6 +1564,8 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
         extensions_cache: Mutex::new(discovered_extensions),
         history: Mutex::new(history),
         file_index: file_index.clone(),
+        macro_jobs: Mutex::new(macro_jobs),
+        canceled_jobs: Mutex::new(HashSet::new()),
     };
 
     let mut builder = tauri::Builder::default();
@@ -1372,6 +1630,10 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             get_workflows,
             dry_run_macro,
             run_macro,
+            start_macro_job,
+            list_macro_jobs,
+            cancel_macro_job,
+            retry_macro_job,
             get_suggestions,
             get_search_diagnostics,
             get_clipboard_history,

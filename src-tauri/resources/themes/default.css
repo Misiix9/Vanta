@@ -1749,6 +1749,80 @@ input[type="range"] {
     animation: spin 0.6s linear infinite;
 }
 
+/* ── Background Jobs Panel ─────────────────────────────────── */
+.jobs-panel {
+    margin: 0 12px 8px;
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.08));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--vanta-surface, #0a0a0a) 86%, transparent);
+    padding: 8px 10px;
+}
+
+.jobs-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.jobs-header h3 {
+    margin: 0;
+    padding: 0;
+    border: none;
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 0.78rem;
+    color: var(--vanta-text, #f5f5f5);
+}
+
+.jobs-count {
+    font-size: 0.7rem;
+    color: var(--vanta-text-dim, #999);
+}
+
+.jobs-empty {
+    font-size: 0.72rem;
+    color: var(--vanta-text-dim, #888);
+}
+
+.jobs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.job-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: center;
+}
+
+.job-title {
+    font-size: 0.74rem;
+    color: var(--vanta-text, #f0f0f0);
+}
+
+.job-meta {
+    font-size: 0.68rem;
+    color: var(--vanta-text-dim, #999);
+}
+
+.job-error {
+    font-size: 0.66rem;
+    color: #e58e8e;
+}
+
+.job-btn {
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.12));
+    background: transparent;
+    color: var(--vanta-text, #f5f5f5);
+    border-radius: 6px;
+    padding: 3px 8px;
+    cursor: pointer;
+    font-size: 0.68rem;
+}
+
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
