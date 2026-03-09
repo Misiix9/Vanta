@@ -44,7 +44,7 @@ sudo rpm -i vanta-2.12.0-1.x86_64.rpm
 - Added async-safe macro execution path with permission preflight and status updates.
 - Includes all window/workspace intelligence upgrades from v2.11.0.
 
-### Phase 13 (v3.0.0) - Unified Command Contract (In Progress)
+### Latest Major (v3.0.0)
 - Added typed result/action contract (`search_v3`, `get_suggestions_v3`) with legacy `exec` fallback.
 - Added versioned extension manifest schema (`schema_version`) and automatic local migration.
 - Added versioned config/workflow schema fields and migration tooling (`run_contract_migration`).
