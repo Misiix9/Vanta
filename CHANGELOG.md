@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.9.0
+- Added Vanta Store discoverability metadata support for categories, ratings, install counts, trust badges, and changelog previews.
+- Added category filtering and richer store cards with permission risk labels (`Low`/`Medium`/`High`) for clearer install decisions.
+- Added stronger install-time manifest validation (name/title/commands checks) with explicit failure reasons.
+- Improved install safety by rolling back partially downloaded extensions when required files fail to download/write.
+
 ## 2.8.0
 - Added Theme Studio controls in Settings with preset packs (`Minimal`, `Vivid`, `High Contrast`, `Compact`).
 - Added theme profile import/export workflow with JSON validation and copy support.

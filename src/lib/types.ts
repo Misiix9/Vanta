@@ -228,6 +228,12 @@ export interface StoreExtensionInfo {
     author: string;
     icon: string | null;
     permissions: string[];
+    category: string;
+    rating?: number | null;
+    install_count: number;
+    trust_badge: string;
+    changelog: string[];
+    permission_risk: "Low" | "Medium" | "High" | string;
     commands_count: number;
     installed: boolean;
 }

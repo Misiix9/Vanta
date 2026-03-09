@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_2.8.0_amd64.deb
+sudo dpkg -i vanta_2.9.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-2.8.0-1.x86_64.rpm
+sudo rpm -i vanta-2.9.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v2.8.0)
-- Theme Studio controls with curated preset packs (`Minimal`, `Vivid`, `High Contrast`, `Compact`).
-- Theme profile import/export with validation for safer customization and sharing.
-- Quick reset-to-default theme safeguards.
-- Includes all clipboard productivity upgrades from v2.7.0.
+### Latest Minor (v2.9.0)
+- Store now surfaces categories, trust badges, risk labels, install counts, ratings, and latest changelog snippets.
+- Added category filter chips for faster extension discovery.
+- Store installs now perform stronger manifest validation and show actionable error messages on failure.
+- Added rollback safeguards to prevent partially installed extensions when download/write steps fail.
 
 ---
 

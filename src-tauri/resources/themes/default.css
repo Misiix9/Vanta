@@ -1467,6 +1467,31 @@ input[type="range"] {
     gap: 10px;
 }
 
+.store-filters {
+    display: flex;
+    gap: 8px;
+    padding: 10px 18px 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.store-filter {
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.1));
+    background: color-mix(in srgb, var(--vanta-surface, #0a0a0a) 80%, transparent);
+    color: var(--vanta-text-dim, #a0a0a0);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.74rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.store-filter.active {
+    color: var(--vanta-text, #f5f5f5);
+    border-color: color-mix(in srgb, var(--vanta-accent, #ffffff) 55%, transparent);
+    background: color-mix(in srgb, var(--vanta-accent, #ffffff) 18%, transparent);
+}
+
 .ext-card {
     display: flex;
     align-items: flex-start;
@@ -1529,6 +1554,30 @@ input[type="range"] {
     letter-spacing: normal;
 }
 
+.ext-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.trust-badge {
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    padding: 2px 8px;
+    border: 1px solid var(--vanta-border, rgba(255,255,255,0.12));
+    color: var(--vanta-text-dim, #a0a0a0);
+}
+
+.trust-badge.verified {
+    color: #64d29a;
+    border-color: rgba(100, 210, 154, 0.5);
+    background: rgba(100, 210, 154, 0.12);
+}
+
 .ext-desc {
     font-size: 0.82rem;
     color: var(--vanta-text-dim, #888);
@@ -1547,6 +1596,28 @@ input[type="range"] {
     font-size: 0.75rem;
     color: var(--vanta-text-dim, #888);
     opacity: 0.8;
+    flex-wrap: wrap;
+}
+
+.risk-badge {
+    border-radius: 999px;
+    padding: 1px 7px;
+    border: 1px solid rgba(255,255,255,0.14);
+}
+
+.risk-badge.risk-low {
+    color: #79d2a6;
+    border-color: rgba(121, 210, 166, 0.5);
+}
+
+.risk-badge.risk-medium {
+    color: #e7b35f;
+    border-color: rgba(231, 179, 95, 0.5);
+}
+
+.risk-badge.risk-high {
+    color: #f07d7d;
+    border-color: rgba(240, 125, 125, 0.6);
 }
 
 .ext-perms {
@@ -1554,6 +1625,13 @@ input[type="range"] {
     gap: 4px;
     margin-top: 4px;
     flex-wrap: wrap;
+}
+
+.ext-changelog {
+    margin-top: 6px;
+    font-size: 0.72rem;
+    color: var(--vanta-text-dim, #8f8f8f);
+    opacity: 0.9;
 }
 
 .perm-badge {

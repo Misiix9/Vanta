@@ -1,4 +1,4 @@
-name: Release Vanta v2.8.0
+name: Release Vanta v2.9.0
 
 on:
   push:
@@ -83,15 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.8.0 -- Theme Studio And Presets
+            ## Vanta v2.9.0 -- Store Discoverability And Trust
 
-            Minor release focused on customization workflows, safety, and preset-driven theme editing.
+            Minor release focused on safer extension installs and stronger store discoverability.
 
             ### Highlights
-            - Added Theme Studio preset packs (`Minimal`, `Vivid`, `High Contrast`, `Compact`).
-            - Added import/export theme profile controls with JSON validation.
-            - Added reset-to-default profile action for safe recovery.
-            - Includes all clipboard productivity improvements from v2.7.0.
+            - Added store metadata support for categories, ratings, install counts, trust badges, and changelog previews.
+            - Added category filters and permission risk labels for clearer install decisions.
+            - Added stricter install-time manifest validation with actionable errors.
+            - Added rollback safeguards to prevent partial extension installs.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

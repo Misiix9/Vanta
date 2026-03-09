@@ -17,6 +17,18 @@
   let actionLevel = $state<"info" | "success" | "error">("info");
   let installingSet = $state<Set<string>>(new Set());
   let uninstallingSet = $state<Set<string>>(new Set());
+  let selectedCategory = $state<string>("All");
+
+  const categories = $derived([
+    "All",
+    ...Array.from(new Set(extensions.map((ext) => ext.category || "Uncategorized"))).sort(),
+  ]);
+
+  const visibleExtensions = $derived(
+    selectedCategory === "All"
+      ? extensions
+      : extensions.filter((ext) => ext.category === selectedCategory),
+  );
 
   const unlisteners: Array<() => void> = [];
 
@@ -136,6 +148,18 @@
 
     return cleaned;
   }
+
+  function formatRating(rating: number | null | undefined): string {
+    if (typeof rating !== "number") return "N/A";
+    return rating.toFixed(1);
+  }
+
+  function formatInstallCount(count: number): string {
+    if (!Number.isFinite(count) || count <= 0) return "new";
+    if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+    if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
+    return `${count}`;
+  }
 </script>
 
 <div class="store-root">
@@ -175,8 +199,28 @@
       <span>No extensions available yet.</span>
     </div>
   {:else}
+    <div class="store-filters" role="tablist" aria-label="Store categories">
+      {#each categories as category}
+        <button
+          class="store-filter"
+          class:active={selectedCategory === category}
+          role="tab"
+          aria-selected={selectedCategory === category}
+          onclick={() => (selectedCategory = category)}
+        >
+          {category}
+        </button>
+      {/each}
+    </div>
+
+    {#if visibleExtensions.length === 0}
+      <div class="store-empty">
+        <i class="fa-solid fa-filter-circle-xmark"></i>
+        <span>No extensions in this category yet.</span>
+      </div>
+    {:else}
     <div class="store-grid">
-      {#each extensions as ext (ext.name)}
+      {#each visibleExtensions as ext (ext.name)}
         <div class="ext-card" class:installed={ext.installed}>
           <div class="ext-icon">
             {#if isInlineSvg(ext.icon)}
@@ -190,11 +234,18 @@
             {/if}
           </div>
           <div class="ext-info">
-            <h3>{ext.title}</h3>
+            <div class="ext-title-row">
+              <h3>{ext.title}</h3>
+              <span class={`trust-badge ${ext.trust_badge}`}>{ext.trust_badge}</span>
+            </div>
             <p class="ext-desc">{ext.description}</p>
             <div class="ext-meta">
+              <span class="ext-category">{ext.category}</span>
               <span class="ext-author">{ext.author}</span>
               <span class="ext-version">v{ext.version}</span>
+              <span class="ext-rating"><i class="fa-solid fa-star"></i> {formatRating(ext.rating)}</span>
+              <span class="ext-installs"><i class="fa-solid fa-download"></i> {formatInstallCount(ext.install_count)}</span>
+              <span class={`risk-badge risk-${ext.permission_risk.toLowerCase()}`}>{ext.permission_risk} Risk</span>
             </div>
             {#if ext.permissions.length > 0}
               <div class="ext-perms">
@@ -202,6 +253,9 @@
                   <span class="perm-badge">{perm}</span>
                 {/each}
               </div>
+            {/if}
+            {#if ext.changelog.length > 0}
+              <div class="ext-changelog">Latest: {ext.changelog[0]}</div>
             {/if}
           </div>
           <div class="ext-actions">
@@ -237,6 +291,7 @@
         </div>
       {/each}
     </div>
+    {/if}
   {/if}
 </div>
 
