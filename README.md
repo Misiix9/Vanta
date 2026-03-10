@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_3.5.0_amd64.deb
+sudo dpkg -i vanta_3.6.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-3.5.0-1.x86_64.rpm
+sudo rpm -i vanta-3.6.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v3.5.0)
-- Added packaging verification script (`scripts/verify-release-packages.sh`) for Deb/RPM metadata and content checks.
-- Added release workflow package verification gate before asset upload.
-- Tightened store metrics policy to avoid mock download/rating placeholders.
-- Added distribution/troubleshooting guidance for release validation.
+### Latest Minor (v3.6.0)
+- Added Phase 19 Community panel with in-app feedback submission and roadmap voting hooks.
+- Added trusted shareable snippet export/import for workflows, profiles, and theme presets.
+- Added opt-in Popular Workflows discovery feed with install actions into local macros.
+- Added safety guardrails to block risky unverified workflow snippet imports.
 
 ### Latest Major (v3.0.0)
 - Added typed result/action contract (`search_v3`, `get_suggestions_v3`) with legacy `exec` fallback.

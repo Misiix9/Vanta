@@ -28,6 +28,42 @@ export interface GeneralConfig {
     hotkey: string;
     max_results: number;
     launch_on_login: boolean;
+    community_feed_opt_in?: boolean;
+}
+
+export interface CommunityVoteCount {
+    topic: string;
+    votes: number;
+}
+
+export interface CommunityTrustMetadata {
+    source: string;
+    publisher: string;
+    verified: boolean;
+    risk_level: string;
+    signature_hint?: string | null;
+}
+
+export interface PopularWorkflowFeedEntry {
+    id: string;
+    title: string;
+    description: string;
+    tags: string[];
+    trust: CommunityTrustMetadata;
+    workflow: WorkflowMacro;
+}
+
+export interface CommunityFeedbackSummary {
+    schema_version: number;
+    updated_at: number;
+    total_feedback: number;
+    top_votes: CommunityVoteCount[];
+}
+
+export interface CommunityFeedbackReceipt {
+    id: string;
+    created_at: number;
+    total_feedback: number;
 }
 
 export interface ExtensionsConfig {

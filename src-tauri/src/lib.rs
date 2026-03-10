@@ -14,6 +14,7 @@ pub mod windows;
 pub mod themes;
 pub mod permissions;
 pub mod workflows;
+pub mod community;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -2286,6 +2287,13 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             store::submit_extension_rating,
             store::install_store_extension,
             store::uninstall_extension,
+            community::submit_community_feedback,
+            community::vote_roadmap_item,
+            community::get_community_feedback_summary,
+            community::get_popular_workflows_feed,
+            community::install_popular_workflow,
+            community::export_community_snippet,
+            community::import_community_snippet,
             get_workflows,
             dry_run_macro,
             run_macro,

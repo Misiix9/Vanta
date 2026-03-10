@@ -3,7 +3,8 @@
   "general": {
     "hotkey": "Alt+Space",
     "max_results": 8,
-    "launch_on_login": false
+    "launch_on_login": false,
+    "community_feed_opt_in": false
   },
   "appearance": {
     "blur_radius": 40,

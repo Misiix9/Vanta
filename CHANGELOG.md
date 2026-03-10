@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.6.0
+- Added a Phase 19 Community settings section with in-app feedback submission and roadmap voting hooks.
+- Added trusted snippet export/import flows for workflows, profiles, and theme presets.
+- Added opt-in Popular Workflows feed support with one-click macro install.
+- Added import safety guardrails that block risky unverified workflow snippets.
+
 ## 2.12.0
 - Added async macro job lifecycle with persisted history (`running`, `succeeded`, `failed`, `canceled`).
 - Added background jobs panel in launcher with retry/cancel controls and live updates.

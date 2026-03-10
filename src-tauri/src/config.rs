@@ -255,6 +255,8 @@ pub struct GeneralConfig {
     pub hotkey: String,
     pub max_results: usize,
     pub launch_on_login: bool,
+    #[serde(default)]
+    pub community_feed_opt_in: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -496,6 +498,7 @@ impl Default for VantaConfig {
                 hotkey: "Alt+Space".to_string(),
                 max_results: 8,
                 launch_on_login: false,
+                community_feed_opt_in: false,
             },
             window: WindowConfig {
                 width: 680.0,
