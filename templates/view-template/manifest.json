@@ -1,0 +1,19 @@
+{
+  "name": "my-view-extension",
+  "title": "My View Extension",
+  "schema_version": 1,
+  "version": "0.1.0",
+  "description": "Starter template for a Vanta SDK view extension",
+  "author": "Vanta Team",
+  "publisher": "Vanta Team",
+  "safe": true,
+  "permissions": [],
+  "commands": [
+    {
+      "name": "open",
+      "title": "Open Template View",
+      "subtitle": "SDK v2 starter",
+      "mode": "view"
+    }
+  ]
+}
