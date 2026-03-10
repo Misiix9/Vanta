@@ -24,6 +24,7 @@
   let nowPlaying = $state<NowPlayingState | null>(null);
   let showControls = $state(false);
   let unlistenRelay: (() => void) | null = null;
+  let tickTimer: number | null = null;
 
   function fmtTime(ms: number): string {
     const s = Math.floor(ms / 1000);
@@ -97,11 +98,23 @@
       nowPlaying = event.payload;
       (window as any).__vanta_now_playing = event.payload;
     });
+
+    tickTimer = window.setInterval(() => {
+      if (!nowPlaying || !nowPlaying.isPlaying || nowPlaying.durationMs <= 0) return;
+      nowPlaying = {
+        ...nowPlaying,
+        progressMs: Math.min(nowPlaying.progressMs + 1000, nowPlaying.durationMs),
+      };
+    }, 1000);
   });
 
   onDestroy(() => {
     window.removeEventListener("vanta-now-playing", handleNowPlaying as EventListener);
     unlistenRelay?.();
+    if (tickTimer !== null) {
+      window.clearInterval(tickTimer);
+      tickTimer = null;
+    }
   });
 </script>
 

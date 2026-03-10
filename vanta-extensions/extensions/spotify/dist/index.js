@@ -101,6 +101,10 @@
       '.spot-vol-icon{color:var(--vanta-text-dim,#888);flex-shrink:0;display:flex;align-items:center}',
       '.spot-vol-bar{flex:1;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;cursor:pointer;position:relative}',
       '.spot-vol-fill{height:100%;background:var(--vanta-accent,#7b35f0);border-radius:2px;transition:width .1s}',
+      '.spot-lyrics{margin:0 16px 12px;padding:10px 12px;background:rgba(255,255,255,0.03);border:1px solid var(--vanta-border,rgba(255,255,255,0.08));border-radius:8px;max-height:150px;overflow:auto}',
+      '.spot-lyrics-title{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--vanta-text-dim,#999);margin-bottom:6px}',
+      '.spot-lyrics-line{font-size:12px;line-height:1.45;color:var(--vanta-text,#e8e8e8);margin:0 0 3px}',
+      '.spot-lyrics-empty{font-size:12px;color:var(--vanta-text-dim,#888)}',
 
       '.spot-empty{text-align:center;padding:32px 16px;color:var(--vanta-text-dim,#888);font-size:13px}',
       '.spot-empty-icon{margin-bottom:12px;opacity:.3}',
@@ -687,6 +691,21 @@
       };
       volWrap.appendChild(volIcon); volWrap.appendChild(volBar);
       container.appendChild(volWrap);
+
+      var lyricsWrap = document.createElement('div'); lyricsWrap.className = 'spot-lyrics';
+      var lyricsTitle = document.createElement('div'); lyricsTitle.className = 'spot-lyrics-title'; lyricsTitle.textContent = 'Lyrics';
+      lyricsWrap.appendChild(lyricsTitle);
+      if (lyricsText && lyricsText.trim()) {
+        lyricsText.split('\n').map(function(line) { return line.trim(); }).filter(function(line) { return line.length > 0; }).slice(0, 30).forEach(function(line) {
+          var row = document.createElement('div'); row.className = 'spot-lyrics-line'; row.textContent = line;
+          lyricsWrap.appendChild(row);
+        });
+      } else {
+        var empty = document.createElement('div'); empty.className = 'spot-lyrics-empty';
+        empty.textContent = 'Lyrics unavailable for this track.';
+        lyricsWrap.appendChild(empty);
+      }
+      container.appendChild(lyricsWrap);
     }
 
     function makeCtrl(svg, active, handler) {
@@ -826,6 +845,7 @@
         if (!isNaN(val)) {
           volumePercent = Math.max(0, Math.min(100, Math.round(val)));
           spotApi('PUT', '/me/player/volume?volume_percent=' + volumePercent);
+          if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer);
           emitNowPlaying();
         }
       }

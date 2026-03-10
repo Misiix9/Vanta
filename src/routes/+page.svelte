@@ -244,7 +244,9 @@
   onMount(async () => {
     onboardingOpen = localStorage.getItem(ONBOARDING_SEEN_KEY) !== "1";
     quickTipsVisible = localStorage.getItem(QUICK_TIPS_HIDDEN_KEY) !== "1";
-    isMiniPlayer = window.location.search.includes("view=mini-player");
+    isMiniPlayer =
+      getCurrentWebviewWindow().label === "spotify-mini" ||
+      window.location.search.includes("view=mini-player");
 
     // Register clipboard listener ASAP so startup emits aren't missed.
     try {

@@ -2119,7 +2119,7 @@ async fn open_spotify_mini_player(app_handle: tauri::AppHandle) -> Result<(), St
         return Ok(());
     }
 
-    let url = WebviewUrl::App("index.html?view=mini-player".into());
+    let url = WebviewUrl::App("/".into());
     let builder = tauri::WebviewWindowBuilder::new(
         &app_handle,
         "spotify-mini",

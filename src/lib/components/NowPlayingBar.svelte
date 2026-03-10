@@ -22,6 +22,7 @@
 
   let nowPlaying = $state<NowPlayingState | null>(null);
   let unlistenCommandRelay: (() => void) | null = null;
+  let tickTimer: number | null = null;
 
   function safeStoreNowPlaying(snapshot: NowPlayingState | null) {
     try {
@@ -86,11 +87,24 @@
         }),
       );
     });
+
+    tickTimer = window.setInterval(() => {
+      if (!nowPlaying || !nowPlaying.isPlaying || nowPlaying.durationMs <= 0) return;
+      nowPlaying = {
+        ...nowPlaying,
+        progressMs: Math.min(nowPlaying.progressMs + 1000, nowPlaying.durationMs),
+      };
+      safeStoreNowPlaying(nowPlaying);
+    }, 1000);
   });
 
   onDestroy(() => {
     window.removeEventListener("vanta-now-playing", handleNowPlaying as EventListener);
     unlistenCommandRelay?.();
+    if (tickTimer !== null) {
+      window.clearInterval(tickTimer);
+      tickTimer = null;
+    }
   });
 </script>
 

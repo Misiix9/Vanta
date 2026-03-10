@@ -151,7 +151,7 @@
   {
     "name": "spotify",
     "title": "Spotify",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "Control Spotify playback and search for music",
     "author": "Vanta Team",
     "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M5 19c4.5-1 9-1 14-4'/><path d='M5 14c3.5-.8 7-.8 11-3'/><path d='M5 9c2.5-.5 5-.5 8-2'/></svg>",
@@ -164,6 +164,7 @@
     "install_count": 24880,
     "trust_badge": "verified",
     "changelog": [
+      "Fixed mini player open flow, improved realtime progress/volume sync, and added lyrics in now-playing view.",
       "Metadata upgraded for Phase 17 SDK v2 and community ratings.",
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
