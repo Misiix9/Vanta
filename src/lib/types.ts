@@ -97,6 +97,20 @@ export interface WorkflowsConfig {
     macros?: WorkflowMacro[];
 }
 
+export interface ProfileConfig {
+    id: string;
+    name: string;
+    hotkey: string;
+    theme: string;
+    search: SearchConfig;
+}
+
+export interface ProfilesConfig {
+    schema_version?: number;
+    active_profile_id: string;
+    entries: ProfileConfig[];
+}
+
 export interface MacroDryRunStep {
     index: number;
     kind: string;
@@ -153,6 +167,7 @@ export interface VantaConfig {
     files: FilesConfig;
     search: SearchConfig;
     workflows: WorkflowsConfig;
+    profiles?: ProfilesConfig;
 }
 
 export interface PerfStats {
@@ -193,6 +208,7 @@ export type CommandContract =
     | { kind: "extension_view"; ext_id: string; command: string }
     | { kind: "extension_action"; ext_id: string; command: string }
     | { kind: "query_fill"; value: string }
+    | { kind: "profile_switch"; id: string }
     | { kind: "unknown"; exec: string };
 
 export interface SearchResult {

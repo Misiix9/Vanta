@@ -1,4 +1,4 @@
-name: Release Vanta v2.12.0
+name: Release Vanta v3.1.0
 
 on:
   push:
@@ -83,15 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v2.12.0 -- Jobs And Async Workflows
+            ## Vanta v3.1.0 -- Profiles v2
 
-            Minor release focused on long-running workflow visibility and lifecycle control.
+            Minor release focused on context-aware profile switching and compatibility-safe profile portability.
 
             ### Highlights
-            - Added background macro jobs with `running/succeeded/failed/canceled` lifecycle states.
-            - Added persisted job history and live `macro-jobs-updated` event updates.
-            - Added job controls for retry and cancel in launcher UI.
-            - Added blocking system-step execution path for clearer macro completion reporting.
+            - Added profile-aware launcher actions for atomic context switching.
+            - Added profile import/export with schema compatibility checks.
+            - Added scoped profile settings for hotkey, theme, and ranking/search behavior.
+            - Added profile entries in suggestions and search for faster switching.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

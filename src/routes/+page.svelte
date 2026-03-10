@@ -522,6 +522,8 @@
         return `ext-no-view:${command.ext_id}:${command.command}`;
       case "query_fill":
         return `fill:${command.value}`;
+      case "profile_switch":
+        return `profile-switch:${command.id}`;
       case "unknown":
         return command.exec;
     }
@@ -551,6 +553,9 @@
       return { kind: "move_window_current_workspace", id: exec.slice(20) };
     }
     if (exec.startsWith("fill:")) return { kind: "query_fill", value: exec.slice(5) };
+    if (exec.startsWith("profile-switch:")) {
+      return { kind: "profile_switch", id: exec.slice(15) };
+    }
     if (exec.startsWith("macro:")) return { kind: "macro_open", id: exec.slice(6) };
     if (exec.startsWith("ext-view:")) {
       const [ext_id, ...rest] = exec.slice(9).split(":");
@@ -952,6 +957,26 @@
         requestAnimationFrame(() => {
           requestAnimationFrame(() => searchInputRef?.focus?.());
         });
+        return;
+      } else if (command.kind === "profile_switch") {
+        try {
+          const updated = await invoke<VantaConfig>("switch_profile", {
+            profileId: command.id,
+          });
+          vantaConfig = updated;
+          applyTheme(updated);
+          const themeId = updated.appearance.theme || "default";
+          const targetTheme =
+            availableThemes.find((t) => t.id === themeId) ||
+            availableThemes.find((t) => t.id === "default");
+          if (targetTheme) {
+            injectThemeCss(targetTheme.css_content);
+          }
+          await loadSuggestions();
+          searchInputRef?.focus?.();
+        } catch (e) {
+          console.error("Profile switch failed", e);
+        }
         return;
       } else if (command.kind === "system_action") {
         const action = command.action;

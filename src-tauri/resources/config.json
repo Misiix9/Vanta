@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "general": {
     "hotkey": "Alt+Space",
     "max_results": 8,
@@ -89,6 +89,25 @@
             "capabilities": ["Shell"]
           }
         ]
+      }
+    ]
+  },
+  "profiles": {
+    "schema_version": 1,
+    "active_profile_id": "default",
+    "entries": [
+      {
+        "id": "default",
+        "name": "Default",
+        "hotkey": "Alt+Space",
+        "theme": "default",
+        "search": {
+          "applications": { "enabled": true, "weight": 100 },
+          "windows": { "enabled": true, "weight": 100 },
+          "calculator": { "enabled": true, "weight": 100 },
+          "files": { "enabled": true, "weight": 100 },
+          "windows_max_results": 0
+        }
       }
     ]
   }

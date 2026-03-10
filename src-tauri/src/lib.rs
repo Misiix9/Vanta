@@ -23,7 +23,7 @@ use tauri::{Manager, Emitter};
 use serde::{Deserialize, Serialize};
 use clap::Parser;
 
-use config::{VantaConfig, WorkflowMacro};
+use config::{ProfileConfig, ProfilesConfig, VantaConfig, WorkflowMacro};
 use history::History;
 use matcher::{ResultSource, SearchResult};
 use scanner::AppEntry;
@@ -189,6 +189,7 @@ enum CommandV1 {
     ExtensionView { ext_id: String, command: String },
     ExtensionAction { ext_id: String, command: String },
     QueryFill { value: String },
+    ProfileSwitch { id: String },
     Unknown { exec: String },
 }
 
@@ -272,6 +273,9 @@ fn exec_to_command(exec: &str, source: &matcher::ResultSource) -> CommandV1 {
             value: v.to_string(),
         };
     }
+    if let Some(v) = exec.strip_prefix("profile-switch:") {
+        return CommandV1::ProfileSwitch { id: v.to_string() };
+    }
     if let Some(v) = exec.strip_prefix("macro:") {
         return CommandV1::MacroOpen { id: v.to_string() };
     }
@@ -333,6 +337,61 @@ fn to_v3_result(src: matcher::SearchResult) -> SearchResultV3 {
         actions,
         exec: src.exec,
     }
+}
+
+fn build_profile_results(
+    query: &str,
+    profiles: &ProfilesConfig,
+    weight: u32,
+) -> Vec<SearchResult> {
+    let trimmed = query.trim();
+    let lower = trimmed.to_lowercase();
+
+    profiles
+        .entries
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, profile)| {
+            let title = format!("Profile: {}", profile.name);
+            let subtitle = if profile.id == profiles.active_profile_id {
+                Some(format!("{} (active)", profile.id))
+            } else {
+                Some(profile.id.clone())
+            };
+
+            let include = if trimmed.is_empty() {
+                true
+            } else {
+                title.to_lowercase().contains(&lower)
+                    || profile.id.to_lowercase().contains(&lower)
+                    || "profile".contains(&lower)
+            };
+
+            if !include {
+                return None;
+            }
+
+            let (base, indices) = if let Some((raw, idxs)) = matcher::fuzzy_score_text(query, &title) {
+                (910_000u32.saturating_add(raw.saturating_mul(10)), idxs)
+            } else {
+                (900_000u32.saturating_sub(idx as u32), Vec::new())
+            };
+
+            Some(SearchResult {
+                title,
+                subtitle,
+                icon: Some("fa-solid fa-user-gear".to_string()),
+                exec: format!("profile-switch:{}", profile.id),
+                score: weighted_score(base, weight),
+                match_indices: indices,
+                source: ResultSource::Application,
+                actions: None,
+                id: Some(format!("profile:{}", profile.id)),
+                group: None,
+                section: Some("Profiles".to_string()),
+            })
+        })
+        .collect()
 }
 
 fn snapshot_perf(calls: &AtomicU64, total_ms: &AtomicU64, max_ms: &AtomicU64) -> PerfStats {
@@ -784,6 +843,75 @@ async fn save_config(
 }
 
 #[tauri::command]
+async fn get_profiles(
+    state: tauri::State<'_, AppState>,
+) -> Result<ProfilesConfig, String> {
+    let config = state
+        .config
+        .lock()
+        .map_err(|_| "Failed to access config state".to_string())?;
+    Ok(config::list_profiles(&config))
+}
+
+#[tauri::command]
+async fn switch_profile(
+    profile_id: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<VantaConfig, String> {
+    let updated = {
+        let mut config = state
+            .config
+            .lock()
+            .map_err(|_| "Failed to access config state".to_string())?;
+        config::switch_profile_in_config(&mut config, &profile_id)?;
+        config.save()?;
+        config.clone()
+    };
+
+    let _ = app_handle.emit("config-updated", &updated);
+    Ok(updated)
+}
+
+#[tauri::command]
+async fn export_profile(
+    profile_id: String,
+    output_path: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let config = state
+        .config
+        .lock()
+        .map_err(|_| "Failed to access config state".to_string())?;
+    config::export_profile_to_path(&config, &profile_id, &output_path)
+}
+
+#[tauri::command]
+async fn import_profile(
+    input_path: String,
+    replace_existing: bool,
+    activate: bool,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<ProfileConfig, String> {
+    let (imported, updated_cfg) = {
+        let mut config = state
+            .config
+            .lock()
+            .map_err(|_| "Failed to access config state".to_string())?;
+        let imported = config::import_profile_from_path(&mut config, &input_path, replace_existing)?;
+        if activate {
+            config::switch_profile_in_config(&mut config, &imported.id)?;
+        }
+        config.save()?;
+        (imported, config.clone())
+    };
+
+    let _ = app_handle.emit("config-updated", &updated_cfg);
+    Ok(imported)
+}
+
+#[tauri::command]
 async fn rebuild_file_index(
     state: tauri::State<'_, AppState>,
 ) -> Result<Option<u64>, String> {
@@ -827,12 +955,16 @@ async fn search(
         .apps
         .lock()
         .map_err(|_| "Failed to access application cache".to_string())?;
-    let (max_results, search_config) = {
+    let (max_results, search_config, profiles_config) = {
         let config = state
             .config
             .lock()
             .map_err(|_| "Failed to access config".to_string())?;
-        (config.general.max_results, config.search.clone())
+        (
+            config.general.max_results,
+            config.search.clone(),
+            config.profiles.clone(),
+        )
     };
 
     let usage_map = {
@@ -904,6 +1036,9 @@ async fn search(
         }
         results.extend(file_results);
     }
+
+    let profile_results = build_profile_results(&query, &profiles_config, search_config.applications.weight);
+    results.extend(profile_results);
 
     // Extension command search
     {
@@ -1030,6 +1165,7 @@ async fn get_suggestions(
 
     let search_config = config.search.clone();
     let max_results = config.general.max_results;
+    let profiles_config = config.profiles.clone();
 
     let file_index = state
         .file_index
@@ -1122,6 +1258,9 @@ async fn get_suggestions(
             }
         }
     }
+
+    let profile_results = build_profile_results("", &profiles_config, search_config.applications.weight);
+    results.extend(profile_results);
 
     results.push(SearchResult {
         title: "Vanta Store".to_string(),
@@ -1852,6 +1991,10 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config,
+            get_profiles,
+            switch_profile,
+            export_profile,
+            import_profile,
             search,
             search_v3,
             launch_app,

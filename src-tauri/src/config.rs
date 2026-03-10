@@ -7,8 +7,10 @@ use crate::permissions::Capability;
 
 // Embedded default config for fallback writes.
 const DEFAULT_CONFIG_JSON: &str = include_str!("../resources/config.json");
-pub const CONFIG_SCHEMA_VERSION: u32 = 3;
+pub const CONFIG_SCHEMA_VERSION: u32 = 4;
 pub const WORKFLOWS_SCHEMA_VERSION: u32 = 1;
+pub const PROFILES_SCHEMA_VERSION: u32 = 1;
+pub const PROFILE_EXPORT_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct ConfigMigrationReport {
@@ -37,9 +39,70 @@ pub struct VantaConfig {
     pub search: SearchConfig,
     #[serde(default)]
     pub workflows: WorkflowsConfig,
+    #[serde(default)]
+    pub profiles: ProfilesConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ProfileConfig {
+    pub id: String,
+    pub name: String,
+    pub hotkey: String,
+    pub theme: String,
+    pub search: SearchConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ProfilesConfig {
+    #[serde(default = "default_profiles_schema_version")]
+    pub schema_version: u32,
+    #[serde(default = "default_active_profile_id")]
+    pub active_profile_id: String,
+    #[serde(default = "default_profiles")]
+    pub entries: Vec<ProfileConfig>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+struct ProfileExportPayload {
+    #[serde(default = "default_profile_export_schema_version")]
+    schema_version: u32,
+    app_schema_version: u32,
+    profile: ProfileConfig,
+}
+
+fn default_profile_export_schema_version() -> u32 {
+    PROFILE_EXPORT_SCHEMA_VERSION
+}
+
+fn default_profiles_schema_version() -> u32 {
+    PROFILES_SCHEMA_VERSION
+}
+
+fn default_active_profile_id() -> String {
+    "default".to_string()
+}
+
+fn default_profiles() -> Vec<ProfileConfig> {
+    vec![ProfileConfig {
+        id: default_active_profile_id(),
+        name: "Default".to_string(),
+        hotkey: "Alt+Space".to_string(),
+        theme: "default".to_string(),
+        search: SearchConfig::default(),
+    }]
+}
+
+impl Default for ProfilesConfig {
+    fn default() -> Self {
+        Self {
+            schema_version: default_profiles_schema_version(),
+            active_profile_id: default_active_profile_id(),
+            entries: default_profiles(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SearchConfig {
     #[serde(default)]
     pub applications: SourcePreference,
@@ -53,7 +116,7 @@ pub struct SearchConfig {
     pub windows_max_results: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SourcePreference {
     #[serde(default = "default_source_enabled")]
     pub enabled: bool,
@@ -433,8 +496,178 @@ impl Default for VantaConfig {
             },
             search: SearchConfig::default(),
             workflows: WorkflowsConfig::default(),
+            profiles: ProfilesConfig::default(),
         }
     }
+}
+
+fn profile_from_runtime(cfg: &VantaConfig, id: &str, name: &str) -> ProfileConfig {
+    ProfileConfig {
+        id: id.to_string(),
+        name: name.to_string(),
+        hotkey: cfg.general.hotkey.clone(),
+        theme: cfg.appearance.theme.clone(),
+        search: cfg.search.clone(),
+    }
+}
+
+fn validate_profile_id(id: &str) -> bool {
+    !id.is_empty()
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+fn ensure_profiles(cfg: &mut VantaConfig) -> bool {
+    let mut changed = false;
+
+    if cfg.profiles.schema_version < PROFILES_SCHEMA_VERSION {
+        cfg.profiles.schema_version = PROFILES_SCHEMA_VERSION;
+        changed = true;
+    }
+
+    cfg.profiles.entries.retain(|p| validate_profile_id(&p.id));
+    if cfg.profiles.entries.is_empty() {
+        cfg.profiles
+            .entries
+            .push(profile_from_runtime(cfg, "default", "Default"));
+        changed = true;
+    }
+
+    if cfg.profiles.active_profile_id.is_empty()
+        || !cfg
+            .profiles
+            .entries
+            .iter()
+            .any(|p| p.id == cfg.profiles.active_profile_id)
+    {
+        cfg.profiles.active_profile_id = cfg.profiles.entries[0].id.clone();
+        changed = true;
+    }
+
+    if sync_active_profile_snapshot(cfg) {
+        changed = true;
+    }
+
+    changed
+}
+
+fn sync_active_profile_snapshot(cfg: &mut VantaConfig) -> bool {
+    let Some(active) = cfg
+        .profiles
+        .entries
+        .iter_mut()
+        .find(|p| p.id == cfg.profiles.active_profile_id)
+    else {
+        return false;
+    };
+
+    let mut changed = false;
+    if active.hotkey != cfg.general.hotkey {
+        active.hotkey = cfg.general.hotkey.clone();
+        changed = true;
+    }
+    if active.theme != cfg.appearance.theme {
+        active.theme = cfg.appearance.theme.clone();
+        changed = true;
+    }
+    if active.search != cfg.search {
+        active.search = cfg.search.clone();
+        changed = true;
+    }
+
+    changed
+}
+
+pub fn list_profiles(cfg: &VantaConfig) -> ProfilesConfig {
+    cfg.profiles.clone()
+}
+
+pub fn switch_profile_in_config(cfg: &mut VantaConfig, profile_id: &str) -> Result<(), String> {
+    let profile = cfg
+        .profiles
+        .entries
+        .iter()
+        .find(|p| p.id == profile_id)
+        .cloned()
+        .ok_or_else(|| format!("Profile '{}' not found", profile_id))?;
+
+    cfg.general.hotkey = profile.hotkey;
+    cfg.appearance.theme = profile.theme;
+    cfg.search = profile.search;
+    cfg.profiles.active_profile_id = profile.id;
+    Ok(())
+}
+
+pub fn export_profile_to_path(
+    cfg: &VantaConfig,
+    profile_id: &str,
+    output_path: &str,
+) -> Result<(), String> {
+    let profile = cfg
+        .profiles
+        .entries
+        .iter()
+        .find(|p| p.id == profile_id)
+        .cloned()
+        .ok_or_else(|| format!("Profile '{}' not found", profile_id))?;
+
+    let payload = ProfileExportPayload {
+        schema_version: PROFILE_EXPORT_SCHEMA_VERSION,
+        app_schema_version: CONFIG_SCHEMA_VERSION,
+        profile,
+    };
+
+    let json = serde_json::to_string_pretty(&payload)
+        .map_err(|e| format!("Failed to serialize profile export: {}", e))?;
+    fs::write(output_path, json)
+        .map_err(|e| format!("Failed to write profile export '{}': {}", output_path, e))
+}
+
+pub fn import_profile_from_path(
+    cfg: &mut VantaConfig,
+    input_path: &str,
+    replace_existing: bool,
+) -> Result<ProfileConfig, String> {
+    let raw = fs::read_to_string(input_path)
+        .map_err(|e| format!("Failed to read profile import '{}': {}", input_path, e))?;
+    let payload: ProfileExportPayload = serde_json::from_str(&raw)
+        .map_err(|e| format!("Failed to parse profile import '{}': {}", input_path, e))?;
+
+    if payload.schema_version > PROFILE_EXPORT_SCHEMA_VERSION {
+        return Err(format!(
+            "Profile export schema {} is newer than supported {}",
+            payload.schema_version, PROFILE_EXPORT_SCHEMA_VERSION
+        ));
+    }
+    if payload.app_schema_version > CONFIG_SCHEMA_VERSION {
+        return Err(format!(
+            "Profile export app schema {} is newer than supported {}",
+            payload.app_schema_version, CONFIG_SCHEMA_VERSION
+        ));
+    }
+    if !validate_profile_id(&payload.profile.id) {
+        return Err("Profile id is invalid. Use only [A-Za-z0-9_-].".to_string());
+    }
+
+    if let Some(idx) = cfg
+        .profiles
+        .entries
+        .iter()
+        .position(|p| p.id == payload.profile.id)
+    {
+        if !replace_existing {
+            return Err(format!(
+                "Profile '{}' already exists. Enable replace to overwrite.",
+                payload.profile.id
+            ));
+        }
+        cfg.profiles.entries[idx] = payload.profile.clone();
+    } else {
+        cfg.profiles.entries.push(payload.profile.clone());
+    }
+
+    Ok(payload.profile)
 }
 
 /// Returns the path to the Vanta config directory (~/.config/vanta/).
@@ -469,6 +702,9 @@ pub fn load_or_create_default() -> VantaConfig {
                     }
                     if config.workflows.schema_version < WORKFLOWS_SCHEMA_VERSION {
                         config.workflows.schema_version = WORKFLOWS_SCHEMA_VERSION;
+                        changed = true;
+                    }
+                    if ensure_profiles(&mut config) {
                         changed = true;
                     }
                     if clamp_window_size(&mut config.window) {
@@ -543,6 +779,9 @@ pub fn migrate_config_on_disk() -> Result<ConfigMigrationReport, String> {
         cfg.workflows.schema_version = WORKFLOWS_SCHEMA_VERSION;
         changed = true;
     }
+    if ensure_profiles(&mut cfg) {
+        changed = true;
+    }
     if clamp_window_size(&mut cfg.window) {
         changed = true;
     }
@@ -571,8 +810,11 @@ impl VantaConfig {
 }
 
 fn write_config(cfg: &VantaConfig) -> Result<(), String> {
+    let mut cfg = cfg.clone();
+    let _ = ensure_profiles(&mut cfg);
+
     let path = config_path();
-    let json = serde_json::to_string_pretty(cfg)
+    let json = serde_json::to_string_pretty(&cfg)
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
 
     fs::write(&path, json)
@@ -686,6 +928,9 @@ mod tests {
                 assert_eq!(cfg.accessibility.text_scale, 1.0);
                 assert_eq!(cfg.accessibility.spacing_preset, "comfortable");
                 assert_eq!(cfg.workflows.schema_version, WORKFLOWS_SCHEMA_VERSION);
+                assert_eq!(cfg.profiles.schema_version, PROFILES_SCHEMA_VERSION);
+                assert_eq!(cfg.profiles.active_profile_id, "default");
+                assert_eq!(cfg.profiles.entries.len(), 1);
 
                 // Legacy payload without accessibility should still deserialize.
                 let legacy = r##"{
@@ -731,6 +976,8 @@ mod tests {
                 assert_eq!(parsed.accessibility.text_scale, 1.0);
                 assert_eq!(parsed.accessibility.spacing_preset, "comfortable");
                 assert_eq!(parsed.workflows.schema_version, WORKFLOWS_SCHEMA_VERSION);
+                assert_eq!(parsed.profiles.active_profile_id, "default");
+                assert_eq!(parsed.profiles.entries.len(), 1);
         }
 
         #[test]
@@ -853,5 +1100,56 @@ mod tests {
             }
             _ => panic!("expected extension step"),
         }
+    }
+
+    #[test]
+    fn switch_profile_applies_runtime_fields() {
+        let mut cfg = VantaConfig::default();
+        cfg.profiles.entries.push(ProfileConfig {
+            id: "work".to_string(),
+            name: "Work".to_string(),
+            hotkey: "Ctrl+Space".to_string(),
+            theme: "high-contrast".to_string(),
+            search: SearchConfig {
+                applications: SourcePreference { enabled: true, weight: 130 },
+                windows: SourcePreference { enabled: true, weight: 110 },
+                calculator: SourcePreference { enabled: true, weight: 80 },
+                files: SourcePreference { enabled: true, weight: 140 },
+                windows_max_results: 6,
+            },
+        });
+
+        switch_profile_in_config(&mut cfg, "work").expect("switch profile");
+
+        assert_eq!(cfg.profiles.active_profile_id, "work");
+        assert_eq!(cfg.general.hotkey, "Ctrl+Space");
+        assert_eq!(cfg.appearance.theme, "high-contrast");
+        assert_eq!(cfg.search.files.weight, 140);
+        assert_eq!(cfg.search.windows_max_results, 6);
+    }
+
+    #[test]
+    fn import_profile_rejects_future_export_schema() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("profile.json");
+
+        let payload = serde_json::json!({
+            "schema_version": PROFILE_EXPORT_SCHEMA_VERSION + 1,
+            "app_schema_version": CONFIG_SCHEMA_VERSION,
+            "profile": {
+                "id": "future",
+                "name": "Future",
+                "hotkey": "Alt+P",
+                "theme": "default",
+                "search": SearchConfig::default(),
+            }
+        });
+
+        std::fs::write(&path, serde_json::to_string_pretty(&payload).unwrap()).expect("write payload");
+
+        let mut cfg = VantaConfig::default();
+        let err = import_profile_from_path(&mut cfg, path.to_str().unwrap(), false)
+            .expect_err("should reject future schema");
+        assert!(err.contains("newer than supported"));
     }
 }
