@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "sdk": {
+    "current": "2.0",
+    "supported": ["2.0"],
+    "deprecated": ["1.x"]
+  },
+  "manifest_schema": {
+    "current": 1,
+    "supported": [1],
+    "sunset_notice": "Manifest schema 1 remains required for all published extensions."
+  },
+  "deprecation_lifecycle": {
+    "announce_days": 30,
+    "warn_days": 30,
+    "remove_days": 60
+  }
+}

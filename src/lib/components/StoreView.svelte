@@ -18,6 +18,7 @@
   let installingSet = $state<Set<string>>(new Set());
   let uninstallingSet = $state<Set<string>>(new Set());
   let selectedCategory = $state<string>("All");
+  let ratingBusy = $state<string | null>(null);
 
   const categories = $derived([
     "All",
@@ -112,6 +113,25 @@
       const next = new Set(uninstallingSet);
       next.delete(name);
       uninstallingSet = next;
+    }
+  }
+
+  async function submitRating(name: string, rating: number) {
+    ratingBusy = `${name}:${rating}`;
+    try {
+      await invoke("submit_extension_rating", {
+        name,
+        rating,
+        comment: null,
+      });
+      actionLevel = "success";
+      actionMessage = `Opened rating form for ${name} (${rating} stars).`;
+    } catch (e) {
+      console.error(`Failed to submit rating for ${name}:`, e);
+      actionLevel = "error";
+      actionMessage = `Failed to open rating form: ${String(e)}`;
+    } finally {
+      ratingBusy = null;
     }
   }
 
@@ -241,10 +261,14 @@
             <p class="ext-desc">{ext.description}</p>
             <div class="ext-meta">
               <span class="ext-category">{ext.category}</span>
-              <span class="ext-author">{ext.author}</span>
+              <span class="ext-author">{ext.publisher}</span>
               <span class="ext-version">v{ext.version}</span>
               <span class="ext-rating"><i class="fa-solid fa-star"></i> {formatRating(ext.rating)}</span>
+              <span class="ext-rating-count">({ext.rating_count || 0})</span>
               <span class="ext-installs"><i class="fa-solid fa-download"></i> {formatInstallCount(ext.install_count)}</span>
+              {#if ext.safe}
+                <span class="risk-badge risk-low">Safe</span>
+              {/if}
               <span class={`risk-badge risk-${ext.permission_risk.toLowerCase()}`}>{ext.permission_risk} Risk</span>
             </div>
             {#if ext.permissions.length > 0}
@@ -259,6 +283,18 @@
             {/if}
           </div>
           <div class="ext-actions">
+            <div class="ext-rate-actions">
+              {#each [1, 2, 3, 4, 5] as score}
+                <button
+                  class="btn-rate"
+                  disabled={ratingBusy !== null}
+                  onclick={() => submitRating(ext.name, score)}
+                  aria-label={`Rate ${ext.title} ${score} stars`}
+                >
+                  {score}
+                </button>
+              {/each}
+            </div>
             {#if ext.installed}
               <button
                 class="btn-uninstall"

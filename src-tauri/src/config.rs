@@ -143,6 +143,8 @@ pub struct SearchConfig {
     pub files: SourcePreference,
     #[serde(default = "default_windows_cap")]
     pub windows_max_results: usize,
+    #[serde(default = "default_show_explain_panel")]
+    pub show_explain_panel: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -178,12 +180,17 @@ impl Default for SearchConfig {
             calculator: SourcePreference::default(),
             files: SourcePreference::default(),
             windows_max_results: default_windows_cap(),
+            show_explain_panel: default_show_explain_panel(),
         }
     }
 }
 
 fn default_windows_cap() -> usize {
     0
+}
+
+fn default_show_explain_panel() -> bool {
+    true
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -1146,6 +1153,7 @@ mod tests {
                 calculator: SourcePreference { enabled: true, weight: 80 },
                 files: SourcePreference { enabled: true, weight: 140 },
                 windows_max_results: 6,
+                show_explain_panel: true,
             },
         });
 

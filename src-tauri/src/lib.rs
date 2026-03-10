@@ -2283,6 +2283,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             extensions::extension_storage_get,
             extensions::extension_storage_set,
             store::fetch_store_registry,
+            store::submit_extension_rating,
             store::install_store_extension,
             store::uninstall_extension,
             get_workflows,

@@ -50,7 +50,8 @@
     "windows": { "enabled": true, "weight": 100 },
     "calculator": { "enabled": true, "weight": 100 },
     "files": { "enabled": true, "weight": 100 },
-    "windows_max_results": 0
+    "windows_max_results": 0,
+    "show_explain_panel": true
   },
   "workflows": {
     "schema_version": 1,
@@ -106,7 +107,8 @@
           "windows": { "enabled": true, "weight": 100 },
           "calculator": { "enabled": true, "weight": 100 },
           "files": { "enabled": true, "weight": 100 },
-          "windows_max_results": 0
+          "windows_max_results": 0,
+          "show_explain_panel": true
         }
       }
     ]

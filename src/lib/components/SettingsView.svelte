@@ -148,6 +148,9 @@
 
     // Initial apply
     onMount(() => {
+        if (config.search.show_explain_panel === undefined) {
+            config.search.show_explain_panel = true;
+        }
         applyTheme(config);
         loadApps();
         loadDiagnostics();
@@ -978,6 +981,17 @@
                         max="300"
                         step="5"
                         bind:value={config.search.files.weight}
+                        onchange={debouncedSave}
+                    />
+                </label>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    Show "Why These Results"
+                    <input
+                        type="checkbox"
+                        bind:checked={config.search.show_explain_panel}
                         onchange={debouncedSave}
                     />
                 </label>

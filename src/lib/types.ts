@@ -77,6 +77,7 @@ export interface SearchConfig {
     calculator: SourcePreference;
     files: SourcePreference;
     windows_max_results?: number;
+    show_explain_panel: boolean;
 }
 
 export interface MacroArg {
@@ -307,6 +308,8 @@ export interface ExtensionManifest {
     version: string;
     description?: string;
     author?: string;
+    publisher?: string;
+    safe?: boolean;
     icon?: string;
     permissions: Capability[];
     commands: ExtensionCommand[];
@@ -325,10 +328,13 @@ export interface StoreExtensionInfo {
     version: string;
     description: string;
     author: string;
+    publisher: string;
+    safe: boolean;
     icon: string | null;
     permissions: string[];
     category: string;
     rating?: number | null;
+    rating_count: number;
     install_count: number;
     trust_badge: string;
     changelog: string[];

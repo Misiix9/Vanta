@@ -1,4 +1,4 @@
-name: Release Vanta v3.3.0
+name: Release Vanta v3.4.0
 
 on:
   push:
@@ -83,15 +83,16 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v3.3.0 -- Enterprise Security And Policy Controls
+            ## Vanta v3.4.0 -- Extension SDK v2
 
-            Minor release focused on enforceable policy controls and auditable security events.
+            Minor release focused on extension authoring quality, trust metadata, and community ratings.
 
             ### Highlights
-            - Added restricted mode extension allowlist enforcement.
-            - Added blocked capability policy enforcement in extension permission checks.
-            - Added verified-extension install policy controls.
-            - Added audit trail events for installs, uninstalls, and permission decisions.
+            - Added SDK v2 scaffolding assets: templates, manifest validator, and extension harness tooling.
+            - Added compatibility matrix + deprecation lifecycle metadata for extension contracts.
+            - Added store metadata enforcement for publisher and safe extension badges.
+            - Added community rating submission flow and shared rating feed support.
+            - Normalized all official Vanta extensions to version `1.1.0` with `publisher=Vanta Team` and `safe=true`.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

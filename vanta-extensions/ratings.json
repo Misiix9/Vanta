@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "source": "community",
+  "updated_at": "2026-03-10T00:00:00Z",
+  "ratings": [
+    { "name": "weather", "average": 4.7, "count": 1240 },
+    { "name": "smart-calculator", "average": 4.8, "count": 1021 },
+    { "name": "color-picker", "average": 4.6, "count": 804 },
+    { "name": "process-manager", "average": 4.5, "count": 690 },
+    { "name": "network-test", "average": 4.6, "count": 745 },
+    { "name": "timer", "average": 4.7, "count": 820 },
+    { "name": "sysinfo", "average": 4.6, "count": 710 },
+    { "name": "spotify", "average": 4.8, "count": 1580 },
+    { "name": "clipboard-tools", "average": 4.7, "count": 940 },
+    { "name": "password-gen", "average": 4.8, "count": 980 }
+  ]
+}

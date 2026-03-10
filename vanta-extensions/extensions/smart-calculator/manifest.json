@@ -1,7 +1,7 @@
 {
   "name": "smart-calculator",
   "title": "Smart Calculator",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Advanced calculator with unit conversions and history",
   "author": "Vanta Team",
   "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='5' y='2' width='14' height='20' rx='2'/><rect x='8' y='5' width='8' height='4' rx='1'/><circle cx='9.5' cy='13' r='1'/><circle cx='14.5' cy='13' r='1'/><circle cx='9.5' cy='17.5' r='1'/><circle cx='14.5' cy='17.5' r='1'/></svg>",
@@ -14,5 +14,7 @@
       "mode": "view"
     }
   ],
-  "schema_version": 1
+  "schema_version": 1,
+  "publisher": "Vanta Team",
+  "safe": true
 }

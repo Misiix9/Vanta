@@ -8,8 +8,12 @@ use crate::permissions;
 
 const REGISTRY_URL: &str =
     "https://raw.githubusercontent.com/Misiix9/vanta-extensions/main/registry.json";
+const RATINGS_URL: &str =
+    "https://raw.githubusercontent.com/Misiix9/vanta-extensions/main/ratings.json";
 const BASE_URL: &str =
     "https://raw.githubusercontent.com/Misiix9/vanta-extensions/main/extensions";
+const RATINGS_FEEDBACK_URL: &str =
+    "https://github.com/Misiix9/vanta-extensions/issues/new?labels=rating";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StoreExtensionInfo {
@@ -18,12 +22,18 @@ pub struct StoreExtensionInfo {
     pub version: String,
     pub description: String,
     pub author: String,
+    #[serde(default = "default_publisher")]
+    pub publisher: String,
+    #[serde(default = "default_safe")]
+    pub safe: bool,
     pub icon: Option<String>,
     pub permissions: Vec<String>,
     #[serde(default = "default_category")]
     pub category: String,
     #[serde(default)]
     pub rating: Option<f32>,
+    #[serde(default)]
+    pub rating_count: u64,
     #[serde(default)]
     pub install_count: u64,
     #[serde(default = "default_trust_badge")]
@@ -42,6 +52,14 @@ fn default_category() -> String {
     "Uncategorized".to_string()
 }
 
+fn default_publisher() -> String {
+    "Community".to_string()
+}
+
+fn default_safe() -> bool {
+    false
+}
+
 fn default_trust_badge() -> String {
     "community".to_string()
 }
@@ -58,6 +76,18 @@ struct RegistryFileWrapped {
     extensions: Vec<StoreExtensionInfo>,
 }
 
+#[derive(Debug, Deserialize)]
+struct RatingsFile {
+    ratings: Vec<RatingEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RatingEntry {
+    name: String,
+    average: f32,
+    count: u64,
+}
+
 fn installed_extension_names() -> Vec<String> {
     extensions::scan_extensions()
         .into_iter()
@@ -66,6 +96,16 @@ fn installed_extension_names() -> Vec<String> {
 }
 
 fn normalize_store_entry(entry: &mut StoreExtensionInfo) {
+    if entry.publisher.trim().is_empty() || entry.publisher == "Community" {
+        if entry.author.trim().eq_ignore_ascii_case("Vanta Team") {
+            entry.publisher = "Vanta Team".to_string();
+        }
+    }
+
+    if !entry.safe && entry.publisher.trim().eq_ignore_ascii_case("Vanta Team") {
+        entry.safe = true;
+    }
+
     if entry.category.trim().is_empty() || entry.category == "Uncategorized" {
         entry.category = infer_category(&entry.name, &entry.permissions);
     }
@@ -79,6 +119,20 @@ fn normalize_store_entry(entry: &mut StoreExtensionInfo) {
 
     if let Some(rating) = entry.rating {
         entry.rating = Some(rating.clamp(0.0, 5.0));
+    }
+}
+
+fn apply_ratings_snapshot(exts: &mut [StoreExtensionInfo], ratings: &[RatingEntry]) {
+    let mut by_name = std::collections::HashMap::new();
+    for item in ratings {
+        by_name.insert(item.name.as_str(), item);
+    }
+
+    for ext in exts {
+        if let Some(item) = by_name.get(ext.name.as_str()) {
+            ext.rating = Some(item.average.clamp(0.0, 5.0));
+            ext.rating_count = item.count;
+        }
     }
 }
 
@@ -183,6 +237,14 @@ pub async fn fetch_store_registry() -> Result<Vec<StoreExtensionInfo>, String> {
             })
             .map_err(|e| format!("Failed to parse registry: {}", e))?;
 
+    if let Ok(resp) = client.get(RATINGS_URL).send().await {
+        if let Ok(text) = resp.text().await {
+            if let Ok(ratings) = serde_json::from_str::<RatingsFile>(&text) {
+                apply_ratings_snapshot(&mut exts, &ratings.ratings);
+            }
+        }
+    }
+
     let installed = installed_extension_names();
     for ext in &mut exts {
         normalize_store_entry(ext);
@@ -190,6 +252,42 @@ pub async fn fetch_store_registry() -> Result<Vec<StoreExtensionInfo>, String> {
     }
 
     Ok(exts)
+}
+
+#[tauri::command]
+pub async fn submit_extension_rating(
+    name: String,
+    rating: u8,
+    comment: Option<String>,
+) -> Result<String, String> {
+    validate_requested_name(&name)?;
+    if !(1..=5).contains(&rating) {
+        return Err("Rating must be between 1 and 5".to_string());
+    }
+
+    let mut url = format!(
+        "{}&title={}&body={}",
+        RATINGS_FEEDBACK_URL,
+        urlencoding::encode(&format!("Rating: {} ({} stars)", name, rating)),
+        urlencoding::encode(&format!(
+            "Extension: {}\nRating: {}\n\nComment:\n{}",
+            name,
+            rating,
+            comment.unwrap_or_default()
+        ))
+    );
+
+    if url.len() > 2000 {
+        url = format!(
+            "{}&title={}&body={}",
+            RATINGS_FEEDBACK_URL,
+            urlencoding::encode(&format!("Rating: {} ({} stars)", name, rating)),
+            urlencoding::encode(&format!("Extension: {}\nRating: {}", name, rating))
+        );
+    }
+
+    open::that(&url).map_err(|e| format!("Failed to open rating form: {}", e))?;
+    Ok(url)
 }
 
 async fn download_file(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, String> {
@@ -241,10 +339,17 @@ pub async fn install_store_extension(name: String) -> Result<(), String> {
 
     if cfg.policy.require_verified_extensions {
         let is_verified = manifest
-            .author
+            .publisher
             .as_deref()
             .map(|a| a.eq_ignore_ascii_case("Vanta Team"))
-            .unwrap_or(false);
+            .unwrap_or_else(|| {
+                manifest
+                    .author
+                    .as_deref()
+                    .map(|a| a.eq_ignore_ascii_case("Vanta Team"))
+                    .unwrap_or(false)
+            })
+            && manifest.safe.unwrap_or(false);
         if !is_verified {
             let _ = permissions::record_audit_event(
                 "extension_install",

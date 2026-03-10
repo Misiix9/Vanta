@@ -49,6 +49,10 @@ pub struct ExtensionManifest {
     #[serde(default)]
     pub author: Option<String>,
     #[serde(default)]
+    pub publisher: Option<String>,
+    #[serde(default)]
+    pub safe: Option<bool>,
+    #[serde(default)]
     pub icon: Option<String>,
     #[serde(default)]
     pub permissions: Vec<Capability>,
@@ -625,6 +629,8 @@ mod tests {
             version: "1.0.0".to_string(),
             description: None,
             author: None,
+            publisher: None,
+            safe: None,
             icon: None,
             permissions: vec![],
             commands: vec![ExtensionCommand {
@@ -647,6 +653,8 @@ mod tests {
             version: "1.0.0".to_string(),
             description: None,
             author: None,
+            publisher: None,
+            safe: None,
             icon: None,
             permissions: vec![],
             commands: vec![ExtensionCommand {
@@ -669,6 +677,8 @@ mod tests {
             version: "1.0.0".to_string(),
             description: None,
             author: None,
+            publisher: None,
+            safe: None,
             icon: None,
             permissions: vec![],
             commands: vec![],
@@ -686,6 +696,8 @@ mod tests {
                 version: "1.0.0".to_string(),
                 description: None,
                 author: None,
+                publisher: None,
+                safe: None,
                 icon: None,
                 permissions: vec![],
                 commands: vec![ExtensionCommand {

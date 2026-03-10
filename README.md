@@ -15,7 +15,7 @@
 
 ## Why Vanta?
 
-Traditional launchers are often slow or clunky. **Vanta** is a fast, Wayland-native command palette built with Rust and Svelte. It starts instantly, stays out of your way, and is fully themeable with plain CSS. With the v2.0 extension engine, anyone can build custom commands and full UI screens using TypeScript and Svelte.
+Traditional launchers are often slow or clunky. **Vanta** is a fast, Wayland-native command palette built with Rust and Svelte. It starts instantly, stays out of your way, and is fully themeable with plain CSS. With the Extension SDK v2 engine, anyone can build custom commands and full UI screens using TypeScript and Svelte.
 
 ---
 
@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_3.3.0_amd64.deb
+sudo dpkg -i vanta_3.4.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-3.3.0-1.x86_64.rpm
+sudo rpm -i vanta-3.4.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v3.3.0)
-- Added enterprise policy controls for restricted mode extension allowlists.
-- Added blocked-capability enforcement for extension permission checks.
-- Added verified-extension install policy control for stricter environments.
-- Added audit trail events for installs, uninstalls, and permission decisions.
+### Latest Minor (v3.4.0)
+- Added Extension SDK v2 tooling: manifest validator, extension harness, and starter template.
+- Added compatibility matrix and deprecation lifecycle docs for extension contracts.
+- Added shared ratings feed + in-app rating submission flow for store extensions.
+- Versioned every official extension to `1.1.0`, marked `safe=true`, and standardized publisher metadata to `Vanta Team`.
 
 ### Latest Major (v3.0.0)
 - Added typed result/action contract (`search_v3`, `get_suggestions_v3`) with legacy `exec` fallback.
@@ -55,7 +55,7 @@ sudo rpm -i vanta-3.3.0-1.x86_64.rpm
 ## Features
 
 - **Fast fuzzy search** powered by Rust + `nucleo-matcher`.
-- **Extension engine** (v2.0): Build custom commands and full UI screens with TypeScript/Svelte.
+- **Extension SDK v2**: Build custom commands and full UI screens with TypeScript/Svelte.
 - **Vanta Store** (v2.1): Browse and install extensions from the built-in store. Search "store" or "install" in the launcher.
 - **10 Default Extensions**: Weather, Smart Calculator, Color Picker, Process Manager, Network Test, Timer, System Info, Spotify, Clipboard Tools, and Password Generator.
 - **Auto-refresh** (v2.2): Settings changes, new app installations, and new extensions take effect immediately without restarting.
@@ -87,7 +87,14 @@ cargo tauri dev
 
 ## Extension SDK
 
-Vanta v2.0 replaces the old JSON script system with a full Raycast-style extension engine. Extensions live in `~/.config/vanta/extensions/` and can declare multiple commands with custom UI.
+Vanta Extension SDK v2 replaces the old JSON script system with a full Raycast-style extension engine. Extensions live in `~/.config/vanta/extensions/` and can declare multiple commands with custom UI.
+
+SDK v2 authoring toolkit (in this repo):
+- `vanta-extensions/templates/view-template/` starter extension
+- `npm run extensions:validate` manifest linting
+- `npm run extensions:harness` extension bundle/command harness checks
+- `vanta-extensions/compatibility-matrix.json` compatibility + deprecation lifecycle contract
+- `vanta-extensions/ratings.json` shared rating snapshot consumed by Vanta Store
 
 ### Extension Structure
 
