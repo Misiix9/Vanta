@@ -27,7 +27,13 @@
   let step = $state(0);
   let modalEl: HTMLDivElement | null = $state(null);
 
-  const samples = ["weather", "timer", "store", "spotify", "calc 2^10 + 5"];
+  const samples = [
+    "weather",
+    "store",
+    "feature hub",
+    "community sharing",
+    "extension template",
+  ];
 
   onMount(() => {
     modalEl?.focus();

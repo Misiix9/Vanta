@@ -28,6 +28,10 @@
   import ExtensionHost from "$lib/components/ExtensionHost.svelte";
   import StoreView from "$lib/components/StoreView.svelte";
   import ClipboardView from "$lib/components/ClipboardView.svelte";
+  import FeatureHubWindow from "$lib/components/FeatureHubWindow.svelte";
+  import CommunityHubWindow from "$lib/components/CommunityHubWindow.svelte";
+  import ThemeStudioWindow from "$lib/components/ThemeStudioWindow.svelte";
+  import ExtensionsHubWindow from "$lib/components/ExtensionsHubWindow.svelte";
   import NowPlayingBar from "$lib/components/NowPlayingBar.svelte";
   import SpotifyMiniPlayer from "$lib/components/SpotifyMiniPlayer.svelte";
   import FirstRunWizard from "$lib/components/FirstRunWizard.svelte";
@@ -40,11 +44,19 @@
   let vantaConfig: VantaConfig | undefined = $state();
   let results: SearchResult[] = $state([]);
   let baseResults: SearchResult[] = $state([]);
-  let view: "launcher" | "settings" | "store" = $state("launcher");
+  let view:
+    | "launcher"
+    | "settings"
+    | "store"
+    | "featureHub"
+    | "communityHub"
+    | "themeHub"
+    | "extensionsHub" = $state("launcher");
   let selectedIndex = $state(0);
   let searchTime: number | null = $state(null);
   let visibleRowCount = $state(0);
   let currentMode: "launcher" | "clipboard" = $state("launcher");
+  let settingsStartSection = $state<string | null>(null);
   let blurMode: string = $state("fallback");
   let searchInputRef: SearchInput | undefined = $state();
   let resultsListRef: ResultsList | undefined = $state();
@@ -107,6 +119,61 @@
   
 
   const builtinCommands: SearchResult[] = [
+    {
+      title: "Feature Hub",
+      subtitle: "Open the guided hub for sharing, templates, and workflows",
+      icon: "fa-solid fa-compass",
+      exec: "open-window:featureHub",
+      score: 1_450_000,
+      match_indices: [],
+      source: "Application",
+      id: "discover-feature-hub",
+      section: "Discover",
+    },
+    {
+      title: "Community Sharing",
+      subtitle: "Feedback, roadmap voting, snippets, and popular workflows",
+      icon: "fa-solid fa-users",
+      exec: "open-window:communityHub",
+      score: 1_445_000,
+      match_indices: [],
+      source: "Application",
+      id: "discover-community-sharing",
+      section: "Discover",
+    },
+    {
+      title: "Theme And Profile Studio",
+      subtitle: "Jump directly to theme profile editing",
+      icon: "fa-solid fa-palette",
+      exec: "open-window:themeHub",
+      score: 1_440_000,
+      match_indices: [],
+      source: "Application",
+      id: "discover-theme-profile",
+      section: "Discover",
+    },
+    {
+      title: "Open Extensions Store",
+      subtitle: "Browse and install extensions",
+      icon: "fa-solid fa-store",
+      exec: "open-store",
+      score: 1_435_000,
+      match_indices: [],
+      source: "Application",
+      id: "discover-store",
+      section: "Discover",
+    },
+    {
+      title: "Extension Template Wizard",
+      subtitle: "Create a starter extension template in one click",
+      icon: "fa-solid fa-wand-magic-sparkles",
+      exec: "open-window:extensionsHub",
+      score: 1_434_000,
+      match_indices: [],
+      source: "Application",
+      id: "discover-extension-template",
+      section: "Discover",
+    },
     {
       title: "Sleep",
       subtitle: "Suspend this machine immediately",
@@ -496,6 +563,10 @@
         return command.path;
       case "open_settings":
         return "open-settings";
+      case "open_settings_section":
+        return `open-settings:${command.section}`;
+      case "open_feature_window":
+        return `open-window:${command.window}`;
       case "open_store":
         return "open-store";
       case "copy_text":
@@ -524,6 +595,8 @@
         return `ext-no-view:${command.ext_id}:${command.command}`;
       case "query_fill":
         return `fill:${command.value}`;
+      case "intent_workflow":
+        return `intent-workflow:${command.steps.join("|||")}`;
       case "profile_switch":
         return `profile-switch:${command.id}`;
       case "unknown":
@@ -537,6 +610,12 @@
       return { kind: "system_action", action: exec.slice(14) };
     }
     if (exec === "open-settings") return { kind: "open_settings" };
+    if (exec.startsWith("open-settings:")) {
+      return { kind: "open_settings_section", section: exec.slice(14) };
+    }
+    if (exec.startsWith("open-window:")) {
+      return { kind: "open_feature_window", window: exec.slice(12) };
+    }
     if (exec === "open-store") return { kind: "open_store" };
     if (exec.startsWith("copy:")) return { kind: "copy_text", value: exec.slice(5) };
     if (exec.startsWith("copy-path:")) return { kind: "copy_path", value: exec.slice(10) };
@@ -555,6 +634,16 @@
       return { kind: "move_window_current_workspace", id: exec.slice(20) };
     }
     if (exec.startsWith("fill:")) return { kind: "query_fill", value: exec.slice(5) };
+    if (exec.startsWith("intent-workflow:")) {
+      return {
+        kind: "intent_workflow",
+        steps: exec
+          .slice(16)
+          .split("|||")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      };
+    }
     if (exec.startsWith("profile-switch:")) {
       return { kind: "profile_switch", id: exec.slice(15) };
     }
@@ -860,6 +949,14 @@
 
   function getConfirmSpec(result: SearchResult): { title: string; description: string; confirmLabel: string } | null {
     const command = commandForResult(result);
+    if (command.kind === "intent_workflow") {
+      return {
+        title: "Run Adaptive Workflow?",
+        description: `This will execute ${command.steps.length} inferred intent steps in sequence.`,
+        confirmLabel: "Run Workflow",
+      };
+    }
+
     if (command.kind === "close_window") {
       return {
         title: "Close Window?",
@@ -914,6 +1011,60 @@
     return null;
   }
 
+  async function executeIntentWorkflow(steps: string[]) {
+    for (const stepExec of steps) {
+      const stepResult: SearchResult = {
+        title: "Intent Step",
+        subtitle: null,
+        icon: null,
+        exec: stepExec,
+        score: 0,
+        match_indices: [],
+        source: "Application",
+      };
+      const command = inferCommandFromResult(stepResult);
+
+      if (command.kind === "open_settings") {
+        settingsStartSection = null;
+        view = "settings";
+        continue;
+      }
+      if (command.kind === "open_settings_section") {
+        settingsStartSection = command.section;
+        view = "settings";
+        continue;
+      }
+      if (command.kind === "open_feature_window") {
+        const target = command.window;
+        if (
+          target === "featureHub" ||
+          target === "communityHub" ||
+          target === "themeHub" ||
+          target === "extensionsHub"
+        ) {
+          view = target;
+        }
+        continue;
+      }
+      if (command.kind === "open_store") {
+        view = "store";
+        continue;
+      }
+      if (command.kind === "query_fill") {
+        query = command.value;
+        await handleSearch(query);
+        continue;
+      }
+      if (command.kind === "system_action") {
+        await invoke("system_action", { action: command.action });
+        continue;
+      }
+      if (command.kind === "launch_app") {
+        await invoke("launch_app", { exec: command.exec });
+      }
+    }
+  }
+
   async function handleActivate(result: SearchResult, bypassConfirm = false) {
     if (permissionPrompt) return; // modal blocks background actions
     if (!bypassConfirm) {
@@ -960,6 +1111,9 @@
           requestAnimationFrame(() => searchInputRef?.focus?.());
         });
         return;
+      } else if (command.kind === "intent_workflow") {
+        await executeIntentWorkflow(command.steps);
+        return;
       } else if (command.kind === "profile_switch") {
         try {
           const updated = await invoke<VantaConfig>("switch_profile", {
@@ -990,9 +1144,29 @@
         }
         return;
       } else if (command.kind === "open_settings") {
+        settingsStartSection = null;
         view = "settings";
         return;
+      } else if (command.kind === "open_settings_section") {
+        settingsStartSection = command.section;
+        view = "settings";
+        return;
+      } else if (command.kind === "open_feature_window") {
+        settingsStartSection = null;
+        const target = command.window;
+        if (
+          target === "featureHub" ||
+          target === "communityHub" ||
+          target === "themeHub" ||
+          target === "extensionsHub"
+        ) {
+          view = target;
+          return;
+        }
+        view = "featureHub";
+        return;
       } else if (command.kind === "open_store") {
+        settingsStartSection = null;
         view = "store";
         return;
       } else if (command.kind === "copy_path") {
@@ -1257,6 +1431,70 @@
     >
       <StoreView onClose={() => (view = "launcher")} />
     </div>
+  {:else if view === "featureHub"}
+    <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
+      <FeatureHubWindow
+        onClose={() => {
+          view = "launcher";
+          loadSuggestions();
+        }}
+        onOpenCommunity={() => {
+          view = "communityHub";
+        }}
+        onOpenTheme={() => {
+          view = "themeHub";
+        }}
+        onOpenExtensions={() => {
+          view = "extensionsHub";
+        }}
+        onOpenStore={() => {
+          view = "store";
+        }}
+        onOpenSettings={() => {
+          settingsStartSection = null;
+          view = "settings";
+        }}
+      />
+    </div>
+  {:else if view === "communityHub" && vantaConfig}
+    <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
+      <CommunityHubWindow
+        communityFeedOptIn={vantaConfig.general.community_feed_opt_in ?? false}
+        onToggleFeedOptIn={async (next) => {
+          if (!vantaConfig) return;
+          vantaConfig.general.community_feed_opt_in = next;
+          try {
+            await invoke("save_config", { newConfig: vantaConfig });
+          } catch (e) {
+            console.error("Failed to save community feed opt-in", e);
+          }
+        }}
+        onClose={() => {
+          view = "featureHub";
+        }}
+      />
+    </div>
+  {:else if view === "themeHub" && vantaConfig}
+    <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
+      <ThemeStudioWindow
+        bind:config={vantaConfig}
+        {availableThemes}
+        onClose={() => {
+          view = "featureHub";
+        }}
+      />
+    </div>
+  {:else if view === "extensionsHub"}
+    <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
+      <ExtensionsHubWindow
+        onClose={() => {
+          view = "featureHub";
+        }}
+        onOpenStore={() => {
+          view = "store";
+        }}
+      />
+    </div>
   {:else if view === "settings" && vantaConfig}
     <div
       in:fade={{ duration: fadeDuration }}
@@ -1265,7 +1503,16 @@
       <SettingsView
         bind:config={vantaConfig}
         {availableThemes}
-        onClose={() => { view = "launcher"; loadSuggestions(); }}
+        initialSection={settingsStartSection}
+        onOpenStore={() => {
+          settingsStartSection = null;
+          view = "store";
+        }}
+        onClose={() => {
+          settingsStartSection = null;
+          view = "launcher";
+          loadSuggestions();
+        }}
       />
     </div>
   {:else if currentMode === "clipboard"}

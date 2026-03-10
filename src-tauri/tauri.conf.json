@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Vanta",
-  "version": "3.6.0",
+  "version": "4.0.0",
   "identifier": "dev.vanta.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -53,7 +53,8 @@
   "bundle": {
     "active": true,
     "resources": {
-      "resources/themes/default.css": "themes/default.css"
+      "resources/themes/default.css": "themes/default.css",
+      "resources/themes/universal.css": "themes/universal.css"
     },
     "targets": [
       "deb",

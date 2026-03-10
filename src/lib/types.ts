@@ -267,6 +267,8 @@ export type CommandContract =
     | { kind: "launch_app"; exec: string }
     | { kind: "open_file"; path: string }
     | { kind: "open_settings" }
+    | { kind: "open_settings_section"; section: string }
+    | { kind: "open_feature_window"; window: string }
     | { kind: "open_store" }
     | { kind: "copy_text"; value: string }
     | { kind: "copy_path"; value: string }
@@ -281,6 +283,7 @@ export type CommandContract =
     | { kind: "extension_view"; ext_id: string; command: string }
     | { kind: "extension_action"; ext_id: string; command: string }
     | { kind: "query_fill"; value: string }
+    | { kind: "intent_workflow"; steps: string[] }
     | { kind: "profile_switch"; id: string }
     | { kind: "unknown"; exec: string };
 

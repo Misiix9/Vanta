@@ -2939,3 +2939,72 @@ input[type="range"] {
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Universal Layout Compatibility Layer ──────────────────── */
+:root {
+    /* Aliases used by new universal layouts */
+    --layout-shell-bg: var(--ds-surface-0);
+    --layout-panel-bg: color-mix(in srgb, var(--vanta-surface, #0a0a0a) 86%, transparent);
+    --layout-card-bg: color-mix(in srgb, var(--vanta-surface, #0a0a0a) 80%, transparent);
+    --layout-border: var(--vanta-border, rgba(123, 53, 240, 0.2));
+    --layout-accent: var(--vanta-accent, #7b35f0);
+    --layout-text: var(--vanta-text, #f5f5f5);
+    --layout-text-dim: var(--vanta-text-dim, #9a9a9a);
+}
+
+.layout-shell-v2 {
+    background: var(--layout-shell-bg);
+    border: 1px solid var(--layout-border);
+    border-radius: var(--radius, 12px);
+}
+
+.layout-header-v2 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.layout-content-v2 {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 12px;
+}
+
+.panel-universal {
+    background: var(--layout-panel-bg);
+    border: 1px solid var(--layout-border);
+    border-radius: 12px;
+}
+
+.card-universal {
+    background: var(--layout-card-bg);
+    border: 1px solid var(--layout-border);
+    border-radius: 10px;
+}
+
+.btn-universal {
+    border: 1px solid var(--layout-border);
+    border-radius: 8px;
+    background: rgba(123, 53, 240, 0.12);
+    color: var(--layout-text);
+}
+
+.btn-universal:hover {
+    background: rgba(123, 53, 240, 0.22);
+    border-color: rgba(155, 95, 248, 0.7);
+}
+
+.input-universal {
+    border: 1px solid var(--layout-border);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--layout-text);
+}
+
+.input-universal::placeholder {
+    color: var(--layout-text-dim);
+}

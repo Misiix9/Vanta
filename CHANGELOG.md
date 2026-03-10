@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.0
+- Added a local-first Adaptive Intent Engine path that detects multi-step intent queries.
+- Added intent workflow result generation for chained commands (for example `open settings then open store`).
+- Added typed `intent_workflow` command contract support and frontend execution wiring.
+- Added explicit confirmation before executing inferred adaptive workflows.
+
 ## 3.6.0
 - Added a Phase 19 Community settings section with in-app feedback submission and roadmap voting hooks.
 - Added trusted snippet export/import flows for workflows, profiles, and theme presets.

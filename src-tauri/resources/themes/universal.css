@@ -1,0 +1,259 @@
+/* Theme Name: Vanta Universal */
+:root {
+    --vanta-width: 760px;
+    --vanta-height: 460px;
+    --vanta-text-scale: 1;
+    --vanta-space-scale: 1;
+    --vanta-motion-scale: 1;
+
+    --uv-bg: #070f16;
+    --uv-surface-1: #0e1824;
+    --uv-surface-2: #132133;
+    --uv-surface-3: #1a2b42;
+    --uv-text: #e7effc;
+    --uv-text-dim: #9fb1cb;
+    --uv-accent: #3dd0b0;
+    --uv-accent-2: #5aa9ff;
+    --uv-warn: #f5c86a;
+    --uv-danger: #ff6e7b;
+
+    /* Legacy aliases for broad compatibility with current layouts */
+    --vanta-bg: var(--uv-bg);
+    --vanta-surface: var(--uv-surface-1);
+    --vanta-text: var(--uv-text);
+    --vanta-text-dim: var(--uv-text-dim);
+    --vanta-accent: var(--uv-accent-2);
+    --vanta-purple: var(--uv-accent-2);
+    --vanta-purple-bright: #8ac3ff;
+    --vanta-border: rgba(90, 169, 255, 0.24);
+
+    --bg: var(--uv-bg);
+    --surface: var(--uv-surface-1);
+    --surface-hover: rgba(90, 169, 255, 0.12);
+    --text-primary: var(--uv-text);
+    --text-secondary: var(--uv-text-dim);
+
+    --ds-surface-0: var(--uv-bg);
+    --ds-surface-1: var(--uv-surface-1);
+    --ds-surface-2: var(--uv-surface-2);
+    --ds-text-primary: var(--uv-text);
+    --ds-text-secondary: var(--uv-text-dim);
+    --ds-accent: var(--uv-accent-2);
+    --ds-border: rgba(90, 169, 255, 0.25);
+
+    --purple: var(--uv-accent-2);
+    --purple-bright: #8ac3ff;
+    --purple-dim: rgba(90, 169, 255, 0.5);
+    --purple-faint: rgba(90, 169, 255, 0.14);
+    --purple-ghost: rgba(90, 169, 255, 0.08);
+
+    --radius: 14px;
+    --radius-item: 10px;
+    --radius-icon: 9px;
+
+    --font-ui: "SN Pro", "Inter", system-ui, sans-serif;
+}
+
+html,
+body {
+    background: transparent;
+    color: var(--uv-text);
+}
+
+.vanta-root {
+    background:
+        radial-gradient(1100px 500px at 85% -40%, rgba(61, 208, 176, 0.18), transparent 60%),
+        radial-gradient(900px 380px at -10% 120%, rgba(90, 169, 255, 0.16), transparent 55%),
+        linear-gradient(160deg, var(--uv-bg), var(--uv-surface-1));
+    border: 1px solid rgba(90, 169, 255, 0.28);
+}
+
+.vanta-root::before {
+    background: linear-gradient(
+        to right,
+        transparent,
+        rgba(61, 208, 176, 0.72) 32%,
+        rgba(138, 195, 255, 0.9) 52%,
+        rgba(90, 169, 255, 0.75) 70%,
+        transparent
+    );
+}
+
+.search-bar {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+}
+
+.vanta-input {
+    color: var(--uv-text);
+}
+
+.vanta-caret {
+    background: var(--uv-accent-2);
+}
+
+.result-item,
+.script-item,
+.hub-card {
+    border: 1px solid rgba(90, 169, 255, 0.18);
+    background: color-mix(in srgb, var(--uv-surface-2) 72%, transparent);
+}
+
+.result-item:hover,
+.result-item.selected,
+.script-item:hover,
+.script-item.selected,
+.hub-card:hover {
+    border-color: rgba(138, 195, 255, 0.7);
+    background: rgba(90, 169, 255, 0.16);
+    box-shadow: 0 10px 26px rgba(5, 11, 18, 0.42);
+}
+
+.group-header,
+.cv-group-header {
+    background: linear-gradient(90deg, rgba(61, 208, 176, 0.12), rgba(90, 169, 255, 0.08));
+    border-color: rgba(90, 169, 255, 0.2);
+}
+
+.status-bar,
+.store-header,
+.ext-header,
+.cv-search {
+    border-color: rgba(255, 255, 255, 0.07);
+}
+
+.action-chip,
+.item-action-hint kbd,
+.action-hint,
+.btn-rate,
+.store-filter,
+.cv-toggle {
+    border-color: rgba(90, 169, 255, 0.35);
+    background: rgba(90, 169, 255, 0.14);
+    color: #b8d8ff;
+}
+
+.btn-install,
+.npb-ctrl-play,
+.mini-player-ctrl-main,
+.cv-action-copy {
+    background: linear-gradient(135deg, var(--uv-accent), var(--uv-accent-2));
+    border: none;
+    color: #041018;
+    font-weight: 700;
+}
+
+/* Universal layout contract for redesigned surfaces */
+.layout-shell-v2,
+.hub-window-root,
+.settings-panel,
+.store-root,
+.extension-host,
+.cv-root {
+    background:
+        radial-gradient(700px 300px at 80% -25%, rgba(61, 208, 176, 0.12), transparent 60%),
+        linear-gradient(160deg, rgba(19, 33, 51, 0.84), rgba(10, 18, 28, 0.94));
+    border: 1px solid rgba(90, 169, 255, 0.24);
+    border-radius: var(--radius);
+}
+
+.layout-header-v2,
+.hub-window-header,
+.store-header,
+.ext-header,
+.cv-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.layout-content-v2,
+.hub-window-scroll,
+.store-grid,
+.cv-detail {
+    padding: 12px;
+}
+
+.panel-universal,
+.accordion-item,
+.jobs-panel,
+.quick-tips,
+.search-explain,
+.action-confirm-modal,
+.onboarding-modal {
+    border: 1px solid rgba(90, 169, 255, 0.24);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--uv-surface-2) 78%, transparent);
+}
+
+.card-universal,
+.ext-card,
+.hub-card,
+.cv-item,
+.result-item,
+.script-item {
+    border-radius: 10px;
+}
+
+.btn-universal,
+.close-btn,
+.link-btn,
+.job-btn,
+.cv-action-btn,
+.back-btn,
+.refresh-btn,
+.ext-back,
+.ext-close {
+    border: 1px solid rgba(90, 169, 255, 0.28);
+    border-radius: 8px;
+    background: rgba(90, 169, 255, 0.1);
+    color: var(--uv-text);
+}
+
+.btn-universal:hover,
+.close-btn:hover,
+.link-btn:hover,
+.job-btn:hover,
+.cv-action-btn:hover,
+.back-btn:hover,
+.refresh-btn:hover,
+.ext-back:hover,
+.ext-close:hover {
+    background: rgba(90, 169, 255, 0.2);
+    border-color: rgba(138, 195, 255, 0.72);
+}
+
+.input-universal,
+.vanta-select,
+input[type="text"],
+input[type="number"],
+textarea {
+    border: 1px solid rgba(90, 169, 255, 0.25);
+    border-radius: 8px;
+    background: rgba(15, 28, 43, 0.9);
+    color: var(--uv-text);
+}
+
+.input-universal:focus,
+.vanta-select:focus,
+input[type="text"]:focus,
+input[type="number"]:focus,
+textarea:focus {
+    border-color: rgba(138, 195, 255, 0.85);
+    box-shadow: 0 0 0 2px rgba(90, 169, 255, 0.2);
+}
+
+@media (max-width: 900px) {
+    :root {
+        --vanta-width: 96vw;
+        --vanta-height: 88vh;
+    }
+
+    .hub-grid,
+    .onboarding-grid,
+    .cv-body {
+        grid-template-columns: 1fr;
+    }
+}

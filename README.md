@@ -29,14 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_3.6.0_amd64.deb
+sudo dpkg -i vanta_4.0.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-3.6.0-1.x86_64.rpm
+sudo rpm -i vanta-4.0.0-1.x86_64.rpm
 ```
+
+### Latest Major (v4.0.0)
+- Added Phase 20 Adaptive Intent Engine for local-first intent parsing.
+- Added multi-step workflow suggestions from natural queries (for example: `open settings then open store`).
+- Added explicit confirmation before running inferred multi-step workflows.
+- Added typed `intent_workflow` command contract integration in launcher command handling.
 
 ### Latest Minor (v3.6.0)
 - Added Phase 19 Community panel with in-app feedback submission and roadmap voting hooks.
@@ -44,7 +50,7 @@ sudo rpm -i vanta-3.6.0-1.x86_64.rpm
 - Added opt-in Popular Workflows discovery feed with install actions into local macros.
 - Added safety guardrails to block risky unverified workflow snippet imports.
 
-### Latest Major (v3.0.0)
+### Previous Major (v3.0.0)
 - Added typed result/action contract (`search_v3`, `get_suggestions_v3`) with legacy `exec` fallback.
 - Added versioned extension manifest schema (`schema_version`) and automatic local migration.
 - Added versioned config/workflow schema fields and migration tooling (`run_contract_migration`).

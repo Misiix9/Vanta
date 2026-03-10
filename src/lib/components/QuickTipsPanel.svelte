@@ -11,6 +11,9 @@
     "weather",
     "timer 15m",
     "store",
+    "feature hub",
+    "community sharing",
+    "theme and profile studio",
     "restart",
     "calc (24*7)-5",
   ];

@@ -276,6 +276,7 @@ enum CommandV1 {
     ExtensionView { ext_id: String, command: String },
     ExtensionAction { ext_id: String, command: String },
     QueryFill { value: String },
+    IntentWorkflow { steps: Vec<String> },
     ProfileSwitch { id: String },
     Unknown { exec: String },
 }
@@ -311,7 +312,120 @@ fn weighted_score(base: u32, weight: u32) -> u32 {
     scaled.min(u32::MAX as u128) as u32
 }
 
+fn split_intent_steps(query: &str) -> Vec<String> {
+    let normalized = query
+        .replace(" and then ", " then ")
+        .replace(" && ", " then ")
+        .replace(" -> ", " then ")
+        .replace(';', " then ");
+
+    normalized
+        .split(" then ")
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(|part| part.to_string())
+        .collect()
+}
+
+fn infer_intent_step_exec(step: &str) -> Option<String> {
+    let s = step.to_lowercase();
+
+    if s.contains("setting") || s.contains("preference") || s.contains("config") {
+        return Some("open-settings".to_string());
+    }
+    if s.contains("store") || s.contains("marketplace") {
+        return Some("open-store".to_string());
+    }
+    if s.contains("feature hub") {
+        return Some("open-window:featureHub".to_string());
+    }
+    if s.contains("community") {
+        return Some("open-window:communityHub".to_string());
+    }
+    if s.contains("theme") || s.contains("profile studio") {
+        return Some("open-window:themeHub".to_string());
+    }
+    if s.contains("extension") && (s.contains("wizard") || s.contains("template") || s.contains("creator")) {
+        return Some("open-window:extensionsHub".to_string());
+    }
+
+    if s.contains("shutdown") || s.contains("power off") {
+        return Some("system-action:shutdown".to_string());
+    }
+    if s.contains("restart") || s.contains("reboot") {
+        if s.contains("bios") || s.contains("firmware") {
+            return Some("system-action:bios".to_string());
+        }
+        return Some("system-action:restart".to_string());
+    }
+    if s.contains("sleep") || s.contains("suspend") {
+        return Some("system-action:sleep".to_string());
+    }
+    if s.contains("logout") || s.contains("log out") {
+        return Some("system-action:logout".to_string());
+    }
+    if s.contains("lock") {
+        return Some("system-action:lock".to_string());
+    }
+
+    None
+}
+
+fn build_intent_results(query: &str, weight: u32) -> Vec<SearchResult> {
+    let trimmed = query.trim();
+    if trimmed.len() < 8 {
+        return Vec::new();
+    }
+
+    let steps = split_intent_steps(trimmed);
+    if steps.len() < 2 {
+        return Vec::new();
+    }
+
+    let mut planned_exec_steps = Vec::new();
+    for step in &steps {
+        if let Some(exec) = infer_intent_step_exec(step) {
+            planned_exec_steps.push(exec);
+        }
+    }
+
+    if planned_exec_steps.len() < 2 {
+        return Vec::new();
+    }
+
+    let workflow_exec = format!("intent-workflow:{}", planned_exec_steps.join("|||"));
+    vec![SearchResult {
+        title: format!("Workflow: {}", steps.join(" -> ")),
+        subtitle: Some(format!(
+            "Adaptive Intent Engine: {} steps with explicit confirmation",
+            planned_exec_steps.len()
+        )),
+        icon: Some("fa-solid fa-route".to_string()),
+        exec: workflow_exec,
+        score: weighted_score(970_000, weight),
+        match_indices: vec![],
+        source: ResultSource::Application,
+        actions: Some(vec![matcher::ActionHint {
+            label: "Preview Step 1".to_string(),
+            exec: format!("fill:{}", steps.first().cloned().unwrap_or_default()),
+            shortcut: Some("Tab".to_string()),
+        }]),
+        id: Some("adaptive-intent-workflow".to_string()),
+        group: None,
+        section: Some("Intent".to_string()),
+    }]
+}
+
 fn exec_to_command(exec: &str, source: &matcher::ResultSource) -> CommandV1 {
+    if let Some(v) = exec.strip_prefix("intent-workflow:") {
+        let steps = v
+            .split("|||")
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
+        return CommandV1::IntentWorkflow { steps };
+    }
     if let Some(v) = exec.strip_prefix("system-action:") {
         return CommandV1::SystemAction {
             action: v.to_string(),
@@ -888,6 +1002,38 @@ mod window_search_tests {
     }
 }
 
+#[cfg(test)]
+mod intent_engine_tests {
+    use super::*;
+
+    #[test]
+    fn split_intent_steps_supports_then_and_arrow() {
+        let steps = split_intent_steps("open settings then open store -> restart");
+        assert_eq!(steps, vec!["open settings", "open store", "restart"]);
+    }
+
+    #[test]
+    fn infer_intent_step_exec_maps_supported_actions() {
+        assert_eq!(infer_intent_step_exec("open settings").as_deref(), Some("open-settings"));
+        assert_eq!(infer_intent_step_exec("go to store").as_deref(), Some("open-store"));
+        assert_eq!(
+            infer_intent_step_exec("restart into bios").as_deref(),
+            Some("system-action:bios")
+        );
+    }
+
+    #[test]
+    fn build_intent_results_requires_multiple_valid_steps() {
+        let none = build_intent_results("open settings", 100);
+        assert!(none.is_empty());
+
+        let results = build_intent_results("open settings then open store", 100);
+        assert_eq!(results.len(), 1);
+        assert!(results[0].exec.starts_with("intent-workflow:"));
+        assert_eq!(results[0].section.as_deref(), Some("Intent"));
+    }
+}
+
 #[tauri::command]
 async fn get_config(
     state: tauri::State<'_, AppState>,
@@ -1126,6 +1272,9 @@ async fn search(
 
     let profile_results = build_profile_results(&query, &profiles_config, search_config.applications.weight);
     results.extend(profile_results);
+
+    let intent_results = build_intent_results(&query, search_config.applications.weight);
+    results.extend(intent_results);
 
     // Extension command search
     {
@@ -2279,6 +2428,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             get_extensions,
             get_extension_bundle,
             get_extension_styles,
+            extensions::create_extension_template,
             extensions::extension_fetch,
             extensions::extension_shell_execute,
             extensions::extension_storage_get,

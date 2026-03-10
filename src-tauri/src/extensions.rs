@@ -85,6 +85,88 @@ pub fn extensions_dir() -> PathBuf {
     dir
 }
 
+fn is_valid_extension_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+#[tauri::command]
+pub async fn create_extension_template(name: String) -> Result<String, String> {
+    let normalized = name.trim().to_ascii_lowercase();
+    if !is_valid_extension_name(&normalized) {
+        return Err("Extension name must use letters, numbers, '-' or '_'".to_string());
+    }
+
+    let ext_root = extensions_dir().join(&normalized);
+    if ext_root.exists() {
+        return Err(format!("Extension '{}' already exists", normalized));
+    }
+
+    fs::create_dir_all(ext_root.join("dist"))
+        .map_err(|e| format!("Failed to create template directory: {}", e))?;
+
+    let manifest = serde_json::json!({
+        "name": normalized,
+        "title": format!("{} Extension", name.trim()),
+        "schema_version": EXTENSION_SCHEMA_VERSION,
+        "version": "0.1.0",
+        "description": "Starter extension template",
+        "author": "You",
+        "publisher": "Community",
+        "safe": false,
+        "permissions": [],
+        "commands": [
+            {
+                "name": "hello",
+                "title": "Hello",
+                "subtitle": "Starter command",
+                "mode": "no-view",
+                "icon": "fa-solid fa-wand-magic-sparkles"
+            }
+        ]
+    });
+
+    let manifest_str = serde_json::to_string_pretty(&manifest)
+        .map_err(|e| format!("Failed to serialize template manifest: {}", e))?;
+
+    let starter_js = r#"(function(vanta) {
+  vanta.registerExtension('EXTENSION_NAME', {
+    commands: {
+      hello: {
+        handler: async (api) => {
+          api.toast({
+            title: 'Template Ready',
+            message: 'Edit dist/index.js and manifest.json to build your extension.',
+            type: 'success'
+          });
+        }
+      }
+    }
+  });
+})(window.__vanta_host);
+"#
+    .replace("EXTENSION_NAME", &normalized);
+
+    let starter_css = "/* Extension-scoped styles */\n";
+    let starter_readme = format!(
+        "# {}\n\nYour extension template is ready.\n\n1. Edit `manifest.json`\n2. Update `dist/index.js`\n3. Reload Vanta and search your command title.\n",
+        normalized
+    );
+
+    fs::write(ext_root.join("manifest.json"), manifest_str)
+        .map_err(|e| format!("Failed to write manifest.json: {}", e))?;
+    fs::write(ext_root.join("dist").join("index.js"), starter_js)
+        .map_err(|e| format!("Failed to write dist/index.js: {}", e))?;
+    fs::write(ext_root.join("dist").join("style.css"), starter_css)
+        .map_err(|e| format!("Failed to write dist/style.css: {}", e))?;
+    fs::write(ext_root.join("README.md"), starter_readme)
+        .map_err(|e| format!("Failed to write README.md: {}", e))?;
+
+    Ok(ext_root.to_string_lossy().to_string())
+}
+
 fn validate_manifest(manifest: &ExtensionManifest, ext_path: &Path) -> Result<(), String> {
     if manifest.name.is_empty() {
         return Err("Extension name is empty".to_string());

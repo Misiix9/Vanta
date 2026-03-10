@@ -21,10 +21,14 @@
     let {
         config = $bindable(),
         availableThemes = [],
+        initialSection = null,
+        onOpenStore = () => {},
         onClose,
     }: {
         config: VantaConfig;
         availableThemes?: ThemeMeta[];
+        initialSection?: string | null;
+        onOpenStore?: () => void;
         onClose: () => void;
     } = $props();
 
@@ -46,6 +50,9 @@
     let snippetTargetId = $state("");
     let snippetPayload = $state("");
     let snippetStatus = $state<string | null>(null);
+    let templateName = $state("my-extension");
+    let templateStatus = $state<string | null>(null);
+    let templateBusy = $state(false);
     let feedbackStatus = $state<string | null>(null);
     let communityBusy = $state(false);
     let includeGlobsText = $state("");
@@ -71,7 +78,8 @@
         },
     } as const;
 
-    let activeSection = $state("Theme Profile");
+    let activeSection = $state("Feature Hub");
+    let lastInitialSection = $state<string | null>(null);
     const roadmapTopics = [
         { id: "shareable-snippets", label: "Shareable snippets" },
         { id: "popular-workflows-feed", label: "Popular workflows feed" },
@@ -81,6 +89,10 @@
 
     function toggleSection(name: string) {
         activeSection = activeSection === name ? "" : name;
+    }
+
+    function jumpToSection(name: string) {
+        activeSection = name;
     }
 
 
@@ -240,6 +252,28 @@
         await loadPopularWorkflowsFeed();
     }
 
+    async function createExtensionTemplateFromHub() {
+        const normalized = templateName.trim().toLowerCase();
+        if (!normalized) {
+            templateStatus = "Extension name is required.";
+            return;
+        }
+
+        templateBusy = true;
+        templateStatus = null;
+        try {
+            const path = await invoke<string>("create_extension_template", {
+                name: normalized,
+            });
+            templateStatus = `Template created at ${path}`;
+            await invoke("open_path", { path });
+        } catch (e) {
+            templateStatus = `Template creation failed: ${String(e)}`;
+        } finally {
+            templateBusy = false;
+        }
+    }
+
     async function submitCommunityFeedback() {
         if (!feedbackMessage.trim()) {
             feedbackStatus = "Please add feedback before submitting.";
@@ -333,6 +367,13 @@
         loadCommunitySummary();
         loadWorkflowTargets();
         loadPopularWorkflowsFeed();
+    });
+
+    $effect(() => {
+        if (initialSection && initialSection !== lastInitialSection) {
+            activeSection = initialSection;
+            lastInitialSection = initialSection;
+        }
     });
 
     $effect(() => {
@@ -999,6 +1040,50 @@
                     {#if feedbackStatus}
                         <div class="status-info">{feedbackStatus}</div>
                     {/if}
+                </div>
+            {/if}
+        </div>
+
+        <!-- Feature Hub Section -->
+        <div class="accordion-item" class:active={activeSection === "Feature Hub"}>
+            <button
+                class="accordion-header"
+                type="button"
+                onclick={() => toggleSection("Feature Hub")}
+                aria-expanded={activeSection === "Feature Hub"}
+            >
+                <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <h3>Feature Hub</h3>
+            </button>
+            {#if activeSection === "Feature Hub"}
+                <div class="accordion-content">
+                    <div class="control-group" style="display: block;">
+                        <h4>Start Here</h4>
+                        <p>Use these shortcuts to access major Vanta features quickly.</p>
+                        <div class="preset-row">
+                            <button class="preset-btn" onclick={() => jumpToSection("Theme Profile")}>Theme/Profile Studio</button>
+                            <button class="preset-btn" onclick={() => jumpToSection("Community")}>Sharing & Feedback</button>
+                            <button class="preset-btn" onclick={onOpenStore}>Extension Store</button>
+                            <button class="preset-btn" onclick={() => jumpToSection("Search Ranking")}>Search & Workflows</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group" style="display: block;">
+                        <h4>Extension Template Starter</h4>
+                        <label>
+                            Extension Name
+                            <input type="text" bind:value={templateName} placeholder="my-extension" />
+                        </label>
+                        <div class="preset-row">
+                            <button class="preset-btn" disabled={templateBusy} onclick={createExtensionTemplateFromHub}>
+                                {templateBusy ? "Creating..." : "Create Template"}
+                            </button>
+                            <button class="preset-btn" onclick={() => jumpToSection("Community")}>Open Sharing Snippets</button>
+                        </div>
+                        {#if templateStatus}
+                            <div class="status-info">{templateStatus}</div>
+                        {/if}
+                    </div>
                 </div>
             {/if}
         </div>

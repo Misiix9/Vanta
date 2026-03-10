@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 const DEFAULT_THEME_CSS: &str = include_str!("../resources/themes/default.css");
+const UNIVERSAL_THEME_CSS: &str = include_str!("../resources/themes/universal.css");
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ThemeMeta {
@@ -38,26 +39,48 @@ pub fn seed_default_theme(app: &tauri::AppHandle) {
         true
     };
 
-    if !needs_update {
+    if needs_update {
+        if let Ok(resource_path) = app.path().resolve(
+            "resources/themes/default.css",
+            tauri::path::BaseDirectory::Resource,
+        ) {
+            if let Err(e) = fs::copy(&resource_path, &dest) {
+                log::warn!("Could not seed default.css from resource: {}", e);
+            } else {
+                log::info!("Updated default theme at {:?}", dest);
+            }
+        }
+
+        if let Err(e) = fs::write(&dest, DEFAULT_THEME_CSS) {
+            log::warn!("Could not write embedded default theme: {}", e);
+        } else {
+            log::info!("Updated default theme from embedded copy at {:?}", dest);
+        }
+    }
+
+    // Seed a universal redesign-compatible theme for users who want the new
+    // layout language without losing backwards-compatible class coverage.
+    let universal_dest = themes_dir.join("universal.css");
+    if universal_dest.exists() {
         return;
     }
 
     if let Ok(resource_path) = app.path().resolve(
-        "resources/themes/default.css",
+        "resources/themes/universal.css",
         tauri::path::BaseDirectory::Resource,
     ) {
-        if let Err(e) = fs::copy(&resource_path, &dest) {
-            log::warn!("Could not seed default.css from resource: {}", e);
+        if let Err(e) = fs::copy(&resource_path, &universal_dest) {
+            log::warn!("Could not seed universal.css from resource: {}", e);
         } else {
-            log::info!("Updated default theme at {:?}", dest);
+            log::info!("Seeded universal theme at {:?}", universal_dest);
             return;
         }
     }
 
-    if let Err(e) = fs::write(&dest, DEFAULT_THEME_CSS) {
-        log::warn!("Could not write embedded default theme: {}", e);
+    if let Err(e) = fs::write(&universal_dest, UNIVERSAL_THEME_CSS) {
+        log::warn!("Could not write embedded universal theme: {}", e);
     } else {
-        log::info!("Updated default theme from embedded copy at {:?}", dest);
+        log::info!("Seeded universal theme from embedded copy at {:?}", universal_dest);
     }
 }
 
