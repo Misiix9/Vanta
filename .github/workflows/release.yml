@@ -1,4 +1,4 @@
-name: Release Vanta
+name: Release Vanta v3.6.0
 
 on:
   push:
@@ -86,15 +86,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v4.0.0 -- Adaptive Intent Engine
+            ## Vanta v3.6.0 -- Community Growth Features
 
-            Major release focused on intent-driven query interpretation and multi-step workflow suggestions with explicit confirmations.
+            Minor release focused on safe community sharing, discoverability, and roadmap feedback loops.
 
             ### Highlights
-            - Added local-first Adaptive Intent Engine workflow parsing for multi-step queries.
-            - Added typed `intent_workflow` command contract support in v3 result payloads.
-            - Added explicit confirmation flow before executing inferred multi-step workflows.
-            - Added intent workflow search results section for discoverable command chaining.
+            - Added trusted shareable snippets for workflows, profiles, and theme presets.
+            - Added opt-in popular workflows feed with one-click install into local macros.
+            - Added in-app community feedback channel and roadmap voting hooks.
+            - Added safe import guardrails that block risky unverified workflow snippets.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.
