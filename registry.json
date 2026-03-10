@@ -10,16 +10,14 @@
       "Network"
     ],
     "category": "Networking",
-    "rating": 4.7,
-    "install_count": 32040,
+    "install_count": 0,
     "trust_badge": "verified",
     "changelog": [
       "Metadata upgraded for Phase 17 SDK v2 and community ratings.",
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
     "publisher": "Vanta Team",
-    "safe": true,
-    "rating_count": 1282
+    "safe": true
   },
   {
     "name": "smart-calculator",
@@ -30,16 +28,14 @@
     "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='5' y='2' width='14' height='20' rx='2'/><rect x='8' y='5' width='8' height='4' rx='1'/><circle cx='9.5' cy='13' r='1'/><circle cx='14.5' cy='13' r='1'/><circle cx='9.5' cy='17.5' r='1'/><circle cx='14.5' cy='17.5' r='1'/></svg>",
     "permissions": [],
     "category": "Productivity",
-    "rating": 4.7,
-    "install_count": 21420,
+    "install_count": 0,
     "trust_badge": "verified",
     "changelog": [
       "Metadata upgraded for Phase 17 SDK v2 and community ratings.",
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
     "publisher": "Vanta Team",
-    "safe": true,
-    "rating_count": 857
+    "safe": true
   },
   {
     "name": "color-picker",
@@ -50,16 +46,14 @@
     "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M2 22l1-1h3l9-9'/><path d='M3 21v-3l9-9'/><path d='M15 6l3.4-3.4a2.1 2.1 0 1 1 3 3L18 9'/><path d='M15 6l3 3'/><circle cx='2' cy='23' r='.8'/></svg>",
     "permissions": [],
     "category": "Productivity",
-    "rating": 4.7,
-    "install_count": 13980,
+    "install_count": 0,
     "trust_badge": "verified",
     "changelog": [
       "Metadata upgraded for Phase 17 SDK v2 and community ratings.",
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
     "publisher": "Vanta Team",
-    "safe": true,
-    "rating_count": 559
+    "safe": true
   },
   {
     "name": "process-manager",
@@ -72,16 +66,14 @@
       "Shell"
     ],
     "category": "System",
-    "rating": 4.7,
-    "install_count": 12210,
+    "install_count": 0,
     "trust_badge": "verified",
     "changelog": [
       "Metadata upgraded for Phase 17 SDK v2 and community ratings.",
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
     "publisher": "Vanta Team",
-    "safe": true,
-    "rating_count": 488
+    "safe": true
   },
   {
     "name": "network-test",
@@ -95,16 +87,14 @@
       "Shell"
     ],
     "category": "Networking",
-    "rating": 4.7,
-    "install_count": 16400,
+    "install_count": 0,
     "trust_badge": "verified",
     "changelog": [
       "Metadata upgraded for Phase 17 SDK v2 and community ratings.",
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
     "publisher": "Vanta Team",
-    "safe": true,
-    "rating_count": 656
+    "safe": true
   },
   {
     "name": "timer",
@@ -115,16 +105,14 @@
     "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='14' r='8'/><path d='M12 14l-3.5-2'/><path d='M12 14V8'/><line x1='10' y1='2' x2='14' y2='2'/><line x1='12' y1='2' x2='12' y2='6'/><path d='M18.5 8l1.5-1.5'/></svg>",
     "permissions": [],
     "category": "Productivity",
-    "rating": 4.7,
-    "install_count": 14730,
+    "install_count": 0,
     "trust_badge": "verified",
     "changelog": [
       "Metadata upgraded for Phase 17 SDK v2 and community ratings.",
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
     "publisher": "Vanta Team",
-    "safe": true,
-    "rating_count": 589
+    "safe": true
   },
   {
     "name": "sysinfo",
@@ -137,16 +125,14 @@
       "Shell"
     ],
     "category": "System",
-    "rating": 4.7,
-    "install_count": 12840,
+    "install_count": 0,
     "trust_badge": "verified",
     "changelog": [
       "Metadata upgraded for Phase 17 SDK v2 and community ratings.",
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
     "publisher": "Vanta Team",
-    "safe": true,
-    "rating_count": 514
+    "safe": true
   },
   {
     "name": "spotify",
@@ -160,8 +146,7 @@
       "Shell"
     ],
     "category": "Media",
-    "rating": 4.7,
-    "install_count": 24880,
+    "install_count": 0,
     "trust_badge": "verified",
     "changelog": [
       "Fixed mini player open flow, improved realtime progress/volume sync, and added lyrics in now-playing view.",
@@ -169,8 +154,7 @@
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
     "publisher": "Vanta Team",
-    "safe": true,
-    "rating_count": 995
+    "safe": true
   },
   {
     "name": "clipboard-tools",
@@ -181,16 +165,14 @@
     "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/><rect x='8' y='2' width='8' height='4' rx='1'/><line x1='8' y1='13' x2='16' y2='13'/><polyline points='13 10 16 13 13 16'/></svg>",
     "permissions": [],
     "category": "Productivity",
-    "rating": 4.7,
-    "install_count": 19510,
+    "install_count": 0,
     "trust_badge": "verified",
     "changelog": [
       "Metadata upgraded for Phase 17 SDK v2 and community ratings.",
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
     "publisher": "Vanta Team",
-    "safe": true,
-    "rating_count": 780
+    "safe": true
   },
   {
     "name": "password-gen",
@@ -201,15 +183,13 @@
     "icon": "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='11' width='18' height='11' rx='2'/><path d='M7 11V7a5 5 0 0 1 10 0v4'/><circle cx='12' cy='15.5' r='1.5'/><path d='M12 17v2'/></svg>",
     "permissions": [],
     "category": "Productivity",
-    "rating": 4.7,
-    "install_count": 18225,
+    "install_count": 0,
     "trust_badge": "verified",
     "changelog": [
       "Metadata upgraded for Phase 17 SDK v2 and community ratings.",
       "Store metadata upgraded for v2.9.0 trust and discoverability."
     ],
     "publisher": "Vanta Team",
-    "safe": true,
-    "rating_count": 729
+    "safe": true
   }
 ]
