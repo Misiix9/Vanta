@@ -175,7 +175,7 @@
   }
 
   function formatInstallCount(count: number): string {
-    if (!Number.isFinite(count) || count <= 0) return "new";
+    if (!Number.isFinite(count) || count <= 0) return "N/A";
     if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
     if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
     return `${count}`;

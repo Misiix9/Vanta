@@ -1,4 +1,4 @@
-name: Release Vanta v3.4.0
+name: Release Vanta v3.5.0
 
 on:
   push:
@@ -68,6 +68,9 @@ jobs:
           TAURI_ENVIRONMENT: production
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify Package Artifacts
+        run: ./scripts/verify-release-packages.sh
+
       - name: Get Version
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
@@ -83,16 +86,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v3.4.0 -- Extension SDK v2
+            ## Vanta v3.5.0 -- Packaging And Distribution Excellence
 
-            Minor release focused on extension authoring quality, trust metadata, and community ratings.
+            Minor release focused on distribution quality, package verification, and release diagnostics.
 
             ### Highlights
-            - Added SDK v2 scaffolding assets: templates, manifest validator, and extension harness tooling.
-            - Added compatibility matrix + deprecation lifecycle metadata for extension contracts.
-            - Added store metadata enforcement for publisher and safe extension badges.
-            - Added community rating submission flow and shared rating feed support.
-            - Normalized all official Vanta extensions to version `1.1.0` with `publisher=Vanta Team` and `safe=true`.
+            - Added package metadata/content verification gate for Deb and RPM artifacts.
+            - Added release verification script (`scripts/verify-release-packages.sh`) for CI and local smoke checks.
+            - Improved distribution documentation and troubleshooting guidance.
+            - Improved store data integrity by avoiding mock install/rating placeholders.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

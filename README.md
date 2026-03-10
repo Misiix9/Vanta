@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_3.4.0_amd64.deb
+sudo dpkg -i vanta_3.5.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-3.4.0-1.x86_64.rpm
+sudo rpm -i vanta-3.5.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v3.4.0)
-- Added Extension SDK v2 tooling: manifest validator, extension harness, and starter template.
-- Added compatibility matrix and deprecation lifecycle docs for extension contracts.
-- Added shared ratings feed + in-app rating submission flow for store extensions.
-- Versioned every official extension to `1.1.0`, marked `safe=true`, and standardized publisher metadata to `Vanta Team`.
+### Latest Minor (v3.5.0)
+- Added packaging verification script (`scripts/verify-release-packages.sh`) for Deb/RPM metadata and content checks.
+- Added release workflow package verification gate before asset upload.
+- Tightened store metrics policy to avoid mock download/rating placeholders.
+- Added distribution/troubleshooting guidance for release validation.
 
 ### Latest Major (v3.0.0)
 - Added typed result/action contract (`search_v3`, `get_suggestions_v3`) with legacy `exec` fallback.
