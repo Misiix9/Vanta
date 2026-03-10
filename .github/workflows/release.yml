@@ -1,4 +1,4 @@
-name: Release Vanta v3.1.0
+name: Release Vanta v3.2.0
 
 on:
   push:
@@ -83,15 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v3.1.0 -- Profiles v2
+            ## Vanta v3.2.0 -- Diagnostics, Recovery, Support Bundle v2
 
-            Minor release focused on context-aware profile switching and compatibility-safe profile portability.
+            Minor release focused on subsystem health visibility, recovery hints, and one-click support bundle generation.
 
             ### Highlights
-            - Added profile-aware launcher actions for atomic context switching.
-            - Added profile import/export with schema compatibility checks.
-            - Added scoped profile settings for hotkey, theme, and ranking/search behavior.
-            - Added profile entries in suggestions and search for faster switching.
+            - Added health dashboard metrics for config, cache, file index, and jobs.
+            - Added startup-recovery hints including unclean startup detection.
+            - Added support bundle export with redacted config summary and performance diagnostics.
+            - Added in-settings diagnostics panel actions for refresh and bundle creation.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

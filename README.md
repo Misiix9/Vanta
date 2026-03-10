@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_3.1.0_amd64.deb
+sudo dpkg -i vanta_3.2.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-3.1.0-1.x86_64.rpm
+sudo rpm -i vanta-3.2.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v3.1.0)
-- Added profile-aware launcher actions (`profile-switch:<id>`) with atomic runtime switching.
-- Added profile import/export commands with schema compatibility checks.
-- Added config-level profiles model with scoped hotkey/theme/search settings.
-- Added profile search/suggestion results for quick context switching.
+### Latest Minor (v3.2.0)
+- Added diagnostics health dashboard for core subsystems and runtime caches.
+- Added startup self-heal hints including unclean startup detection.
+- Added one-click support bundle generation for troubleshooting.
+- Added diagnostics panel controls for refresh, recovery hints, and bundle export.
 
 ### Latest Major (v3.0.0)
 - Added typed result/action contract (`search_v3`, `get_suggestions_v3`) with legacy `exec` fallback.

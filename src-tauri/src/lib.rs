@@ -45,6 +45,7 @@ pub struct AppState {
     pub file_index: FileIndex,
     macro_jobs: Mutex<Vec<MacroJobRecord>>,
     canceled_jobs: Mutex<HashSet<String>>,
+    startup_unclean: Mutex<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -116,6 +117,59 @@ fn jobs_path() -> std::path::PathBuf {
     config::config_dir().join("macro-jobs.json")
 }
 
+fn startup_state_path() -> std::path::PathBuf {
+    config::config_dir().join("startup-state.json")
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct StartupState {
+    in_progress: bool,
+    updated_at: i64,
+}
+
+fn mark_startup_in_progress() -> bool {
+    let path = startup_state_path();
+    let previous_unclean = std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<StartupState>(&raw).ok())
+        .map(|s| s.in_progress)
+        .unwrap_or(false);
+
+    let next = StartupState {
+        in_progress: true,
+        updated_at: now_millis(),
+    };
+
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(
+        &path,
+        serde_json::to_string_pretty(&next).unwrap_or_else(|_| "{}".to_string()),
+    );
+
+    previous_unclean
+}
+
+fn mark_startup_complete() {
+    let path = startup_state_path();
+    let done = StartupState {
+        in_progress: false,
+        updated_at: now_millis(),
+    };
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let _ = std::fs::write(
+        &path,
+        serde_json::to_string_pretty(&done).unwrap_or_else(|_| "{}".to_string()),
+    );
+}
+
+fn support_bundle_dir() -> std::path::PathBuf {
+    config::config_dir().join("support-bundles")
+}
+
 fn load_jobs_from_disk() -> Vec<MacroJobRecord> {
     let path = jobs_path();
     let Ok(raw) = std::fs::read_to_string(path) else {
@@ -161,6 +215,38 @@ struct SearchDiagnostics {
     search: PerfStats,
     suggestions: PerfStats,
     launch: PerfStats,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct HealthCheck {
+    name: String,
+    status: String,
+    detail: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct HealthDashboard {
+    generated_at: i64,
+    config_schema: u32,
+    active_profile_id: String,
+    apps_cached: usize,
+    extensions_cached: usize,
+    file_index_entries: usize,
+    macro_jobs_total: usize,
+    checks: Vec<HealthCheck>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct SupportBundleReport {
+    path: String,
+    size_bytes: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct RecoveryHint {
+    id: String,
+    title: String,
+    detail: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1353,6 +1439,191 @@ async fn get_search_diagnostics() -> Result<SearchDiagnostics, String> {
 }
 
 #[tauri::command]
+async fn get_health_dashboard(
+    state: tauri::State<'_, AppState>,
+) -> Result<HealthDashboard, String> {
+    let cfg = state
+        .config
+        .lock()
+        .map_err(|_| "Failed to access config".to_string())?
+        .clone();
+    let apps_cached = state
+        .apps
+        .lock()
+        .map_err(|_| "Failed to access apps cache".to_string())?
+        .len();
+    let extensions_cached = state
+        .extensions_cache
+        .lock()
+        .map_err(|_| "Failed to access extensions cache".to_string())?
+        .len();
+    let file_index_entries = state
+        .file_index
+        .lock()
+        .map_err(|_| "Failed to access file index".to_string())?
+        .entries
+        .len();
+    let macro_jobs_total = state
+        .macro_jobs
+        .lock()
+        .map_err(|_| "Failed to access macro jobs".to_string())?
+        .len();
+
+    let mut checks = Vec::new();
+    checks.push(HealthCheck {
+        name: "config".to_string(),
+        status: "ok".to_string(),
+        detail: format!(
+            "schema={} active_profile={} profiles={}",
+            cfg.schema_version,
+            cfg.profiles.active_profile_id,
+            cfg.profiles.entries.len()
+        ),
+    });
+    checks.push(HealthCheck {
+        name: "apps_cache".to_string(),
+        status: if apps_cached > 0 { "ok" } else { "warn" }.to_string(),
+        detail: format!("{} apps cached", apps_cached),
+    });
+    checks.push(HealthCheck {
+        name: "extensions_cache".to_string(),
+        status: "ok".to_string(),
+        detail: format!("{} extensions cached", extensions_cached),
+    });
+    checks.push(HealthCheck {
+        name: "file_index".to_string(),
+        status: if file_index_entries > 0 { "ok" } else { "warn" }.to_string(),
+        detail: format!("{} indexed entries", file_index_entries),
+    });
+    checks.push(HealthCheck {
+        name: "macro_jobs".to_string(),
+        status: "ok".to_string(),
+        detail: format!("{} jobs recorded", macro_jobs_total),
+    });
+
+    Ok(HealthDashboard {
+        generated_at: now_millis(),
+        config_schema: cfg.schema_version,
+        active_profile_id: cfg.profiles.active_profile_id,
+        apps_cached,
+        extensions_cached,
+        file_index_entries,
+        macro_jobs_total,
+        checks,
+    })
+}
+
+#[tauri::command]
+async fn create_support_bundle(
+    output_path: Option<String>,
+    state: tauri::State<'_, AppState>,
+) -> Result<SupportBundleReport, String> {
+    let dashboard = get_health_dashboard(state.clone()).await?;
+    let perf = get_search_diagnostics().await?;
+    let cfg = state
+        .config
+        .lock()
+        .map_err(|_| "Failed to access config".to_string())?
+        .clone();
+
+    let use_default_path = output_path.is_none();
+    let mut target_path = output_path
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| support_bundle_dir().join(format!("support-{}.json", now_millis())));
+
+    if target_path.is_dir() || use_default_path {
+        target_path = target_path.join(format!("support-{}.json", now_millis()));
+    }
+    if let Some(parent) = target_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create support bundle directory: {}", e))?;
+    }
+
+    let payload = serde_json::json!({
+        "created_at": now_millis(),
+        "health": dashboard,
+        "search_diagnostics": perf,
+        "config_summary": {
+            "schema_version": cfg.schema_version,
+            "active_profile_id": cfg.profiles.active_profile_id,
+            "profiles": cfg.profiles.entries.iter().map(|p| serde_json::json!({
+                "id": p.id,
+                "name": p.name,
+                "theme": p.theme,
+                "hotkey": p.hotkey,
+            })).collect::<Vec<_>>()
+        }
+    });
+
+    let serialized = serde_json::to_string_pretty(&payload)
+        .map_err(|e| format!("Failed to serialize support bundle: {}", e))?;
+    std::fs::write(&target_path, serialized)
+        .map_err(|e| format!("Failed to write support bundle: {}", e))?;
+    let size = std::fs::metadata(&target_path)
+        .map_err(|e| format!("Failed to stat support bundle: {}", e))?
+        .len();
+
+    Ok(SupportBundleReport {
+        path: target_path.to_string_lossy().to_string(),
+        size_bytes: size,
+    })
+}
+
+#[tauri::command]
+async fn get_recovery_hints(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<RecoveryHint>, String> {
+    let cfg = state
+        .config
+        .lock()
+        .map_err(|_| "Failed to access config".to_string())?
+        .clone();
+    let unclean = *state
+        .startup_unclean
+        .lock()
+        .map_err(|_| "Failed to access startup state".to_string())?;
+    let index_count = state
+        .file_index
+        .lock()
+        .map_err(|_| "Failed to access file index".to_string())?
+        .entries
+        .len();
+
+    let mut hints = Vec::new();
+    if unclean {
+        hints.push(RecoveryHint {
+            id: "unclean-startup".to_string(),
+            title: "Previous startup may have failed".to_string(),
+            detail: "Try launching with default theme/profile and regenerate a support bundle for troubleshooting.".to_string(),
+        });
+    }
+    if index_count == 0 {
+        hints.push(RecoveryHint {
+            id: "rebuild-file-index".to_string(),
+            title: "File index is empty".to_string(),
+            detail: "Open Settings -> File Search and run 'Rebuild Index' to restore document results.".to_string(),
+        });
+    }
+    if cfg.profiles.entries.is_empty() {
+        hints.push(RecoveryHint {
+            id: "reseed-profiles".to_string(),
+            title: "No profiles found".to_string(),
+            detail: "Run contract migration or reset config to regenerate the default profile.".to_string(),
+        });
+    }
+
+    if hints.is_empty() {
+        hints.push(RecoveryHint {
+            id: "all-good".to_string(),
+            title: "No recovery action needed".to_string(),
+            detail: "Core subsystems are healthy based on current diagnostics.".to_string(),
+        });
+    }
+
+    Ok(hints)
+}
+
+#[tauri::command]
 async fn rescan_apps(
     state: tauri::State<'_, AppState>,
 ) -> Result<usize, String> {
@@ -1870,6 +2141,7 @@ async fn open_spotify_mini_player(app_handle: tauri::AppHandle) -> Result<(), St
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run(start_hidden: bool, open_clipboard: bool) {
     env_logger::init();
+    let startup_unclean = mark_startup_in_progress();
 
     if let Err(e) = clipboard::init_db() {
         log::error!("Failed to init clipboard DB: {}", e);
@@ -1946,6 +2218,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
         file_index: file_index.clone(),
         macro_jobs: Mutex::new(macro_jobs),
         canceled_jobs: Mutex::new(HashSet::new()),
+        startup_unclean: Mutex::new(startup_unclean),
     };
 
     let mut builder = tauri::Builder::default();
@@ -2023,6 +2296,9 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             get_suggestions_v3,
             run_contract_migration,
             get_search_diagnostics,
+            get_health_dashboard,
+            create_support_bundle,
+            get_recovery_hints,
             get_clipboard_history,
             delete_clipboard_item,
             toggle_clipboard_pin,
@@ -2039,6 +2315,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
+            mark_startup_complete();
 
             if let Some(win) = app.get_webview_window("main") {
                 let _ = window::init_window(&win, &app_handle);

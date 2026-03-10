@@ -183,6 +183,34 @@ export interface SearchDiagnostics {
     launch: PerfStats;
 }
 
+export interface HealthCheck {
+    name: string;
+    status: string;
+    detail: string;
+}
+
+export interface HealthDashboard {
+    generated_at: number;
+    config_schema: number;
+    active_profile_id: string;
+    apps_cached: number;
+    extensions_cached: number;
+    file_index_entries: number;
+    macro_jobs_total: number;
+    checks: HealthCheck[];
+}
+
+export interface SupportBundleReport {
+    path: string;
+    size_bytes: number;
+}
+
+export interface RecoveryHint {
+    id: string;
+    title: string;
+    detail: string;
+}
+
 export interface ResultAction {
     label: string;
     exec?: string;
