@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "general": {
     "hotkey": "Alt+Space",
     "max_results": 8,
@@ -110,5 +110,11 @@
         }
       }
     ]
+  },
+  "policy": {
+    "restricted_mode": false,
+    "allowed_extensions": [],
+    "blocked_capabilities": [],
+    "require_verified_extensions": false
   }
 }

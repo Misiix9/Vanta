@@ -3,6 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::extensions::{self, ExtensionManifest};
+use crate::config;
+use crate::permissions;
 
 const REGISTRY_URL: &str =
     "https://raw.githubusercontent.com/Misiix9/vanta-extensions/main/registry.json";
@@ -211,6 +213,20 @@ async fn download_file(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, S
 pub async fn install_store_extension(name: String) -> Result<(), String> {
     validate_requested_name(&name)?;
 
+    let cfg = config::load_or_create_default();
+    if cfg.policy.restricted_mode
+        && !cfg.policy.allowed_extensions.iter().any(|id| id == &name)
+    {
+        let _ = permissions::record_audit_event(
+            "extension_install",
+            "store",
+            &name,
+            "denied",
+            Some("blocked by restricted mode allowlist".to_string()),
+        );
+        return Err("Install blocked by policy: extension not in allowlist".to_string());
+    }
+
     let ext_dir = extensions::extensions_dir().join(&name);
     let dist_dir = ext_dir.join("dist");
     fs::create_dir_all(&dist_dir)
@@ -222,6 +238,24 @@ pub async fn install_store_extension(name: String) -> Result<(), String> {
     let manifest_bytes = download_file(&client, &format!("{}/manifest.json", base)).await?;
     let manifest = validate_downloaded_manifest(&name, &manifest_bytes)
         .map_err(|e| format!("Install blocked by manifest validation: {}", e))?;
+
+    if cfg.policy.require_verified_extensions {
+        let is_verified = manifest
+            .author
+            .as_deref()
+            .map(|a| a.eq_ignore_ascii_case("Vanta Team"))
+            .unwrap_or(false);
+        if !is_verified {
+            let _ = permissions::record_audit_event(
+                "extension_install",
+                "store",
+                &name,
+                "denied",
+                Some("require_verified_extensions=true".to_string()),
+            );
+            return Err("Install blocked by policy: only verified extensions are allowed".to_string());
+        }
+    }
 
     let normalized_manifest = serde_json::to_string_pretty(&manifest)
         .map_err(|e| format!("Failed to serialize normalized manifest: {}", e))?;
@@ -262,6 +296,13 @@ pub async fn install_store_extension(name: String) -> Result<(), String> {
         manifest.commands.len(),
         ext_dir.display()
     );
+    let _ = permissions::record_audit_event(
+        "extension_install",
+        "store",
+        &name,
+        "allowed",
+        Some(format!("commands={}", manifest.commands.len())),
+    );
     Ok(())
 }
 
@@ -297,6 +338,13 @@ pub async fn uninstall_extension(name: String) -> Result<(), String> {
     }
 
     log::info!("Uninstalled extension '{}'", name);
+    let _ = permissions::record_audit_event(
+        "extension_uninstall",
+        "store",
+        &name,
+        "allowed",
+        None,
+    );
     Ok(())
 }
 

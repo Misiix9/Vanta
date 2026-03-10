@@ -2308,6 +2308,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             open_spotify_mini_player,
             permissions::get_permission_decision,
             permissions::set_permission_decision,
+            permissions::get_audit_events,
             get_apps,
             themes::get_installed_themes,
             themes::resize_window_for_theme,

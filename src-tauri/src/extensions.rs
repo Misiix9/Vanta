@@ -328,6 +328,46 @@ pub fn check_extension_permissions(
         return Ok(());
     }
 
+    let cfg = config::load_or_create_default();
+    if cfg.policy.restricted_mode
+        && !cfg.policy.allowed_extensions.iter().any(|id| id == ext_id)
+    {
+        for capability in requested_caps {
+            let _ = permissions::record_block_event(
+                ext_id,
+                capability.clone(),
+                Some("blocked-by-policy-restricted-mode".to_string()),
+            );
+        }
+        let _ = permissions::record_audit_event(
+            "policy_extension_block",
+            "system",
+            ext_id,
+            "denied",
+            Some("restricted mode allowlist".to_string()),
+        );
+        return Err(PermissionError::Deny);
+    }
+
+    if let Some(blocked) = requested_caps
+        .iter()
+        .find(|cap| cfg.policy.blocked_capabilities.contains(cap))
+    {
+        let _ = permissions::record_block_event(
+            ext_id,
+            blocked.clone(),
+            Some("blocked-by-policy-capability".to_string()),
+        );
+        let _ = permissions::record_audit_event(
+            "policy_capability_block",
+            "system",
+            ext_id,
+            "denied",
+            Some(format!("blocked capability: {:?}", blocked)),
+        );
+        return Err(PermissionError::Deny);
+    }
+
     let response = permissions::get_decision_for(ext_id, requested_caps);
 
     match response.decision {

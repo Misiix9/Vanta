@@ -29,20 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_3.2.0_amd64.deb
+sudo dpkg -i vanta_3.3.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-3.2.0-1.x86_64.rpm
+sudo rpm -i vanta-3.3.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v3.2.0)
-- Added diagnostics health dashboard for core subsystems and runtime caches.
-- Added startup self-heal hints including unclean startup detection.
-- Added one-click support bundle generation for troubleshooting.
-- Added diagnostics panel controls for refresh, recovery hints, and bundle export.
+### Latest Minor (v3.3.0)
+- Added enterprise policy controls for restricted mode extension allowlists.
+- Added blocked-capability enforcement for extension permission checks.
+- Added verified-extension install policy control for stricter environments.
+- Added audit trail events for installs, uninstalls, and permission decisions.
 
 ### Latest Major (v3.0.0)
 - Added typed result/action contract (`search_v3`, `get_suggestions_v3`) with legacy `exec` fallback.

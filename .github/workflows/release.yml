@@ -1,4 +1,4 @@
-name: Release Vanta v3.2.0
+name: Release Vanta v3.3.0
 
 on:
   push:
@@ -83,15 +83,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v3.2.0 -- Diagnostics, Recovery, Support Bundle v2
+            ## Vanta v3.3.0 -- Enterprise Security And Policy Controls
 
-            Minor release focused on subsystem health visibility, recovery hints, and one-click support bundle generation.
+            Minor release focused on enforceable policy controls and auditable security events.
 
             ### Highlights
-            - Added health dashboard metrics for config, cache, file index, and jobs.
-            - Added startup-recovery hints including unclean startup detection.
-            - Added support bundle export with redacted config summary and performance diagnostics.
-            - Added in-settings diagnostics panel actions for refresh and bundle creation.
+            - Added restricted mode extension allowlist enforcement.
+            - Added blocked capability policy enforcement in extension permission checks.
+            - Added verified-extension install policy controls.
+            - Added audit trail events for installs, uninstalls, and permission decisions.
 
             ### Packaging
             - Deb and RPM bundles are published for this release.

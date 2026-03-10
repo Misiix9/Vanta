@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Emitter;
 
 const MAX_BLOCK_EVENTS: usize = 200;
+const MAX_AUDIT_EVENTS: usize = 500;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Capability {
@@ -43,11 +44,24 @@ pub struct BlockEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditEvent {
+    pub event_type: String,
+    pub actor: String,
+    pub target: String,
+    pub outcome: String,
+    pub timestamp: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PermissionsStore {
     #[serde(default)]
     pub decisions: HashMap<String, DecisionRecord>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub block_events: Vec<BlockEvent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub audit_events: Vec<AuditEvent>,
 }
 
 impl Default for PermissionsStore {
@@ -55,6 +69,7 @@ impl Default for PermissionsStore {
         Self {
             decisions: HashMap::new(),
             block_events: Vec::new(),
+            audit_events: Vec::new(),
         }
     }
 }
@@ -203,6 +218,29 @@ pub fn record_block_event(
     save_permissions(&store)
 }
 
+pub fn record_audit_event(
+    event_type: &str,
+    actor: &str,
+    target: &str,
+    outcome: &str,
+    detail: Option<String>,
+) -> Result<(), String> {
+    let mut store = load_permissions_raw()?;
+    store.audit_events.push(AuditEvent {
+        event_type: event_type.to_string(),
+        actor: actor.to_string(),
+        target: target.to_string(),
+        outcome: outcome.to_string(),
+        timestamp: now_millis(),
+        detail,
+    });
+    if store.audit_events.len() > MAX_AUDIT_EVENTS {
+        let excess = store.audit_events.len().saturating_sub(MAX_AUDIT_EVENTS);
+        store.audit_events.drain(0..excess);
+    }
+    save_permissions(&store)
+}
+
 pub fn get_decision_for(script_id: &str, requested_caps: &[Capability]) -> PermissionDecisionResponse {
     let store = load_permissions();
     let record = store.decisions.get(script_id);
@@ -248,6 +286,19 @@ pub fn set_permission_decision(
     note: Option<String>,
 ) -> Result<DecisionRecord, String> {
     let record = set_decision(&script_id, decision, note, requested_caps)?;
+    let _ = record_audit_event(
+        "permission_decision",
+        "user",
+        &record.script_id,
+        "updated",
+        Some(format!("decision={:?}", record.decision)),
+    );
     let _ = app_handle.emit("permissions-updated", &record);
     Ok(record)
+}
+
+#[tauri::command]
+pub fn get_audit_events() -> Result<Vec<AuditEvent>, String> {
+    let store = load_permissions_raw()?;
+    Ok(store.audit_events)
 }

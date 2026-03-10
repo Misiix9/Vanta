@@ -7,7 +7,7 @@ use crate::permissions::Capability;
 
 // Embedded default config for fallback writes.
 const DEFAULT_CONFIG_JSON: &str = include_str!("../resources/config.json");
-pub const CONFIG_SCHEMA_VERSION: u32 = 4;
+pub const CONFIG_SCHEMA_VERSION: u32 = 5;
 pub const WORKFLOWS_SCHEMA_VERSION: u32 = 1;
 pub const PROFILES_SCHEMA_VERSION: u32 = 1;
 pub const PROFILE_EXPORT_SCHEMA_VERSION: u32 = 1;
@@ -41,6 +41,35 @@ pub struct VantaConfig {
     pub workflows: WorkflowsConfig,
     #[serde(default)]
     pub profiles: ProfilesConfig,
+    #[serde(default)]
+    pub policy: PolicyConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct PolicyConfig {
+    #[serde(default = "default_policy_restricted_mode")]
+    pub restricted_mode: bool,
+    #[serde(default)]
+    pub allowed_extensions: Vec<String>,
+    #[serde(default)]
+    pub blocked_capabilities: Vec<Capability>,
+    #[serde(default)]
+    pub require_verified_extensions: bool,
+}
+
+fn default_policy_restricted_mode() -> bool {
+    false
+}
+
+impl Default for PolicyConfig {
+    fn default() -> Self {
+        Self {
+            restricted_mode: default_policy_restricted_mode(),
+            allowed_extensions: Vec::new(),
+            blocked_capabilities: Vec::new(),
+            require_verified_extensions: false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -497,6 +526,7 @@ impl Default for VantaConfig {
             search: SearchConfig::default(),
             workflows: WorkflowsConfig::default(),
             profiles: ProfilesConfig::default(),
+            policy: PolicyConfig::default(),
         }
     }
 }

@@ -35,6 +35,13 @@ export interface ExtensionsConfig {
     dev_mode: boolean;
 }
 
+export interface PolicyConfig {
+    restricted_mode: boolean;
+    allowed_extensions: string[];
+    blocked_capabilities: Capability[];
+    require_verified_extensions: boolean;
+}
+
 export interface WindowConfig {
     width: number;
     height: number;
@@ -168,6 +175,7 @@ export interface VantaConfig {
     search: SearchConfig;
     workflows: WorkflowsConfig;
     profiles?: ProfilesConfig;
+    policy?: PolicyConfig;
 }
 
 export interface PerfStats {
