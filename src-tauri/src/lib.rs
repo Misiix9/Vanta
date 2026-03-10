@@ -327,8 +327,71 @@ fn split_intent_steps(query: &str) -> Vec<String> {
         .collect()
 }
 
-fn infer_intent_step_exec(step: &str) -> Option<String> {
+fn resolve_app_exec_for_step(step: &str, apps: &[AppEntry]) -> Option<String> {
+    let lower = step.to_lowercase();
+    let normalized = lower
+        .replace("open ", " ")
+        .replace("launch ", " ")
+        .replace("run ", " ")
+        .replace("start ", " ");
+    let tokens: Vec<&str> = normalized.split_whitespace().collect();
+    if tokens.is_empty() {
+        return None;
+    }
+
+    let mut best: Option<(&AppEntry, usize)> = None;
+    for app in apps {
+        let name = app.name.to_lowercase();
+        let generic = app
+            .generic_name
+            .as_deref()
+            .unwrap_or_default()
+            .to_lowercase();
+        let cmd = app
+            .exec
+            .split_whitespace()
+            .next()
+            .unwrap_or_default()
+            .to_lowercase();
+
+        let mut score = 0usize;
+        for t in &tokens {
+            if name.contains(t) {
+                score += 4;
+            }
+            if !generic.is_empty() && generic.contains(t) {
+                score += 2;
+            }
+            if !cmd.is_empty() && cmd.contains(t) {
+                score += 3;
+            }
+        }
+
+        if score == 0 {
+            continue;
+        }
+
+        match best {
+            Some((_, best_score)) if best_score >= score => {}
+            _ => best = Some((app, score)),
+        }
+    }
+
+    best.map(|(app, _)| app.exec.clone())
+}
+
+fn infer_intent_step_exec(step: &str, apps: &[AppEntry]) -> Option<String> {
     let s = step.to_lowercase();
+
+    let app_launch_hint = s.contains("open ")
+        || s.contains("launch ")
+        || s.contains("run ")
+        || s.contains("start ");
+    if app_launch_hint {
+        if let Some(app_exec) = resolve_app_exec_for_step(step, apps) {
+            return Some(app_exec);
+        }
+    }
 
     if s.contains("setting") || s.contains("preference") || s.contains("config") {
         return Some("open-settings".to_string());
@@ -371,7 +434,7 @@ fn infer_intent_step_exec(step: &str) -> Option<String> {
     None
 }
 
-fn build_intent_results(query: &str, weight: u32) -> Vec<SearchResult> {
+fn build_intent_results(query: &str, weight: u32, apps: &[AppEntry]) -> Vec<SearchResult> {
     let trimmed = query.trim();
     if trimmed.len() < 8 {
         return Vec::new();
@@ -384,7 +447,7 @@ fn build_intent_results(query: &str, weight: u32) -> Vec<SearchResult> {
 
     let mut planned_exec_steps = Vec::new();
     for step in &steps {
-        if let Some(exec) = infer_intent_step_exec(step) {
+        if let Some(exec) = infer_intent_step_exec(step, apps) {
             planned_exec_steps.push(exec);
         }
     }
@@ -414,6 +477,89 @@ fn build_intent_results(query: &str, weight: u32) -> Vec<SearchResult> {
         group: None,
         section: Some("Intent".to_string()),
     }]
+}
+
+fn query_relevance_bonus(query: &str, result: &SearchResult) -> u32 {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return 0;
+    }
+
+    let title = result.title.to_lowercase();
+    let subtitle = result
+        .subtitle
+        .as_deref()
+        .unwrap_or_default()
+        .to_lowercase();
+    let exec = result.exec.to_lowercase();
+
+    let mut bonus = 0u32;
+    if title == q {
+        bonus += 130_000;
+    } else if title.starts_with(&q) {
+        bonus += 95_000;
+    } else if title.contains(&q) {
+        bonus += 65_000;
+    }
+
+    if !subtitle.is_empty() && subtitle.contains(&q) {
+        bonus += 22_000;
+    }
+
+    if exec.starts_with(&q) || exec.contains(&q) {
+        bonus += 18_000;
+    }
+
+    if q.split_whitespace().count() > 1 && q.split_whitespace().all(|t| title.contains(t)) {
+        bonus += 18_000;
+    }
+
+    bonus
+}
+
+fn source_intent_bonus(query: &str, result: &SearchResult) -> u32 {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return 0;
+    }
+
+    match result.source {
+        ResultSource::Application => {
+            if q.starts_with("open ") || q.starts_with("launch ") || q.starts_with("run ") {
+                30_000
+            } else {
+                0
+            }
+        }
+        ResultSource::File => {
+            if q.starts_with("file ") || q.starts_with("open ") || q.contains("document") {
+                26_000
+            } else {
+                0
+            }
+        }
+        ResultSource::Window => {
+            if q.contains("window") || q.contains("switch") || q.contains("focus") {
+                26_000
+            } else {
+                0
+            }
+        }
+        ResultSource::Calculator => {
+            if q.chars().any(|c| c.is_ascii_digit()) {
+                20_000
+            } else {
+                0
+            }
+        }
+        ResultSource::Extension { .. } => {
+            if q.contains("extension") || q.contains("plugin") {
+                16_000
+            } else {
+                0
+            }
+        }
+    }
 }
 
 fn exec_to_command(exec: &str, source: &matcher::ResultSource) -> CommandV1 {
@@ -1006,6 +1152,20 @@ mod window_search_tests {
 mod intent_engine_tests {
     use super::*;
 
+    fn app(name: &str, exec: &str) -> AppEntry {
+        AppEntry {
+            name: name.to_string(),
+            generic_name: None,
+            comment: None,
+            exec: exec.to_string(),
+            icon: None,
+            categories: Vec::new(),
+            terminal: false,
+            startup_wm_class: None,
+            desktop_file_path: String::new(),
+        }
+    }
+
     #[test]
     fn split_intent_steps_supports_then_and_arrow() {
         let steps = split_intent_steps("open settings then open store -> restart");
@@ -1014,23 +1174,68 @@ mod intent_engine_tests {
 
     #[test]
     fn infer_intent_step_exec_maps_supported_actions() {
-        assert_eq!(infer_intent_step_exec("open settings").as_deref(), Some("open-settings"));
-        assert_eq!(infer_intent_step_exec("go to store").as_deref(), Some("open-store"));
+        let apps = vec![app("Zen Browser", "zen-browser")];
+        assert_eq!(infer_intent_step_exec("open settings", &apps).as_deref(), Some("open-settings"));
+        assert_eq!(infer_intent_step_exec("go to store", &apps).as_deref(), Some("open-store"));
         assert_eq!(
-            infer_intent_step_exec("restart into bios").as_deref(),
+            infer_intent_step_exec("restart into bios", &apps).as_deref(),
             Some("system-action:bios")
         );
+        assert_eq!(infer_intent_step_exec("open zen", &apps).as_deref(), Some("zen-browser"));
     }
 
     #[test]
     fn build_intent_results_requires_multiple_valid_steps() {
-        let none = build_intent_results("open settings", 100);
+        let apps = vec![app("Zen Browser", "zen-browser"), app("Foot", "foot")];
+
+        let none = build_intent_results("open settings", 100, &apps);
         assert!(none.is_empty());
 
-        let results = build_intent_results("open settings then open store", 100);
+        let results = build_intent_results("open zen then open foot", 100, &apps);
         assert_eq!(results.len(), 1);
         assert!(results[0].exec.starts_with("intent-workflow:"));
+        assert!(results[0].exec.contains("zen-browser"));
+        assert!(results[0].exec.contains("foot"));
         assert_eq!(results[0].section.as_deref(), Some("Intent"));
+    }
+}
+
+#[cfg(test)]
+mod relevance_ranking_tests {
+    use super::*;
+
+    fn result(title: &str, exec: &str, source: ResultSource, score: u32) -> SearchResult {
+        SearchResult {
+            title: title.to_string(),
+            subtitle: None,
+            icon: None,
+            exec: exec.to_string(),
+            score,
+            match_indices: Vec::new(),
+            source,
+            actions: None,
+            id: None,
+            group: None,
+            section: None,
+        }
+    }
+
+    #[test]
+    fn relevance_bonus_prefers_exact_app_name() {
+        let q = "discord";
+        let mut app = result("Discord", "discord", ResultSource::Application, 1_000);
+        let mut file = result("discord-notes.txt", "/tmp/discord-notes.txt", ResultSource::File, 1_000);
+
+        app.score = app
+            .score
+            .saturating_add(query_relevance_bonus(q, &app))
+            .saturating_add(source_intent_bonus(q, &app));
+        file.score = file
+            .score
+            .saturating_add(query_relevance_bonus(q, &file))
+            .saturating_add(source_intent_bonus(q, &file));
+
+        assert!(app.score > file.score);
     }
 }
 
@@ -1214,13 +1419,17 @@ async fn search(
         max_results
     };
 
-    let mut results = matcher::fuzzy_search(
-        &query,
-        &apps,
-        app_limit,
-        &usage_map,
-        search_config.applications.weight,
-    );
+    let mut results = if search_config.applications.enabled {
+        matcher::fuzzy_search(
+            &query,
+            &apps,
+            app_limit,
+            &usage_map,
+            search_config.applications.weight,
+        )
+    } else {
+        Vec::new()
+    };
 
     let query_lower = query.to_lowercase();
     let derived_cap = std::cmp::max(1, max_results / 2);
@@ -1229,14 +1438,16 @@ async fn search(
     } else {
         derived_cap
     };
-    let window_results = build_window_results(
-        &query_lower,
-        window_cap,
-        &apps,
-        search_config.windows.weight,
-        |cap| list_windows_grouped(cap),
-    );
-    results.extend(window_results);
+    if search_config.windows.enabled {
+        let window_results = build_window_results(
+            &query_lower,
+            window_cap,
+            &apps,
+            search_config.windows.weight,
+            |cap| list_windows_grouped(cap),
+        );
+        results.extend(window_results);
+    }
 
     if search_config.calculator.enabled {
         if let Some(val) = math::evaluate(&query) {
@@ -1270,11 +1481,16 @@ async fn search(
         results.extend(file_results);
     }
 
-    let profile_results = build_profile_results(&query, &profiles_config, search_config.applications.weight);
-    results.extend(profile_results);
+    if search_config.applications.enabled {
+        let profile_results =
+            build_profile_results(&query, &profiles_config, search_config.applications.weight);
+        results.extend(profile_results);
+    }
 
-    let intent_results = build_intent_results(&query, search_config.applications.weight);
-    results.extend(intent_results);
+    if search_config.applications.enabled {
+        let intent_results = build_intent_results(&query, search_config.applications.weight, &apps);
+        results.extend(intent_results);
+    }
 
     // Extension command search
     {
@@ -1282,7 +1498,7 @@ async fn search(
             .extensions_cache
             .lock()
             .map_err(|_| "Failed to access extensions cache".to_string())?;
-        let ext_results = build_extension_results(&query, &ext_cache, 100);
+        let ext_results = build_extension_results(&query, &ext_cache, search_config.applications.weight);
         results.extend(ext_results);
     }
 
@@ -1328,6 +1544,14 @@ async fn search(
                 group: None,
                 section: Some("Settings".to_string()),
             });
+        }
+    }
+
+    if !query.trim().is_empty() {
+        for result in &mut results {
+            let bonus = query_relevance_bonus(&query, result)
+                .saturating_add(source_intent_bonus(&query, result));
+            result.score = result.score.saturating_add(bonus);
         }
     }
 

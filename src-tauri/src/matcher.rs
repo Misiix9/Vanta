@@ -47,6 +47,15 @@ fn apply_weight(score: u32, weight: u32) -> u32 {
     scaled.min(u32::MAX as u128) as u32
 }
 
+fn usage_relevance_bonus(usage: u32) -> u32 {
+    if usage == 0 {
+        return 0;
+    }
+    // Log-shaped growth keeps heavy users influential without dominating query relevance.
+    let bucket = ((usage as f64 + 1.0).ln() * 75.0).round() as u32;
+    bucket.min(350)
+}
+
 /// Perform fuzzy search across cached app entries using nucleo-matcher.
 /// Returns top `max_results` entries sorted by score (descending).
 /// Perform fuzzy search across cached app entries using nucleo-matcher.
@@ -96,7 +105,7 @@ pub fn fuzzy_search(
     let mut matcher = Matcher::new(Config::DEFAULT);
     let pattern = Atom::new(
         query,
-        CaseMatching::Smart,
+        CaseMatching::Ignore,
         Normalization::Smart,
         AtomKind::Fuzzy,
         false,
@@ -107,11 +116,8 @@ pub fn fuzzy_search(
     let mut indices = Vec::new();
 
     for app in apps {
-        // Calculate history boost first
         let usage = usage_map.get(&app.exec).copied().unwrap_or(0);
-        // Cap the bonus at 200 points (e.g. 40 launches) to prevent overuse from
-        // completely overshadowing relevance.
-        let usage_bonus = std::cmp::min(usage * 5, 200);
+        let usage_bonus = usage_relevance_bonus(usage);
 
         // Match against name (primary)
         haystack_buf.clear();
@@ -193,7 +199,7 @@ pub fn fuzzy_score_text(query: &str, text: &str) -> Option<(u32, Vec<u32>)> {
     let mut matcher = Matcher::new(Config::DEFAULT);
     let pattern = Atom::new(
         trimmed,
-        CaseMatching::Smart,
+        CaseMatching::Ignore,
         Normalization::Smart,
         AtomKind::Fuzzy,
         false,
@@ -206,4 +212,44 @@ pub fn fuzzy_score_text(query: &str, text: &str) -> Option<(u32, Vec<u32>)> {
     pattern
         .indices(haystack, &mut matcher, &mut indices)
         .map(|score| (score as u32, indices))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scanner::AppEntry;
+    use std::collections::HashMap;
+
+    fn app(name: &str, exec: &str) -> AppEntry {
+        AppEntry {
+            name: name.to_string(),
+            generic_name: None,
+            comment: None,
+            exec: exec.to_string(),
+            icon: None,
+            categories: Vec::new(),
+            terminal: false,
+            startup_wm_class: None,
+            desktop_file_path: String::new(),
+        }
+    }
+
+    #[test]
+    fn fuzzy_search_is_case_insensitive() {
+        let apps = vec![app("Discord", "discord"), app("Foot", "foot")];
+        let history = HashMap::new();
+        let results = fuzzy_search("DISCORD", &apps, 10, &history, 100);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].title, "Discord");
+    }
+
+    #[test]
+    fn fuzzy_search_prefers_usage_when_relevance_is_close() {
+        let apps = vec![app("Discord Canary", "discord-canary"), app("Discord", "discord")];
+        let mut history = HashMap::new();
+        history.insert("discord".to_string(), 120);
+        let results = fuzzy_search("disc", &apps, 10, &history, 100);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].exec, "discord");
+    }
 }

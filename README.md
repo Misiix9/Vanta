@@ -29,14 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_4.0.0_amd64.deb
+sudo dpkg -i vanta_4.1.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-4.0.0-1.x86_64.rpm
+sudo rpm -i vanta-4.1.0-1.x86_64.rpm
 ```
+
+### Latest Minor (v4.1.0)
+- Added Phase 21 Smartest Search And Result Intelligence with relevance-first ordering for typed queries.
+- Added app-aware entity resolution for multi-step intents (for example: `open zen then open foot`).
+- Added query-aware ranking bonuses to boost exact and prefix matches.
+- Improved case-insensitive fuzzy matching and launch-history-driven ranking.
 
 ### Latest Major (v4.0.0)
 - Added Phase 20 Adaptive Intent Engine for local-first intent parsing.
@@ -44,7 +50,7 @@ sudo rpm -i vanta-4.0.0-1.x86_64.rpm
 - Added explicit confirmation before running inferred multi-step workflows.
 - Added typed `intent_workflow` command contract integration in launcher command handling.
 
-### Latest Minor (v3.6.0)
+### Previous Minor (v3.6.0)
 - Added Phase 19 Community panel with in-app feedback submission and roadmap voting hooks.
 - Added trusted shareable snippet export/import for workflows, profiles, and theme presets.
 - Added opt-in Popular Workflows discovery feed with install actions into local macros.

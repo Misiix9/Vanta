@@ -26,10 +26,12 @@
   let {
     results = [],
     selectedIndex = $bindable(0),
+    groupBySection = true,
     onActivate,
   }: {
     results: SearchResult[];
     selectedIndex: number;
+    groupBySection?: boolean;
     onActivate: (result: SearchResult) => void;
   } = $props();
 
@@ -150,6 +152,21 @@
 
   let visibleRows = $derived.by<VisibleRow[]>(() => {
     const rows: VisibleRow[] = [];
+
+    if (!groupBySection) {
+      results.forEach((result, idx) => {
+        const keyBase = result.id ?? `${result.exec}-${idx}`;
+        rows.push({
+          type: "item",
+          result,
+          groupLabel: "Results",
+          itemIndex: idx,
+          key: `item-flat-${idx}-${keyBase}`,
+        });
+      });
+      return rows;
+    }
+
     let flatItemIndex = 0;
 
     groupedResults.forEach((group, groupIndex) => {

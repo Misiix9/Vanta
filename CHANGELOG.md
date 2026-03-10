@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.0
+- Added a global relevance-first ranking pass for typed queries across apps, files, windows, calculator, extensions, macros, and commands.
+- Added app-aware intent entity resolution so multi-step queries like `open zen then open foot` map to the best matching installed apps.
+- Added query-aware ranking bonuses and source-intent priors to improve top-result accuracy for natural language searches.
+- Improved search consistency with case-insensitive fuzzy matching and stronger launch-history learning.
+
 ## 4.0.0
 - Added a local-first Adaptive Intent Engine path that detects multi-step intent queries.
 - Added intent workflow result generation for chained commands (for example `open settings then open store`).

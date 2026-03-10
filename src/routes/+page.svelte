@@ -107,6 +107,7 @@
   let quickTipsVisible = $state(false);
   let pendingConfirmResult = $state<SearchResult | null>(null);
   let fadeDuration = $derived(vantaConfig?.accessibility?.reduced_motion ? 0 : 150);
+  let groupBySection = $derived(query.trim() === "");
 
   function scheduleScrollToSelected() {
     if (pendingScrollFrame !== null) return;
@@ -243,10 +244,20 @@
   ];
 
   function filterCommandResults(q: string): SearchResult[] {
-    const normalized = q.trim().toLowerCase();
-    if (!normalized) return builtinCommands;
+    if (vantaConfig && vantaConfig.search.applications.enabled === false) {
+      return [];
+    }
 
-    return builtinCommands.filter((cmd) => {
+    const normalized = q.trim().toLowerCase();
+    const appWeight = vantaConfig?.search?.applications?.weight ?? 100;
+    const weightedCommands = builtinCommands.map((cmd) => ({
+      ...cmd,
+      score: Math.round((cmd.score * appWeight) / 100),
+    }));
+
+    if (!normalized) return weightedCommands;
+
+    return weightedCommands.filter((cmd) => {
       const inTitle = cmd.title.toLowerCase().includes(normalized);
       const inSubtitle = (cmd.subtitle || "").toLowerCase().includes(normalized);
       return inTitle || inSubtitle;
@@ -256,7 +267,11 @@
   function composeResults(base: SearchResult[], q: string): SearchResult[] {
     const commands = filterCommandResults(q);
     const macros = buildMacroResults(q);
-    return [...commands, ...macros, ...base];
+    const merged = [...commands, ...macros, ...base];
+    if (!q.trim()) {
+      return merged;
+    }
+    return merged.sort((a, b) => (b.score || 0) - (a.score || 0));
   }
 
   onDestroy(() => {
@@ -505,8 +520,10 @@
   }
 
   function buildMacroResults(q: string): SearchResult[] {
+    if (vantaConfig && vantaConfig.search.applications.enabled === false) return [];
     if (!availableMacros.length) return [];
     const needle = q.trim().toLowerCase();
+    const appWeight = vantaConfig?.search?.applications?.weight ?? 100;
     return availableMacros
       .filter((macro) => {
         if (!macro.enabled) return false;
@@ -522,7 +539,7 @@
         subtitle: macro.description ?? macro.id,
         icon: "fa-solid fa-diagram-project",
         exec: `macro:${macro.id}`,
-        score: 1_300_000 - idx,
+        score: Math.round(((1_300_000 - idx) * appWeight) / 100),
         match_indices: [],
         source: "Application",
         id: `macro-${macro.id}`,
@@ -835,9 +852,7 @@
 
       results = composeResults(baseResults, "");
 
-      if (results.length > 0) {
-        selectedIndex = 1;
-      }
+      selectedIndex = results.length > 0 ? 1 : 0;
     } catch (e) {
       console.error("Failed to load suggestions:", e);
       // Fallback to empty search results to keep UI populated
@@ -882,7 +897,7 @@
       console.info("search results", searchResults?.length ?? 0, "for", q);
       baseResults = searchResults;
       results = composeResults(baseResults, q);
-      selectedIndex = results.length > 0 ? 1 : 0;
+      selectedIndex = 0;
       searchTime = elapsed;
     } catch (e) {
       if (requestId !== searchRequestId) return;
@@ -1574,6 +1589,7 @@
         <ResultsList
           bind:this={resultsListRef}
           {results}
+          {groupBySection}
           bind:selectedIndex
           onActivate={handleActivate}
           on:visiblecount={(event) => (visibleRowCount = event.detail.count)}

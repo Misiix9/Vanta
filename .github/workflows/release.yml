@@ -1,4 +1,4 @@
-name: Release Vanta v3.6.0
+name: Release Vanta v4.1.0
 
 on:
   push:
@@ -86,15 +86,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v3.6.0 -- Community Growth Features
+            ## Vanta v4.1.0 -- Smartest Search And Result Intelligence
 
-            Minor release focused on safe community sharing, discoverability, and roadmap feedback loops.
+            Minor release focused on relevance-first search quality and app-aware intent execution.
 
             ### Highlights
-            - Added trusted shareable snippets for workflows, profiles, and theme presets.
-            - Added opt-in popular workflows feed with one-click install into local macros.
-            - Added in-app community feedback channel and roadmap voting hooks.
-            - Added safe import guardrails that block risky unverified workflow snippets.
+            - Added global relevance-first ordering for typed queries across all result sources.
+            - Added app-aware intent entity resolution for multi-step commands (for example `open zen then open foot`).
+            - Added query-aware ranking bonuses to prioritize exact and prefix matches.
+            - Improved matching quality with case-insensitive fuzzy search and stronger history learning.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.
