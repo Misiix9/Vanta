@@ -29,16 +29,28 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_4.7.0_amd64.deb
+sudo dpkg -i vanta_5.0.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-4.7.0-1.x86_64.rpm
+sudo rpm -i vanta-5.0.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v4.7.0)
+### Latest Major (v5.0.0)
+- Added Phase 30 Theme Engine v3 with 5-layer token inheritance (Context → Core → Semantic → Component → Compatibility).
+- Added theme token contract enforcing 15 required and 25 recommended tokens with diagnostics.
+- Added dual-side theme validation in both TypeScript and Rust with error/warning reporting.
+- Improved legacy alias safety by converting hardcoded values to var() references across both built-in themes.
+
+### Previous Minor (v4.9.0)
+- Added Phase 29 iconography system with size tokens from --icon-xs through --icon-4xl.
+
+### Previous Minor (v4.8.0)
+- Added Phase 28 typography token system with heading, body, and micro type scales.
+
+### Previous Minor (v4.7.0)
 - Added Phase 27 motion system primitives with reduced-motion-safe fallbacks across major views.
 - Added consistent micro-interaction choreography for hover, focus, selection, and action feedback.
 - Added full Aurora Slate redesign for universal theme surfaces with richer depth and hierarchy.
@@ -80,7 +92,7 @@ sudo rpm -i vanta-4.7.0-1.x86_64.rpm
 - Added query-aware ranking bonuses to boost exact and prefix matches.
 - Improved case-insensitive fuzzy matching and launch-history-driven ranking.
 
-### Latest Major (v4.0.0)
+### Previous Major (v4.0.0)
 - Added Phase 20 Adaptive Intent Engine for local-first intent parsing.
 - Added multi-step workflow suggestions from natural queries (for example: `open settings then open store`).
 - Added explicit confirmation before running inferred multi-step workflows.
