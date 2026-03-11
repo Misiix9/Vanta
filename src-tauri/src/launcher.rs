@@ -303,16 +303,21 @@ pub fn launch_terminal_command(command: &str) -> Result<(), String> {
     let mut candidates: Vec<(String, Vec<String>)> = Vec::new();
 
     if let Ok(term_raw) = env::var("TERMINAL") {
-        let parsed = shell_words::split(&term_raw).unwrap_or_else(|_| vec![term_raw.clone()]);
-        if let Some((bin, rest)) = parsed.split_first() {
-            let mut args: Vec<String> = rest.iter().map(|s| s.to_string()).collect();
-            args.extend([
-                "-e".to_string(),
-                "bash".to_string(),
-                "-lc".to_string(),
-                wrapped.clone(),
-            ]);
-            candidates.push((bin.to_string(), args));
+        // Reject absurdly long values or those containing null bytes to avoid
+        // resource exhaustion during shell-word parsing.
+        if term_raw.len() <= 256 && !term_raw.contains('\0') {
+            let parsed =
+                shell_words::split(&term_raw).unwrap_or_else(|_| vec![term_raw.clone()]);
+            if let Some((bin, rest)) = parsed.split_first() {
+                let mut args: Vec<String> = rest.iter().map(|s| s.to_string()).collect();
+                args.extend([
+                    "-e".to_string(),
+                    "bash".to_string(),
+                    "-lc".to_string(),
+                    wrapped.clone(),
+                ]);
+                candidates.push((bin.to_string(), args));
+            }
         }
     }
 

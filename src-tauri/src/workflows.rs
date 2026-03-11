@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -9,6 +10,10 @@ use crate::config::{MacroArg, MacroStep, WorkflowMacro};
 use crate::extensions;
 use crate::permissions::{self, Capability, Decision};
 use crate::{launcher, AppState};
+
+/// Compiled once; matches `{AlphaNumeric_Key}` placeholders in workflow tokens.
+static TOKEN_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\{([A-Za-z0-9_]+)\}").expect("invalid token regex"));
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MacroDryRunStep {
@@ -347,17 +352,18 @@ fn render_tokens(
     tokens: &[String],
     arg_map: &HashMap<String, String>,
 ) -> Result<Vec<String>, String> {
-    let re = Regex::new(r"\{([A-Za-z0-9_]+)\}").unwrap();
     let mut rendered = Vec::new();
 
     for token in tokens {
         let mut last = 0;
         let mut output = String::new();
 
-        for caps in re.captures_iter(token) {
-            let m = caps.get(0).unwrap();
+        for caps in TOKEN_RE.captures_iter(token) {
+            // Group 0 (full match) and group 1 (key) are guaranteed present
+            // by the regex structure within captures_iter.
+            let m = caps.get(0).expect("capture group 0 missing in TOKEN_RE");
             output.push_str(&token[last..m.start()]);
-            let key = caps.get(1).unwrap().as_str();
+            let key = caps.get(1).expect("capture group 1 missing in TOKEN_RE").as_str();
             let val = arg_map
                 .get(key)
                 .ok_or_else(|| format!("Missing value for placeholder '{}'", key))?;
