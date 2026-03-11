@@ -339,7 +339,7 @@ fn resolve_app_exec_for_step(step: &str, apps: &[AppEntry]) -> Option<String> {
         return None;
     }
 
-    let mut best: Option<(&AppEntry, usize)> = None;
+    let mut best: Option<(&AppEntry, u32)> = None;
     for app in apps {
         let name = app.name.to_lowercase();
         let generic = app
@@ -354,17 +354,22 @@ fn resolve_app_exec_for_step(step: &str, apps: &[AppEntry]) -> Option<String> {
             .unwrap_or_default()
             .to_lowercase();
 
-        let mut score = 0usize;
+        let mut score = 0u32;
         for t in &tokens {
             if name.contains(t) {
-                score += 4;
+                score += 40;
             }
             if !generic.is_empty() && generic.contains(t) {
-                score += 2;
+                score += 20;
             }
             if !cmd.is_empty() && cmd.contains(t) {
-                score += 3;
+                score += 30;
             }
+        }
+
+        // Fuzzy match against app name improves short aliases like "zen" or "foot".
+        if let Some((raw, _)) = matcher::fuzzy_score_text(&normalized, &app.name) {
+            score = score.saturating_add(raw.saturating_mul(4));
         }
 
         if score == 0 {
@@ -495,23 +500,23 @@ fn query_relevance_bonus(query: &str, result: &SearchResult) -> u32 {
 
     let mut bonus = 0u32;
     if title == q {
-        bonus += 130_000;
+        bonus += 18_000;
     } else if title.starts_with(&q) {
-        bonus += 95_000;
+        bonus += 12_000;
     } else if title.contains(&q) {
-        bonus += 65_000;
+        bonus += 7_000;
     }
 
     if !subtitle.is_empty() && subtitle.contains(&q) {
-        bonus += 22_000;
+        bonus += 3_000;
     }
 
     if exec.starts_with(&q) || exec.contains(&q) {
-        bonus += 18_000;
+        bonus += 2_500;
     }
 
     if q.split_whitespace().count() > 1 && q.split_whitespace().all(|t| title.contains(t)) {
-        bonus += 18_000;
+        bonus += 4_000;
     }
 
     bonus
@@ -526,39 +531,73 @@ fn source_intent_bonus(query: &str, result: &SearchResult) -> u32 {
     match result.source {
         ResultSource::Application => {
             if q.starts_with("open ") || q.starts_with("launch ") || q.starts_with("run ") {
-                30_000
+                8_000
             } else {
                 0
             }
         }
         ResultSource::File => {
-            if q.starts_with("file ") || q.starts_with("open ") || q.contains("document") {
-                26_000
+            if q.starts_with("file ")
+                || q.contains("document")
+                || q.contains("folder")
+                || q.contains("path")
+                || q.contains("download")
+            {
+                4_500
             } else {
                 0
             }
         }
         ResultSource::Window => {
             if q.contains("window") || q.contains("switch") || q.contains("focus") {
-                26_000
+                4_500
             } else {
                 0
             }
         }
         ResultSource::Calculator => {
             if q.chars().any(|c| c.is_ascii_digit()) {
-                20_000
+                4_000
             } else {
                 0
             }
         }
         ResultSource::Extension { .. } => {
             if q.contains("extension") || q.contains("plugin") {
-                16_000
+                3_500
             } else {
                 0
             }
         }
+        ResultSource::Clipboard => {
+            if q.contains("clipboard") || q.contains("copy") || q.contains("snippet") {
+                3_200
+            } else {
+                0
+            }
+        }
+    }
+}
+
+fn app_entity_bonus(query: &str, result: &SearchResult) -> u32 {
+    if !matches!(result.source, ResultSource::Application) {
+        return 0;
+    }
+
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return 0;
+    }
+
+    let title = result.title.to_lowercase();
+    if title == q {
+        8_000
+    } else if title.starts_with(&q) {
+        5_000
+    } else if title.contains(&q) {
+        2_000
+    } else {
+        0
     }
 }
 
@@ -719,9 +758,9 @@ fn build_profile_results(
             }
 
             let (base, indices) = if let Some((raw, idxs)) = matcher::fuzzy_score_text(query, &title) {
-                (910_000u32.saturating_add(raw.saturating_mul(10)), idxs)
+                (1_000u32.saturating_add(raw.saturating_mul(10)), idxs)
             } else {
-                (900_000u32.saturating_sub(idx as u32), Vec::new())
+                (900u32.saturating_sub(idx as u32), Vec::new())
             };
 
             Some(SearchResult {
@@ -802,6 +841,7 @@ fn record_latency(
 }
 
 fn build_window_results<F>(
+    query: &str,
     query_lower: &str,
     window_cap: usize,
     apps: &[AppEntry],
@@ -881,7 +921,7 @@ where
         }
         count += entries.len();
 
-        for win in entries {
+        for (entry_idx, win) in entries.into_iter().enumerate() {
             let matched_app = apps.iter().find(|app| {
                 if let Some(ref wm_class) = app.startup_wm_class {
                     if wm_class.eq_ignore_ascii_case(&win.class) {
@@ -929,13 +969,29 @@ where
                 subtitle.push_str(" • Limited actions");
             }
 
+            let mut base_score = 650u32;
+            let mut match_indices = Vec::new();
+            if !query.trim().is_empty() {
+                if let Some((raw, idxs)) = matcher::fuzzy_score_text(query, &win.title) {
+                    base_score = 850u32.saturating_add(raw.saturating_mul(8));
+                    match_indices = idxs;
+                } else if let Some((raw, _)) = matcher::fuzzy_score_text(query, &win.class) {
+                    base_score = 760u32.saturating_add(raw.saturating_mul(6));
+                } else {
+                    base_score = 500;
+                }
+            }
+            // Earlier entries are usually more recent in grouped providers.
+            let recency_bonus = (window_cap.saturating_sub(entry_idx) as u32).saturating_mul(8).min(180);
+            base_score = base_score.saturating_add(recency_bonus);
+
             results.push(SearchResult {
                 title: win.title,
                 subtitle: Some(subtitle),
                 icon,
                 exec: format!("focus:{}", win.address),
-                score: weighted_score(950_000, weight),
-                match_indices: vec![],
+                score: weighted_score(base_score, weight),
+                match_indices,
                 source: matcher::ResultSource::Window,
                 actions: Some(actions),
                 id: Some(win.address.clone()),
@@ -987,7 +1043,7 @@ fn build_extension_results(
                             &ext.path,
                         ),
                         exec: format!("{}:{}:{}", exec_prefix, ext.manifest.name, cmd.name),
-                        score: weighted_score(score + 800_000, weight),
+                        score: weighted_score(700u32.saturating_add(score.saturating_mul(6)), weight),
                         match_indices: indices,
                         source: ResultSource::Extension {
                             ext_id: ext.manifest.name.clone(),
@@ -1014,7 +1070,7 @@ fn build_extension_results(
                         &ext.path,
                     ),
                 exec: format!("{}:{}:{}", exec_prefix, ext.manifest.name, cmd.name),
-                score: weighted_score(900_000, weight),
+                score: weighted_score(1_050, weight),
                 match_indices: vec![],
                 source: ResultSource::Extension {
                     ext_id: ext.manifest.name.clone(),
@@ -1024,6 +1080,61 @@ fn build_extension_results(
                 group: None,
                 section: Some("Extensions".to_string()),
             });
+        }
+    }
+
+    results
+}
+
+fn build_clipboard_results(query: &str, weight: u32, max_results: usize) -> Vec<SearchResult> {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    let Ok(history) = clipboard::get_history() else {
+        return Vec::new();
+    };
+
+    let lower = trimmed.to_lowercase();
+    let mut results = Vec::new();
+
+    for item in history.into_iter().take(80) {
+        let content = item.content.replace('\n', " ");
+        let title = content.chars().take(100).collect::<String>();
+        let matched = title.to_lowercase().contains(&lower);
+        let fuzzy = matcher::fuzzy_score_text(trimmed, &title);
+
+        if !matched && fuzzy.is_none() {
+            continue;
+        }
+
+        let mut score: u32 = if matched { 900 } else { 700 };
+        let mut indices = Vec::new();
+        if let Some((raw, idxs)) = fuzzy {
+            score = score.saturating_add(raw.saturating_mul(5));
+            indices = idxs;
+        }
+        if item.pinned {
+            score = score.saturating_add(220);
+        }
+
+        results.push(SearchResult {
+            title,
+            subtitle: Some(item.timestamp.to_rfc3339()),
+            icon: Some("clipboard".to_string()),
+            exec: format!("copy:{}", item.content),
+            score: weighted_score(score, weight),
+            match_indices: indices,
+            source: ResultSource::Clipboard,
+            actions: None,
+            id: Some(format!("clip:{}", item.id)),
+            group: None,
+            section: Some("Clipboard".to_string()),
+        });
+
+        if results.len() >= max_results {
+            break;
         }
     }
 
@@ -1102,13 +1213,13 @@ mod window_search_tests {
             ),
         ];
 
-        let results = build_window_results("", 2, &apps, 100, |_| groups.clone());
+        let results = build_window_results("", "", 2, &apps, 100, |_| groups.clone());
 
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].title, "Beta Main");
         assert_eq!(results[0].exec, "focus:b1");
         assert_eq!(results[0].group.as_deref(), Some("Beta"));
-        assert_eq!(results[0].score, weighted_score(950_000, 100));
+        assert!(results[0].score >= weighted_score(650, 100));
         assert_eq!(results[1].title, "Alpha One");
         assert_eq!(results[1].group.as_deref(), Some("Alpha"));
     }
@@ -1130,7 +1241,7 @@ mod window_search_tests {
             ),
         ];
 
-        let results = build_window_results("term", 5, &apps, 100, |_| groups.clone());
+        let results = build_window_results("term", "term", 5, &apps, 100, |_| groups.clone());
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title, "Terminal");
@@ -1236,6 +1347,46 @@ mod relevance_ranking_tests {
             .saturating_add(source_intent_bonus(q, &file));
 
         assert!(app.score > file.score);
+    }
+
+    #[test]
+    fn open_query_prefers_matching_app_over_file_path() {
+        let q = "open discord";
+        let mut app = result("Discord", "discord", ResultSource::Application, 1_000);
+        let mut file = result("discord-notes.txt", "/tmp/discord-notes.txt", ResultSource::File, 1_000);
+
+        app.score = app
+            .score
+            .saturating_add(query_relevance_bonus(q, &app))
+            .saturating_add(source_intent_bonus(q, &app))
+            .saturating_add(app_entity_bonus(q, &app));
+        file.score = file
+            .score
+            .saturating_add(query_relevance_bonus(q, &file))
+            .saturating_add(source_intent_bonus(q, &file))
+            .saturating_add(app_entity_bonus(q, &file));
+
+        assert!(app.score > file.score);
+    }
+
+    #[test]
+    fn file_can_outrank_app_when_file_is_more_relevant() {
+        let q = "invoice pdf";
+        let mut app = result("Discord", "discord", ResultSource::Application, 900);
+        let mut file = result("invoice_2026.pdf", "/home/user/docs/invoice_2026.pdf", ResultSource::File, 1_100);
+
+        app.score = app
+            .score
+            .saturating_add(query_relevance_bonus(q, &app))
+            .saturating_add(source_intent_bonus(q, &app))
+            .saturating_add(app_entity_bonus(q, &app));
+        file.score = file
+            .score
+            .saturating_add(query_relevance_bonus(q, &file))
+            .saturating_add(source_intent_bonus(q, &file))
+            .saturating_add(app_entity_bonus(q, &file));
+
+        assert!(file.score > app.score);
     }
 }
 
@@ -1440,6 +1591,7 @@ async fn search(
     };
     if search_config.windows.enabled {
         let window_results = build_window_results(
+            &query,
             &query_lower,
             window_cap,
             &apps,
@@ -1481,6 +1633,11 @@ async fn search(
         results.extend(file_results);
     }
 
+    if !query.trim().is_empty() {
+        let clipboard_results = build_clipboard_results(&query, search_config.files.weight, max_results / 2);
+        results.extend(clipboard_results);
+    }
+
     if search_config.applications.enabled {
         let profile_results =
             build_profile_results(&query, &profiles_config, search_config.applications.weight);
@@ -1493,7 +1650,7 @@ async fn search(
     }
 
     // Extension command search
-    {
+    if search_config.applications.enabled {
         let ext_cache = state
             .extensions_cache
             .lock()
@@ -1513,7 +1670,7 @@ async fn search(
             subtitle: Some("Browse and install extensions".to_string()),
             icon: Some("fa-solid fa-store".to_string()),
             exec: "open-store".to_string(),
-            score: weighted_score(950_000, 100),
+            score: weighted_score(2_600, 100),
             match_indices: vec![],
             source: ResultSource::Application,
             actions: None,
@@ -1530,7 +1687,7 @@ async fn search(
 
     if wants_settings && search_config.applications.enabled {
         if let Some((raw_score, indices)) = matcher::fuzzy_score_text(&query, "Open Vanta Settings") {
-            let base = 900_000u32.saturating_add(raw_score.saturating_mul(20));
+            let base = 1_100u32.saturating_add(raw_score.saturating_mul(8));
             results.push(SearchResult {
                 title: "Settings".to_string(),
                 subtitle: Some("Open Vanta settings".to_string()),
@@ -1550,7 +1707,8 @@ async fn search(
     if !query.trim().is_empty() {
         for result in &mut results {
             let bonus = query_relevance_bonus(&query, result)
-                .saturating_add(source_intent_bonus(&query, result));
+                .saturating_add(source_intent_bonus(&query, result))
+                .saturating_add(app_entity_bonus(&query, result));
             result.score = result.score.saturating_add(bonus);
         }
     }
@@ -1642,6 +1800,7 @@ async fn get_suggestions(
     };
 
     let window_results = build_window_results(
+        "",
         "",
         window_cap,
         &apps,

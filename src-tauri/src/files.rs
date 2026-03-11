@@ -155,33 +155,52 @@ pub fn search_index(index: &FileIndexState, query: &str, limit: usize) -> Vec<Se
     let mut results = Vec::new();
 
     for entry in &index.entries {
-        // Empty term = list everything (up to limit)
-        if term.is_empty() || entry.name.contains(&term) {
+        let path_lower = entry.path.to_lowercase();
+        let name_fuzzy = if query_trimmed.is_empty() {
+            None
+        } else {
+            fuzzy_score_text(query_trimmed, &entry.name_display)
+        };
+        let path_fuzzy = if query_trimmed.is_empty() {
+            None
+        } else {
+            fuzzy_score_text(query_trimmed, &entry.path)
+        };
+
+        let contains_term = !term.is_empty() && (entry.name.contains(&term) || path_lower.contains(&term));
+        let matches = term.is_empty() || contains_term || name_fuzzy.is_some() || path_fuzzy.is_some();
+
+        if matches {
             let is_dir = entry.icon == "dir";
             let mut actions: Vec<ActionHint> = Vec::new();
 
-            // Score by fuzzy match so document-centric queries surface higher.
-            let mut base_score: u32 = 50;
+            // Keep file scores on a bounded scale so source weights remain meaningful.
+            let mut base_score: u32 = if is_dir { 120 } else { 160 };
             let mut match_indices: Vec<u32> = Vec::new();
 
-            if !query_trimmed.is_empty() {
-                if let Some((score, indices)) = fuzzy_score_text(query_trimmed, &entry.name_display) {
-                    // Boost matches heavily so document-focused queries reorder sections.
-                    base_score = 20_000 + score.saturating_mul(40);
-                    match_indices = indices;
-                } else if entry.name.contains(&term) {
-                    base_score = 15_000;
-                }
+            if let Some((score, indices)) = name_fuzzy {
+                base_score = 1_100u32.saturating_add(score.saturating_mul(8));
+                match_indices = indices;
+            } else if let Some((score, _)) = path_fuzzy {
+                base_score = 850u32.saturating_add(score.saturating_mul(5));
+            } else if contains_term {
+                base_score = if is_dir { 520 } else { 620 };
+            }
 
-                // Heuristic boost for explicit document intent
-                if query_lower.contains("document")
-                    || query_lower.contains("documents")
-                    || query_lower.contains("download")
-                    || query_lower.contains("downloads")
-                    || query_lower.contains("file")
-                {
-                    base_score = base_score.saturating_add(120_000);
-                }
+            // Intent boost is intentionally small and bounded.
+            let has_file_intent = query_lower.contains("document")
+                || query_lower.contains("documents")
+                || query_lower.contains("download")
+                || query_lower.contains("downloads")
+                || query_lower.contains("file")
+                || query_lower.contains("folder")
+                || query_lower.contains("path");
+            if has_file_intent {
+                base_score = base_score.saturating_add(if is_dir { 1_600 } else { 2_100 });
+            }
+
+            if query_trimmed.starts_with('/') || query_trimmed.starts_with("~/") {
+                base_score = base_score.saturating_add(1_200);
             }
 
             // File/dir secondary actions
@@ -323,5 +342,22 @@ mod tests {
         assert!(log_results.is_empty());
         let hidden_results = search_index(&index, "/.secret", 10);
         assert!(hidden_results.is_empty());
+    }
+
+    #[test]
+    fn test_file_intent_score_is_bounded() {
+        let index = FileIndexState {
+            entries: vec![FileEntry {
+                name: "discord-notes.txt".to_string(),
+                name_display: "discord-notes.txt".to_string(),
+                path: "/tmp/discord-notes.txt".to_string(),
+                icon: "file:txt".to_string(),
+            }],
+            indexed_at: None,
+        };
+
+        let results = search_index(&index, "discord", 10);
+        assert_eq!(results.len(), 1);
+        assert!(results[0].score < 25_000);
     }
 }

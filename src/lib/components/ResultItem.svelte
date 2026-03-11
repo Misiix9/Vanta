@@ -124,7 +124,7 @@
 </script>
 
 <button
-    class="result-item"
+    class="result-item v2-card"
     class:selected={isSelected}
     onmouseenter={() => onSelect(index)}
     onclick={() => onActivate(result)}

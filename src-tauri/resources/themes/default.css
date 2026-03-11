@@ -224,11 +224,17 @@ kbd {
     --ds-surface-0: var(--bg);
     --ds-surface-1: var(--surface);
     --ds-surface-2: #141420;
+    --ds-surface-3: #1b1b2a;
     --ds-accent: #7b35f0;
     --ds-accent-glow: rgba(123, 53, 240, 0.30);
     --ds-text-primary: var(--text-primary);
     --ds-text-secondary: var(--text-secondary);
+    --ds-text-muted: #7f82a1;
     --ds-border: rgba(149, 118, 206, 0.30);
+    --ds-success: #2dd4bf;
+    --ds-warning: #f59e0b;
+    --ds-danger: #ef4444;
+    --ds-info: #7b35f0;
 
     /* Typography */
     --font-ui: 'SN Pro', 'Inter', system-ui, sans-serif;
@@ -277,6 +283,87 @@ kbd {
     --t-med: 300ms;
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-std: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* ── Phase 22 Primitives (Design Language v2) ─────────────── */
+.v2-shell {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-3) * var(--vanta-space-scale, 1));
+    padding: calc(var(--space-3) * var(--vanta-space-scale, 1));
+    background: var(--ds-surface-0);
+}
+
+.v2-panel {
+    background: var(--ds-surface-1);
+    border: 1px solid var(--ds-border);
+    border-radius: var(--radius);
+    padding: calc(var(--space-3) * var(--vanta-space-scale, 1));
+}
+
+.v2-card {
+    background: color-mix(in srgb, var(--ds-surface-1) 92%, transparent 8%);
+    border: 1px solid color-mix(in srgb, var(--ds-border) 65%, transparent 35%);
+    border-radius: var(--radius-item);
+    padding: calc(var(--space-2) * var(--vanta-space-scale, 1)) calc(var(--space-3) * var(--vanta-space-scale, 1));
+}
+
+.v2-stack {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
+.v2-hstack {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
+.v2-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-1) * var(--vanta-space-scale, 1));
+}
+
+.v2-form-label {
+    font-size: var(--type-caption);
+    letter-spacing: 0.02em;
+    color: var(--ds-text-secondary);
+}
+
+.v2-form-help {
+    font-size: var(--type-caption);
+    color: var(--ds-text-muted);
+}
+
+.v2-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--type-caption);
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--ds-border) 70%, white 30%);
+    background: color-mix(in srgb, var(--ds-surface-2) 82%, transparent 18%);
+    color: var(--ds-text-primary);
+}
+
+.v2-status-badge.success { color: var(--ds-success); }
+.v2-status-badge.warning { color: var(--ds-warning); }
+.v2-status-badge.danger { color: var(--ds-danger); }
+.v2-status-badge.info { color: var(--ds-info); }
+
+.density-compact {
+    --vanta-space-scale: 0.88;
+}
+
+.density-comfortable {
+    --vanta-space-scale: 1;
+}
+
+.density-relaxed {
+    --vanta-space-scale: 1.16;
 }
 
 [data-reduced-motion="true"] * {
@@ -388,6 +475,12 @@ a:hover {
     animation: snapIn var(--t-fast) var(--ease-out) both;
 }
 
+.launcher-grid {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 0;
+}
+
 /* Top-edge purple shimmer — the signature detail */
 .vanta-root::before {
     content: '';
@@ -485,9 +578,9 @@ a:hover {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 12px;
+    gap: calc(var(--space-3) * var(--vanta-space-scale, 1));
     /* Minimal padding so input spans edge to edge */
-    padding: var(--space-1) 0 var(--space-3) 0;
+    padding: calc(var(--space-1) * var(--vanta-space-scale, 1)) 0 calc(var(--space-3) * var(--vanta-space-scale, 1)) 0;
     /* Single hairline separator from results */
     border: none;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -598,12 +691,12 @@ a:hover {
 }
 
 .results-container {
-    padding: var(--space-1) var(--space-1);
+    padding: calc(var(--space-1) * var(--vanta-space-scale, 1)) calc(var(--space-1) * var(--vanta-space-scale, 1));
     overflow-y: auto;
     overflow-x: hidden;
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: calc(var(--space-1) * var(--vanta-space-scale, 1));
     scroll-behavior: smooth;
     flex: 1;
     height: 100%;
@@ -984,8 +1077,8 @@ a:hover {
     display: grid;
     grid-template-columns: 1fr 1fr;
     align-items: center;
-    padding: 0px 14px;
-    height: 20px;
+    padding: 0 calc(var(--space-3) * var(--vanta-space-scale, 1));
+    height: 24px;
     border-top: 1px solid rgba(255, 255, 255, 0.04);
     font-size: var(--type-caption);
     position: relative;
@@ -995,13 +1088,13 @@ a:hover {
 .status-left {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: calc(var(--space-1) * var(--vanta-space-scale, 1));
 }
 
 .status-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
     justify-self: end;
 }
 
@@ -1115,7 +1208,7 @@ h3 {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding-right: 6px;
+    padding-right: calc(var(--space-1) * var(--vanta-space-scale, 1));
     scrollbar-width: none;
 }
 
@@ -1126,7 +1219,7 @@ h3 {
 .control-group {
     display: flex;
     flex-direction: column;
-    gap: calc(10px * var(--vanta-space-scale, 1));
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
     margin-bottom: calc(14px * var(--vanta-space-scale, 1));
 }
 
@@ -1327,7 +1420,7 @@ input[type="range"] {
     padding: 0 calc(20px * var(--vanta-space-scale, 1)) calc(20px * var(--vanta-space-scale, 1)) calc(20px * var(--vanta-space-scale, 1));
     display: flex;
     flex-direction: column;
-    gap: calc(12px * var(--vanta-space-scale, 1));
+    gap: calc(var(--space-3) * var(--vanta-space-scale, 1));
 }
 /* FontAwesome Icon Styling */
 .item-icon i.fa-solid, 

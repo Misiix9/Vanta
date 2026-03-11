@@ -5,6 +5,11 @@ export function applyTheme(config: VantaConfig): void {
     const { colors, blur_radius, opacity, border_radius } = config.appearance;
     const { reduced_motion, text_scale, spacing_preset } = config.accessibility;
     const root = document.documentElement;
+    const surfaceElevated = colors.surface_elevated ?? "color-mix(in srgb, " + colors.surface + " 78%, white 22%)";
+    const success = colors.success ?? "#2dd4bf";
+    const warning = colors.warning ?? "#f59e0b";
+    const danger = colors.danger ?? "#ef4444";
+    const info = colors.info ?? colors.accent;
 
     // Legacy color variables
     root.style.setProperty("--vanta-bg", colors.background);
@@ -18,12 +23,18 @@ export function applyTheme(config: VantaConfig): void {
     // Design-system semantic tokens
     root.style.setProperty("--ds-surface-0", colors.background);
     root.style.setProperty("--ds-surface-1", colors.surface);
-    root.style.setProperty("--ds-surface-2", colors.surface);
+    root.style.setProperty("--ds-surface-2", surfaceElevated);
+    root.style.setProperty("--ds-surface-3", "color-mix(in srgb, " + surfaceElevated + " 78%, white 22%)");
     root.style.setProperty("--ds-accent", colors.accent);
     root.style.setProperty("--ds-accent-glow", colors.accent_glow);
     root.style.setProperty("--ds-text-primary", colors.text_primary);
     root.style.setProperty("--ds-text-secondary", colors.text_secondary);
+    root.style.setProperty("--ds-text-muted", "color-mix(in srgb, " + colors.text_secondary + " 70%, black 30%)");
     root.style.setProperty("--ds-border", colors.border);
+    root.style.setProperty("--ds-success", success);
+    root.style.setProperty("--ds-warning", warning);
+    root.style.setProperty("--ds-danger", danger);
+    root.style.setProperty("--ds-info", info);
 
     // Back-compat aliases used by existing theme CSS
     root.style.setProperty("--bg", colors.background);

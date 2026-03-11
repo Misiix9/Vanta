@@ -250,27 +250,38 @@
 
     const normalized = q.trim().toLowerCase();
     const appWeight = vantaConfig?.search?.applications?.weight ?? 100;
-    const weightedCommands = builtinCommands.map((cmd) => ({
-      ...cmd,
-      score: Math.round((cmd.score * appWeight) / 100),
-    }));
+    if (!normalized) {
+      return builtinCommands.map((cmd) => ({
+        ...cmd,
+        score: Math.round((cmd.score * appWeight) / 100),
+      }));
+    }
 
-    if (!normalized) return weightedCommands;
+    return builtinCommands
+      .map((cmd) => {
+        const title = cmd.title.toLowerCase();
+        const subtitle = (cmd.subtitle || "").toLowerCase();
 
-    return weightedCommands.filter((cmd) => {
-      const inTitle = cmd.title.toLowerCase().includes(normalized);
-      const inSubtitle = (cmd.subtitle || "").toLowerCase().includes(normalized);
-      return inTitle || inSubtitle;
-    });
+        let base = 0;
+        if (title === normalized) base = 30_000;
+        else if (title.startsWith(normalized)) base = 22_000;
+        else if (title.includes(normalized)) base = 15_000;
+        else if (subtitle.includes(normalized)) base = 9_000;
+
+        if (!base) return null;
+
+        return {
+          ...cmd,
+          score: Math.round((base * appWeight) / 100),
+        } as SearchResult;
+      })
+      .filter((item): item is SearchResult => item !== null);
   }
 
   function composeResults(base: SearchResult[], q: string): SearchResult[] {
     const commands = filterCommandResults(q);
     const macros = buildMacroResults(q);
     const merged = [...commands, ...macros, ...base];
-    if (!q.trim()) {
-      return merged;
-    }
     return merged.sort((a, b) => (b.score || 0) - (a.score || 0));
   }
 
@@ -410,6 +421,14 @@
         if (targetTheme) {
           injectThemeCss(targetTheme.css_content);
         }
+
+        if (currentMode === "launcher") {
+          if (query.trim() === "") {
+            void loadSuggestions();
+          } else {
+            void handleSearch(query);
+          }
+        }
       }),
     );
 
@@ -534,17 +553,29 @@
           (macro.description ?? "").toLowerCase().includes(needle)
         );
       })
-      .map((macro, idx) => ({
-        title: macro.name,
-        subtitle: macro.description ?? macro.id,
-        icon: "fa-solid fa-diagram-project",
-        exec: `macro:${macro.id}`,
-        score: Math.round(((1_300_000 - idx) * appWeight) / 100),
-        match_indices: [],
-        source: "Application",
-        id: `macro-${macro.id}`,
-        section: "Macros",
-      }));
+      .map((macro, idx) => {
+        let base = 1_300_000 - idx;
+        if (needle) {
+          const name = macro.name.toLowerCase();
+          const desc = (macro.description ?? "").toLowerCase();
+          if (name === needle) base = 28_000;
+          else if (name.startsWith(needle)) base = 20_000;
+          else if (name.includes(needle) || desc.includes(needle)) base = 13_000;
+          else base = 9_000;
+        }
+
+        return {
+          title: macro.name,
+          subtitle: macro.description ?? macro.id,
+          icon: "fa-solid fa-diagram-project",
+          exec: `macro:${macro.id}`,
+          score: Math.round((base * appWeight) / 100),
+          match_indices: [],
+          source: "Application",
+          id: `macro-${macro.id}`,
+          section: "Macros",
+        } as SearchResult;
+      });
   }
 
   function parsePermissionError(err: unknown):
@@ -1435,7 +1466,7 @@
   <SpotifyMiniPlayer />
 {:else}
 <div
-  class="vanta-root vanta-glass"
+  class="vanta-root vanta-glass v2-shell"
   class:css-blur={blurMode === "fallback"}
   role="application"
 >
@@ -1555,7 +1586,8 @@
   {:else}
     <div
       in:fade={{ duration: fadeDuration }}
-      style="height: 100%; width: 100%; display: grid; grid-template-rows: auto 1fr auto;"
+      class="launcher-grid v2-stack"
+      style="height: 100%; width: 100%;"
     >
       <SearchInput
         bind:this={searchInputRef}

@@ -29,16 +29,22 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_4.1.0_amd64.deb
+sudo dpkg -i vanta_4.2.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-4.1.0-1.x86_64.rpm
+sudo rpm -i vanta-4.2.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v4.1.0)
+### Latest Minor (v4.2.0)
+- Added Phase 22 UI primitive foundations with reusable shell, panel, card, and stack patterns.
+- Added expanded semantic token mapping with runtime fallbacks for elevated surfaces and status roles.
+- Improved launcher and settings visual consistency with density-aware spacing and shared layout primitives.
+- Improved result and status surfaces with cleaner hierarchy and tokenized spacing.
+
+### Previous Minor (v4.1.0)
 - Added Phase 21 Smartest Search And Result Intelligence with relevance-first ordering for typed queries.
 - Added app-aware entity resolution for multi-step intents (for example: `open zen then open foot`).
 - Added query-aware ranking bonuses to boost exact and prefix matches.

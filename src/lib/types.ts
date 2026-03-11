@@ -6,6 +6,11 @@ export interface VantaColors {
     text_primary: string;
     text_secondary: string;
     border: string;
+    surface_elevated?: string;
+    success?: string;
+    warning?: string;
+    danger?: string;
+    info?: string;
 }
 
 export interface AppearanceConfig {

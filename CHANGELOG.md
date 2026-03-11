@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.2.0
+- Added Phase 22 design primitive foundations with reusable shell, panel, card, stack, and status patterns.
+- Added expanded semantic theme token mapping and runtime fallbacks for elevated surfaces, status roles, and border hierarchy.
+- Improved launcher and settings layout consistency with density-aware spacing tokens and shared container primitives.
+- Improved result and status surfaces with tokenized spacing and cleaner visual hierarchy.
+
 ## 4.1.0
 - Added a global relevance-first ranking pass for typed queries across apps, files, windows, calculator, extensions, macros, and commands.
 - Added app-aware intent entity resolution so multi-step queries like `open zen then open foot` map to the best matching installed apps.

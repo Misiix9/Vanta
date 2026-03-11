@@ -38,6 +38,7 @@ pub enum ResultSource {
     Calculator,
     Window,
     File,
+    Clipboard,
     Extension { ext_id: String },
 }
 
@@ -47,13 +48,16 @@ fn apply_weight(score: u32, weight: u32) -> u32 {
     scaled.min(u32::MAX as u128) as u32
 }
 
-fn usage_relevance_bonus(usage: u32) -> u32 {
+fn usage_relevance_bonus(usage: u32, text_score: u32) -> u32 {
     if usage == 0 {
         return 0;
     }
-    // Log-shaped growth keeps heavy users influential without dominating query relevance.
-    let bucket = ((usage as f64 + 1.0).ln() * 75.0).round() as u32;
-    bucket.min(350)
+
+    // Stronger log-shaped growth helps frequent launches in close calls.
+    let learned = ((usage as f64 + 1.0).ln() * 130.0).round() as u32;
+    // Hard bound based on textual match quality keeps relevance primary.
+    let relevance_cap = text_score / 3 + 180;
+    learned.min(1_400).min(relevance_cap)
 }
 
 /// Perform fuzzy search across cached app entries using nucleo-matcher.
@@ -68,6 +72,7 @@ pub fn fuzzy_search(
     app_weight: u32,
 ) -> Vec<SearchResult> {
     let start = std::time::Instant::now();
+    let query_lower = query.trim().to_lowercase();
 
     if query.is_empty() {
         let mut scored: Vec<(u32, &AppEntry)> = apps
@@ -117,7 +122,6 @@ pub fn fuzzy_search(
 
     for app in apps {
         let usage = usage_map.get(&app.exec).copied().unwrap_or(0);
-        let usage_bonus = usage_relevance_bonus(usage);
 
         // Match against name (primary)
         haystack_buf.clear();
@@ -125,7 +129,16 @@ pub fn fuzzy_search(
         let haystack = Utf32Str::new(&app.name, &mut haystack_buf);
 
         if let Some(score) = pattern.indices(haystack, &mut matcher, &mut indices) {
-            let final_score = score as u32 + usage_bonus;
+            let text_score = score as u32;
+            let mut final_score = text_score + usage_relevance_bonus(usage, text_score);
+            if !query_lower.is_empty() {
+                let name_lower = app.name.to_lowercase();
+                if name_lower == query_lower {
+                    final_score = final_score.saturating_add(800);
+                } else if name_lower.starts_with(&query_lower) {
+                    final_score = final_score.saturating_add(260);
+                }
+            }
             scored.push((final_score, indices.clone(), app));
             continue;
         }
@@ -137,8 +150,8 @@ pub fn fuzzy_search(
             let haystack = Utf32Str::new(gname, &mut haystack_buf);
             if let Some(score) = pattern.indices(haystack, &mut matcher, &mut indices) {
                 // Slightly lower score for secondary matches
-                let base_score = score.saturating_sub(10);
-                let final_score = base_score as u32 + usage_bonus;
+                let text_score = score.saturating_sub(10) as u32;
+                let final_score = text_score + usage_relevance_bonus(usage, text_score);
                 scored.push((final_score, indices.clone(), app));
                 continue;
             }
@@ -150,8 +163,8 @@ pub fn fuzzy_search(
             indices.clear();
             let haystack = Utf32Str::new(comment, &mut haystack_buf);
             if let Some(score) = pattern.indices(haystack, &mut matcher, &mut indices) {
-                let base_score = score.saturating_sub(20);
-                let final_score = base_score as u32 + usage_bonus;
+                let text_score = score.saturating_sub(20) as u32;
+                let final_score = text_score + usage_relevance_bonus(usage, text_score);
                 scored.push((final_score, indices.clone(), app));
             }
         }
@@ -249,6 +262,17 @@ mod tests {
         let mut history = HashMap::new();
         history.insert("discord".to_string(), 120);
         let results = fuzzy_search("disc", &apps, 10, &history, 100);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].exec, "discord");
+    }
+
+    #[test]
+    fn fuzzy_search_keeps_stronger_text_match_first_even_with_heavy_usage() {
+        let apps = vec![app("Discord", "discord"), app("Discord Canary", "discord-canary")];
+        let mut history = HashMap::new();
+        history.insert("discord-canary".to_string(), 10_000);
+
+        let results = fuzzy_search("discord", &apps, 10, &history, 100);
         assert!(!results.is_empty());
         assert_eq!(results[0].exec, "discord");
     }

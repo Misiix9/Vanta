@@ -17,9 +17,9 @@
   });
 </script>
 
-<div class="status-bar">
+<div class="status-bar v2-hstack">
   <div class="status-left">
-    <span class="status-badge">
+    <span class="status-badge v2-status-badge info">
       <img src="/32x32.png" alt="" class="status-badge-logo" />
       Vanta
     </span>
@@ -38,13 +38,11 @@
 
 <style>
   .status-bar {
-    display: flex;
-    align-items: center;
     justify-content: space-between;
-    padding: 6px 16px;
+    padding: calc(var(--space-1) * var(--vanta-space-scale, 1)) calc(var(--space-3) * var(--vanta-space-scale, 1));
     font-size: 11px;
-    color: var(--vanta-text-dim, #666);
-    border-top: 1px solid var(--vanta-border, rgba(255, 255, 255, 0.06));
+    color: var(--ds-text-secondary, #999);
+    border-top: 1px solid var(--ds-border, rgba(255, 255, 255, 0.08));
     flex-shrink: 0;
     user-select: none;
   }
@@ -57,11 +55,8 @@
   }
 
   .status-badge {
-    display: flex;
-    align-items: center;
     gap: 4px;
     font-weight: 500;
-    color: var(--vanta-text-dim, #888);
   }
 
   .status-badge-logo {
@@ -71,7 +66,7 @@
   }
 
   .status-info {
-    color: var(--vanta-text-dim, #888);
+    color: var(--ds-text-secondary, #999);
   }
 
   .status-version {

@@ -422,36 +422,6 @@
         debouncedSave();
     }
 
-    function applySearchPreset(preset: "developer" | "creator" | "minimal") {
-        if (preset === "developer") {
-            config.search.applications.weight = 120;
-            config.search.windows.weight = 150;
-            config.search.files.weight = 170;
-            config.search.calculator.weight = 90;
-            config.search.windows.enabled = true;
-            config.search.files.enabled = true;
-            config.search.calculator.enabled = true;
-        } else if (preset === "creator") {
-            config.search.applications.weight = 160;
-            config.search.windows.weight = 120;
-            config.search.files.weight = 95;
-            config.search.calculator.weight = 130;
-            config.search.windows.enabled = true;
-            config.search.files.enabled = true;
-            config.search.calculator.enabled = true;
-        } else {
-            config.search.applications.weight = 180;
-            config.search.windows.weight = 80;
-            config.search.files.weight = 70;
-            config.search.calculator.weight = 100;
-            config.search.windows.enabled = false;
-            config.search.files.enabled = true;
-            config.search.calculator.enabled = true;
-        }
-
-        debouncedSave();
-    }
-
     function applyThemePreset(preset: "minimal" | "vivid" | "high-contrast" | "compact") {
         if (preset === "minimal") {
             config.appearance.colors.background = "#070707";
@@ -620,7 +590,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="settings-panel">
+<div class="settings-panel v2-panel v2-stack">
     <header>
         <h2>Settings</h2>
         <div class="actions">
@@ -628,7 +598,7 @@
         </div>
     </header>
 
-    <div class="sections">
+    <div class="sections v2-stack density-comfortable">
         <!-- Theme Section -->
         <div class="accordion-item" class:active={activeSection === "Theme Profile"}>
             <button
@@ -1064,7 +1034,7 @@
                             <button class="preset-btn" onclick={() => jumpToSection("Theme Profile")}>Theme/Profile Studio</button>
                             <button class="preset-btn" onclick={() => jumpToSection("Community")}>Sharing & Feedback</button>
                             <button class="preset-btn" onclick={onOpenStore}>Extension Store</button>
-                            <button class="preset-btn" onclick={() => jumpToSection("Search Ranking")}>Search & Workflows</button>
+                            <button class="preset-btn" onclick={() => jumpToSection("File Search")}>Search & Workflows</button>
                         </div>
                     </div>
 
@@ -1287,126 +1257,6 @@
                 <button class="link-btn" onclick={rebuildIndex} disabled={rebuilding}>
                     {rebuilding ? "Rebuilding..." : "Rebuild Index"}
                 </button>
-            </div>
-                </div>
-            {/if}
-        </div>
-
-        <!-- Search Ranking Section -->
-        <div class="accordion-item" class:active={activeSection === "Search Ranking"}>
-            <button
-                class="accordion-header"
-                type="button"
-                onclick={() => toggleSection("Search Ranking")}
-                aria-expanded={activeSection === "Search Ranking"}
-            >
-                <svg class="accordion-icon" width="16" height="16" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                <h3>Search Ranking</h3>
-            </button>
-            {#if activeSection === "Search Ranking"}
-                <div class="accordion-content">
-<div class="preset-row">
-                <button class="preset-btn" onclick={() => applySearchPreset("developer")}>Developer</button>
-                <button class="preset-btn" onclick={() => applySearchPreset("creator")}>Creator</button>
-                <button class="preset-btn" onclick={() => applySearchPreset("minimal")}>Minimal</button>
-            </div>
-<div class="control-group">
-                <label>
-                    Applications Enabled
-                    <input
-                        type="checkbox"
-                        bind:checked={config.search.applications.enabled}
-                        onchange={debouncedSave}
-                    />
-                </label>
-                <label>
-                    Application Weight ({config.search.applications.weight}%)
-                    <input
-                        type="range"
-                        min="10"
-                        max="300"
-                        step="5"
-                        bind:value={config.search.applications.weight}
-                        onchange={debouncedSave}
-                    />
-                </label>
-            </div>
-
-            <div class="control-group">
-                <label>
-                    Windows Enabled
-                    <input
-                        type="checkbox"
-                        bind:checked={config.search.windows.enabled}
-                        onchange={debouncedSave}
-                    />
-                </label>
-                <label>
-                    Window Weight ({config.search.windows.weight}%)
-                    <input
-                        type="range"
-                        min="10"
-                        max="300"
-                        step="5"
-                        bind:value={config.search.windows.weight}
-                        onchange={debouncedSave}
-                    />
-                </label>
-            </div>
-
-            <div class="control-group">
-                <label>
-                    Calculator Enabled
-                    <input
-                        type="checkbox"
-                        bind:checked={config.search.calculator.enabled}
-                        onchange={debouncedSave}
-                    />
-                </label>
-                <label>
-                    Calculator Weight ({config.search.calculator.weight}%)
-                    <input
-                        type="range"
-                        min="10"
-                        max="300"
-                        step="5"
-                        bind:value={config.search.calculator.weight}
-                        onchange={debouncedSave}
-                    />
-                </label>
-            </div>
-
-            <div class="control-group">
-                <label>
-                    File Search Enabled
-                    <input
-                        type="checkbox"
-                        bind:checked={config.search.files.enabled}
-                        onchange={debouncedSave}
-                    />
-                </label>
-                <label>
-                    File Weight ({config.search.files.weight}%)
-                    <input
-                        type="range"
-                        min="10"
-                        max="300"
-                        step="5"
-                        bind:value={config.search.files.weight}
-                        onchange={debouncedSave}
-                    />
-                </label>
-            </div>
-
-            <div class="control-group">
-                <label>
-                    Show "Why These Results"
-                    <input
-                        type="checkbox"
-                        bind:checked={config.search.show_explain_panel}
-                        onchange={debouncedSave}
-                    />
-                </label>
             </div>
                 </div>
             {/if}
