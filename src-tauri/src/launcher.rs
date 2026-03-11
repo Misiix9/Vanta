@@ -1,3 +1,4 @@
+use crate::errors::VantaError;
 use std::process::{Command, Stdio};
 use std::env;
 
@@ -17,7 +18,7 @@ fn spawn_cmd(_cmd: &str, _args: &[String]) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn try_commands(commands: Vec<(&str, Vec<String>)>) -> Result<(), String> {
+fn try_commands(commands: Vec<(&str, Vec<String>)>) -> Result<(), VantaError> {
     let mut errors = Vec::new();
 
     for (cmd, args) in commands {
@@ -27,11 +28,11 @@ fn try_commands(commands: Vec<(&str, Vec<String>)>) -> Result<(), String> {
         }
     }
 
-    Err(format!("All commands failed: {}", errors.join("; ")))
+    Err(format!("All commands failed: {}", errors.join("; ")).into())
 }
 
 // Handles .desktop Exec placeholders (like %u, %F) so we don't pass garbage to the shell.
-pub fn launch(exec: &str, _app_handle: Option<&tauri::AppHandle>) -> Result<(), String> {
+pub fn launch(exec: &str, _app_handle: Option<&tauri::AppHandle>) -> Result<(), VantaError> {
     let start = std::time::Instant::now();
 
     // Check for window actions
@@ -54,7 +55,7 @@ pub fn launch(exec: &str, _app_handle: Option<&tauri::AppHandle>) -> Result<(), 
     let cleaned = strip_field_codes(exec);
 
     if cleaned.is_empty() {
-        return Err("Empty exec command after parsing".to_string());
+        return Err("Empty exec command after parsing".into());
     }
 
     let parts = shell_words::split(&cleaned)
@@ -88,7 +89,7 @@ pub fn launch_blocking(
     command: &str,
     args: &[String],
     _app_handle: Option<&tauri::AppHandle>,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let status = Command::new(command)
         .args(args)
         .stdin(std::process::Stdio::null())
@@ -104,11 +105,11 @@ pub fn launch_blocking(
             "Blocking command '{}' failed with status {:?}",
             command,
             status.code()
-        ))
+        ).into())
     }
 }
 
-pub fn system_action(action: &str) -> Result<(), String> {
+pub fn system_action(action: &str) -> Result<(), VantaError> {
     let normalized = action.to_lowercase();
 
     match normalized.as_str() {
@@ -140,7 +141,7 @@ pub fn system_action(action: &str) -> Result<(), String> {
                 vec!["reboot".into(), "--firmware-setup".into()],
             ),
         ]),
-        other => Err(format!("Unsupported system action: {}", other)),
+        other => Err(format!("Unsupported system action: {}", other).into()),
     }
 }
 
@@ -176,7 +177,7 @@ fn strip_field_codes(exec: &str) -> String {
     cleaned
 }
 
-fn focus_window(address: &str) -> Result<(), String> {
+fn focus_window(address: &str) -> Result<(), VantaError> {
     let mut ok = false;
 
     if let Err(e) = spawn_cmd(
@@ -204,11 +205,11 @@ fn focus_window(address: &str) -> Result<(), String> {
     if ok {
         Ok(())
     } else {
-        Err("Failed to focus window".to_string())
+        Err("Failed to focus window".into())
     }
 }
 
-fn close_window(address: &str) -> Result<(), String> {
+fn close_window(address: &str) -> Result<(), VantaError> {
     let mut ok = false;
 
     if let Err(e) = spawn_cmd(
@@ -235,11 +236,11 @@ fn close_window(address: &str) -> Result<(), String> {
     if ok {
         Ok(())
     } else {
-        Err("Failed to close window".to_string())
+        Err("Failed to close window".into())
     }
 }
 
-fn minimize_window(address: &str) -> Result<(), String> {
+fn minimize_window(address: &str) -> Result<(), VantaError> {
     let mut ok = false;
 
     // Sway equivalent for minimizing/hiding the container.
@@ -268,11 +269,11 @@ fn minimize_window(address: &str) -> Result<(), String> {
     if ok {
         Ok(())
     } else {
-        Err("Minimize not supported on this compositor".to_string())
+        Err("Minimize not supported on this compositor".into())
     }
 }
 
-fn move_window_to_current_workspace(address: &str) -> Result<(), String> {
+fn move_window_to_current_workspace(address: &str) -> Result<(), VantaError> {
     let mut ok = false;
 
     // Sway supports moving focused/target container to the active workspace.
@@ -288,13 +289,13 @@ fn move_window_to_current_workspace(address: &str) -> Result<(), String> {
     if ok {
         Ok(())
     } else {
-        Err("Move-to-workspace is not supported on this compositor".to_string())
+        Err("Move-to-workspace is not supported on this compositor".into())
     }
 }
 
 /// Launches a terminal emulator and runs the provided shell command.
 /// Tries common terminals plus $TERMINAL; falls back to an error if none spawn.
-pub fn launch_terminal_command(command: &str) -> Result<(), String> {
+pub fn launch_terminal_command(command: &str) -> Result<(), VantaError> {
     let wrapped = format!(
         "{}; echo \"\\nPress Enter to close\"; read -r _",
         command
@@ -350,7 +351,7 @@ pub fn launch_terminal_command(command: &str) -> Result<(), String> {
         }
     }
 
-    Err("No terminal emulator found to run 'vanta doctor'".to_string())
+    Err("No terminal emulator found to run 'vanta doctor'".into())
 }
 
 #[cfg(test)]

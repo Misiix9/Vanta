@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use tauri::Emitter;
 
 use crate::permissions::Capability;
+use crate::errors::VantaError;
 
 // Embedded default config for fallback writes.
 const DEFAULT_CONFIG_JSON: &str = include_str!("../resources/config.json");
@@ -623,7 +624,7 @@ pub fn list_profiles(cfg: &VantaConfig) -> ProfilesConfig {
     cfg.profiles.clone()
 }
 
-pub fn switch_profile_in_config(cfg: &mut VantaConfig, profile_id: &str) -> Result<(), String> {
+pub fn switch_profile_in_config(cfg: &mut VantaConfig, profile_id: &str) -> Result<(), VantaError> {
     let profile = cfg
         .profiles
         .entries
@@ -643,7 +644,7 @@ pub fn export_profile_to_path(
     cfg: &VantaConfig,
     profile_id: &str,
     output_path: &str,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let profile = cfg
         .profiles
         .entries
@@ -660,15 +661,15 @@ pub fn export_profile_to_path(
 
     let json = serde_json::to_string_pretty(&payload)
         .map_err(|e| format!("Failed to serialize profile export: {}", e))?;
-    fs::write(output_path, json)
-        .map_err(|e| format!("Failed to write profile export '{}': {}", output_path, e))
+    Ok(fs::write(output_path, json)
+        .map_err(|e| format!("Failed to write profile export '{}': {}", output_path, e))?)
 }
 
 pub fn import_profile_from_path(
     cfg: &mut VantaConfig,
     input_path: &str,
     replace_existing: bool,
-) -> Result<ProfileConfig, String> {
+) -> Result<ProfileConfig, VantaError> {
     let raw = fs::read_to_string(input_path)
         .map_err(|e| format!("Failed to read profile import '{}': {}", input_path, e))?;
     let payload: ProfileExportPayload = serde_json::from_str(&raw)
@@ -678,16 +679,16 @@ pub fn import_profile_from_path(
         return Err(format!(
             "Profile export schema {} is newer than supported {}",
             payload.schema_version, PROFILE_EXPORT_SCHEMA_VERSION
-        ));
+        ).into());
     }
     if payload.app_schema_version > CONFIG_SCHEMA_VERSION {
         return Err(format!(
             "Profile export app schema {} is newer than supported {}",
             payload.app_schema_version, CONFIG_SCHEMA_VERSION
-        ));
+        ).into());
     }
     if !validate_profile_id(&payload.profile.id) {
-        return Err("Profile id is invalid. Use only [A-Za-z0-9_-].".to_string());
+        return Err("Profile id is invalid. Use only [A-Za-z0-9_-].".into());
     }
 
     if let Some(idx) = cfg
@@ -700,7 +701,7 @@ pub fn import_profile_from_path(
             return Err(format!(
                 "Profile '{}' already exists. Enable replace to overwrite.",
                 payload.profile.id
-            ));
+            ).into());
         }
         cfg.profiles.entries[idx] = payload.profile.clone();
     } else {
@@ -790,7 +791,7 @@ pub fn load_or_create_default() -> VantaConfig {
     rewrite_default_config()
 }
 
-pub fn migrate_config_on_disk() -> Result<ConfigMigrationReport, String> {
+pub fn migrate_config_on_disk() -> Result<ConfigMigrationReport, VantaError> {
     let path = config_path();
     if !path.exists() {
         return Ok(ConfigMigrationReport {
@@ -844,12 +845,12 @@ pub fn migrate_config_on_disk() -> Result<ConfigMigrationReport, String> {
 
 impl VantaConfig {
     /// Save the current configuration to disk.
-    pub fn save(&self) -> Result<(), String> {
+    pub fn save(&self) -> Result<(), VantaError> {
         write_config(self)
     }
 }
 
-fn write_config(cfg: &VantaConfig) -> Result<(), String> {
+fn write_config(cfg: &VantaConfig) -> Result<(), VantaError> {
     let mut cfg = cfg.clone();
     let _ = ensure_profiles(&mut cfg);
 

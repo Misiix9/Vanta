@@ -1,6 +1,7 @@
 /// Window management module.
 /// This module is the single point of control for show/hide/blur/focus.
 use std::time::Instant;
+use crate::errors::VantaError;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow, LogicalSize};
@@ -11,7 +12,7 @@ pub struct BlurStatus {
 }
 
 /// Initialize the window on startup: attempt native blur, emit fallback status.
-pub fn init_window(_window: &WebviewWindow, app_handle: &AppHandle) -> Result<(), String> {
+pub fn init_window(_window: &WebviewWindow, app_handle: &AppHandle) -> Result<(), VantaError> {
     log::info!("Initializing Vanta window");
 
     // On Linux/Wayland, native vibrancy is not universally supported.
@@ -34,7 +35,7 @@ pub fn init_window(_window: &WebviewWindow, app_handle: &AppHandle) -> Result<()
 }
 
 /// Show the Vanta window and focus it.
-pub fn show_window(window: &WebviewWindow) -> Result<(), String> {
+pub fn show_window(window: &WebviewWindow) -> Result<(), VantaError> {
     let start = Instant::now();
 
     window
@@ -56,14 +57,14 @@ pub fn show_window(window: &WebviewWindow) -> Result<(), String> {
 }
 
 /// Hide the Vanta window.
-pub fn hide_window(window: &WebviewWindow) -> Result<(), String> {
-    window
+pub fn hide_window(window: &WebviewWindow) -> Result<(), VantaError> {
+    Ok(window
         .hide()
-        .map_err(|e| format!("Failed to hide window: {}", e))
+        .map_err(|e| format!("Failed to hide window: {}", e))?)
 }
 
 /// Toggle window visibility (for hotkey/CLI). Optional size enforces current config.
-pub fn toggle_window(app: &AppHandle, size: Option<(f64, f64)>) -> Result<(), String> {
+pub fn toggle_window(app: &AppHandle, size: Option<(f64, f64)>) -> Result<(), VantaError> {
     let window = app
         .get_webview_window("main")
         .ok_or("Failed to get main window")?;

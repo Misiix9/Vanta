@@ -7,6 +7,7 @@ use serde_json::json;
 use tauri::State;
 
 use crate::config::{MacroArg, MacroStep, WorkflowMacro};
+use crate::errors::VantaError;
 use crate::extensions;
 use crate::permissions::{self, Capability, Decision};
 use crate::{launcher, AppState};
@@ -64,7 +65,7 @@ struct ResolvedStep {
     capabilities: Vec<Capability>,
 }
 
-pub fn list_macros(state: &State<'_, AppState>) -> Result<Vec<WorkflowMacro>, String> {
+pub fn list_macros(state: &State<'_, AppState>) -> Result<Vec<WorkflowMacro>, VantaError> {
     let cfg = state
         .config
         .lock()
@@ -76,7 +77,7 @@ pub fn dry_run_macro(
     macro_id: &str,
     provided_args: HashMap<String, String>,
     state: &State<'_, AppState>,
-) -> Result<MacroDryRunResult, String> {
+) -> Result<MacroDryRunResult, VantaError> {
     let macro_def = fetch_macro(state, macro_id)?;
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
     let resolved_steps = resolve_steps(&macro_def, &arg_map)?;
@@ -131,7 +132,7 @@ pub fn run_macro(
     provided_args: HashMap<String, String>,
     state: &State<'_, AppState>,
     app_handle: &tauri::AppHandle,
-) -> Result<MacroRunResult, String> {
+) -> Result<MacroRunResult, VantaError> {
     let macro_def = fetch_macro(state, macro_id)?;
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
     let resolved_steps = resolve_steps(&macro_def, &arg_map)?;
@@ -152,14 +153,14 @@ pub fn run_macro(
                             "missing_caps": missing_caps,
                             "requested_caps": step.capabilities,
                         });
-                        return Err(format!("PERMISSION_NEEDED:{}", payload));
+                        return Err(format!("PERMISSION_NEEDED:{}", payload).into());
                     }
                     Err(extensions::PermissionError::Deny) => {
                         let payload = json!({
                             "script_id": step.id,
                             "requested_caps": step.capabilities,
                         });
-                        return Err(format!("PERMISSION_DENIED:{}", payload));
+                        return Err(format!("PERMISSION_DENIED:{}", payload).into());
                     }
                 }
 
@@ -188,14 +189,14 @@ pub fn run_macro(
                             "missing_caps": missing_caps,
                             "requested_caps": step.capabilities,
                         });
-                        return Err(format!("PERMISSION_NEEDED:{}", payload));
+                        return Err(format!("PERMISSION_NEEDED:{}", payload).into());
                     }
                     Err(extensions::PermissionError::Deny) => {
                         let payload = json!({
                             "script_id": step.id,
                             "requested_caps": step.capabilities,
                         });
-                        return Err(format!("PERMISSION_DENIED:{}", payload));
+                        return Err(format!("PERMISSION_DENIED:{}", payload).into());
                     }
                 }
 
@@ -227,7 +228,7 @@ pub fn run_macro_blocking(
     provided_args: HashMap<String, String>,
     state: &State<'_, AppState>,
     app_handle: &tauri::AppHandle,
-) -> Result<MacroRunResult, String> {
+) -> Result<MacroRunResult, VantaError> {
     let macro_def = fetch_macro(state, macro_id)?;
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
     let resolved_steps = resolve_steps(&macro_def, &arg_map)?;
@@ -248,14 +249,14 @@ pub fn run_macro_blocking(
                             "missing_caps": missing_caps,
                             "requested_caps": step.capabilities,
                         });
-                        return Err(format!("PERMISSION_NEEDED:{}", payload));
+                        return Err(format!("PERMISSION_NEEDED:{}", payload).into());
                     }
                     Err(extensions::PermissionError::Deny) => {
                         let payload = json!({
                             "script_id": step.id,
                             "requested_caps": step.capabilities,
                         });
-                        return Err(format!("PERMISSION_DENIED:{}", payload));
+                        return Err(format!("PERMISSION_DENIED:{}", payload).into());
                     }
                 }
 
@@ -277,14 +278,14 @@ pub fn run_macro_blocking(
                             "missing_caps": missing_caps,
                             "requested_caps": step.capabilities,
                         });
-                        return Err(format!("PERMISSION_NEEDED:{}", payload));
+                        return Err(format!("PERMISSION_NEEDED:{}", payload).into());
                     }
                     Err(extensions::PermissionError::Deny) => {
                         let payload = json!({
                             "script_id": step.id,
                             "requested_caps": step.capabilities,
                         });
-                        return Err(format!("PERMISSION_DENIED:{}", payload));
+                        return Err(format!("PERMISSION_DENIED:{}", payload).into());
                     }
                 }
 
@@ -308,13 +309,13 @@ pub fn run_macro_blocking(
     })
 }
 
-fn fetch_macro(state: &State<'_, AppState>, macro_id: &str) -> Result<WorkflowMacro, String> {
+fn fetch_macro(state: &State<'_, AppState>, macro_id: &str) -> Result<WorkflowMacro, VantaError> {
     let cfg = state
         .config
         .lock()
         .map_err(|_| "Failed to access config".to_string())?;
 
-    cfg.workflows
+    Ok(cfg.workflows
         .macros
         .iter()
         .find(|m| m.id == macro_id)
@@ -326,13 +327,13 @@ fn fetch_macro(state: &State<'_, AppState>, macro_id: &str) -> Result<WorkflowMa
             } else {
                 Err(format!("Macro '{}' is disabled", macro_id))
             }
-        })
+        })?)
 }
 
 fn resolve_args(
     args_def: &[MacroArg],
     provided: &HashMap<String, String>,
-) -> Result<HashMap<String, String>, String> {
+) -> Result<HashMap<String, String>, VantaError> {
     let mut resolved = HashMap::new();
 
     for arg in args_def {
@@ -341,7 +342,7 @@ fn resolve_args(
         } else if let Some(default_val) = &arg.default_value {
             resolved.insert(arg.name.clone(), default_val.clone());
         } else if arg.required {
-            return Err(format!("Missing required arg '{}'", arg.name));
+            return Err(format!("Missing required arg '{}'", arg.name).into());
         }
     }
 
@@ -351,7 +352,7 @@ fn resolve_args(
 fn render_tokens(
     tokens: &[String],
     arg_map: &HashMap<String, String>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, VantaError> {
     let mut rendered = Vec::new();
 
     for token in tokens {
@@ -381,7 +382,7 @@ fn render_tokens(
 fn resolve_steps(
     macro_def: &WorkflowMacro,
     arg_map: &HashMap<String, String>,
-) -> Result<Vec<ResolvedStep>, String> {
+) -> Result<Vec<ResolvedStep>, VantaError> {
     let mut steps = Vec::new();
 
     for (idx, step) in macro_def.steps.iter().enumerate() {
@@ -425,9 +426,9 @@ fn resolve_steps(
     Ok(steps)
 }
 
-fn require_system_capabilities(caps: &[Capability]) -> Result<(), String> {
+fn require_system_capabilities(caps: &[Capability]) -> Result<(), VantaError> {
     if caps.is_empty() {
-        Err("System steps must declare at least one capability".to_string())
+        Err("System steps must declare at least one capability".into())
     } else {
         Ok(())
     }

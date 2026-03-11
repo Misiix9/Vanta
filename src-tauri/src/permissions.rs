@@ -1,4 +1,5 @@
 use crate::config;
+use crate::errors::VantaError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -98,7 +99,7 @@ pub fn load_permissions() -> PermissionsStore {
     })
 }
 
-fn load_permissions_raw() -> Result<PermissionsStore, String> {
+fn load_permissions_raw() -> Result<PermissionsStore, VantaError> {
     let path = permissions_path();
     if !path.exists() {
         return Ok(PermissionsStore::default());
@@ -118,7 +119,7 @@ fn load_permissions_raw() -> Result<PermissionsStore, String> {
     Ok(store)
 }
 
-pub fn save_permissions(store: &PermissionsStore) -> Result<(), String> {
+pub fn save_permissions(store: &PermissionsStore) -> Result<(), VantaError> {
     let path = permissions_path();
     let dir = path
         .parent()
@@ -143,7 +144,7 @@ pub fn save_permissions(store: &PermissionsStore) -> Result<(), String> {
 
 /// Ensure new scripts have a seed decision so capability prompts work immediately.
 /// Only inserts when no decision exists; it never overwrites user choices.
-pub fn seed_missing_decisions(seeds: &[(String, Vec<Capability>)]) -> Result<(), String> {
+pub fn seed_missing_decisions(seeds: &[(String, Vec<Capability>)]) -> Result<(), VantaError> {
     if seeds.is_empty() {
         return Ok(());
     }
@@ -184,7 +185,7 @@ pub fn set_decision(
     decision: Decision,
     note: Option<String>,
     requested_caps: Vec<Capability>,
-) -> Result<DecisionRecord, String> {
+) -> Result<DecisionRecord, VantaError> {
     let mut store = load_permissions_raw()?;
     let record = DecisionRecord {
         script_id: script_id.to_string(),
@@ -202,7 +203,7 @@ pub fn record_block_event(
     script_id: &str,
     capability: Capability,
     note: Option<String>,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let mut store = load_permissions_raw()?;
     let event = BlockEvent {
         script_id: script_id.to_string(),
@@ -224,7 +225,7 @@ pub fn record_audit_event(
     target: &str,
     outcome: &str,
     detail: Option<String>,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let mut store = load_permissions_raw()?;
     store.audit_events.push(AuditEvent {
         event_type: event_type.to_string(),
@@ -273,7 +274,7 @@ pub fn get_decision_for(script_id: &str, requested_caps: &[Capability]) -> Permi
 pub fn get_permission_decision(
     script_id: String,
     requested_caps: Vec<Capability>,
-) -> Result<PermissionDecisionResponse, String> {
+) -> Result<PermissionDecisionResponse, VantaError> {
     Ok(get_decision_for(&script_id, &requested_caps))
 }
 
@@ -284,7 +285,7 @@ pub fn set_permission_decision(
     requested_caps: Vec<Capability>,
     decision: Decision,
     note: Option<String>,
-) -> Result<DecisionRecord, String> {
+) -> Result<DecisionRecord, VantaError> {
     let record = set_decision(&script_id, decision, note, requested_caps)?;
     let _ = record_audit_event(
         "permission_decision",
@@ -298,7 +299,7 @@ pub fn set_permission_decision(
 }
 
 #[tauri::command]
-pub fn get_audit_events() -> Result<Vec<AuditEvent>, String> {
+pub fn get_audit_events() -> Result<Vec<AuditEvent>, VantaError> {
     let store = load_permissions_raw()?;
     Ok(store.audit_events)
 }

@@ -7,6 +7,7 @@ use std::time::Duration;
 use tauri::Manager;
 
 use crate::config;
+use crate::errors::VantaError;
 use crate::permissions::{self, Capability, Decision};
 
 pub const EXTENSION_SCHEMA_VERSION: u32 = 1;
@@ -93,15 +94,15 @@ fn is_valid_extension_name(name: &str) -> bool {
 }
 
 #[tauri::command]
-pub async fn create_extension_template(name: String) -> Result<String, String> {
+pub async fn create_extension_template(name: String) -> Result<String, VantaError> {
     let normalized = name.trim().to_ascii_lowercase();
     if !is_valid_extension_name(&normalized) {
-        return Err("Extension name must use letters, numbers, '-' or '_'".to_string());
+        return Err("Extension name must use letters, numbers, '-' or '_'".into());
     }
 
     let ext_root = extensions_dir().join(&normalized);
     if ext_root.exists() {
-        return Err(format!("Extension '{}' already exists", normalized));
+        return Err(format!("Extension '{}' already exists", normalized).into());
     }
 
     fs::create_dir_all(ext_root.join("dist"))
@@ -167,23 +168,23 @@ pub async fn create_extension_template(name: String) -> Result<String, String> {
     Ok(ext_root.to_string_lossy().to_string())
 }
 
-fn validate_manifest(manifest: &ExtensionManifest, ext_path: &Path) -> Result<(), String> {
+fn validate_manifest(manifest: &ExtensionManifest, ext_path: &Path) -> Result<(), VantaError> {
     if manifest.name.is_empty() {
-        return Err("Extension name is empty".to_string());
+        return Err("Extension name is empty".into());
     }
 
     if manifest.name.contains("..") || manifest.name.contains('/') || manifest.name.contains('\\') {
         return Err(format!(
             "Extension name '{}' contains path traversal characters",
             manifest.name
-        ));
+        ).into());
     }
 
     if manifest.commands.is_empty() {
         return Err(format!(
             "Extension '{}' has no commands defined",
             manifest.name
-        ));
+        ).into());
     }
 
     for cmd in &manifest.commands {
@@ -191,7 +192,7 @@ fn validate_manifest(manifest: &ExtensionManifest, ext_path: &Path) -> Result<()
             return Err(format!(
                 "Extension '{}' has a command with empty name or title",
                 manifest.name
-            ));
+            ).into());
         }
     }
 
@@ -205,7 +206,7 @@ fn validate_manifest(manifest: &ExtensionManifest, ext_path: &Path) -> Result<()
         return Err(format!(
             "Extension path escapes the extensions directory: {}",
             canonical.display()
-        ));
+        ).into());
     }
 
     Ok(())
@@ -287,14 +288,14 @@ pub fn scan_extensions() -> Vec<ExtensionEntry> {
     entries
 }
 
-fn migrate_manifest_file(path: &Path) -> Result<bool, String> {
+fn migrate_manifest_file(path: &Path) -> Result<bool, VantaError> {
     let raw = fs::read_to_string(path)
         .map_err(|e| format!("failed to read manifest: {}", e))?;
     let mut value: serde_json::Value = serde_json::from_str(&raw)
         .map_err(|e| format!("failed to parse manifest json: {}", e))?;
 
     let Some(obj) = value.as_object_mut() else {
-        return Err("manifest root is not an object".to_string());
+        return Err("manifest root is not an object".into());
     };
 
     let mut changed = false;
@@ -354,7 +355,7 @@ pub fn migrate_extension_manifests() -> ExtensionMigrationReport {
     report
 }
 
-pub fn load_extension_bundle(ext_id: &str) -> Result<String, String> {
+pub fn load_extension_bundle(ext_id: &str) -> Result<String, VantaError> {
     let dir = extensions_dir();
     let bundle_path = dir.join(ext_id).join("dist").join("index.js");
 
@@ -363,7 +364,7 @@ pub fn load_extension_bundle(ext_id: &str) -> Result<String, String> {
             "No compiled bundle found for extension '{}'. Expected at {}",
             ext_id,
             bundle_path.display()
-        ));
+        ).into());
     }
 
     let canonical = bundle_path
@@ -371,18 +372,18 @@ pub fn load_extension_bundle(ext_id: &str) -> Result<String, String> {
         .map_err(|e| format!("Cannot resolve bundle path: {}", e))?;
     let ext_dir_canonical = dir.canonicalize().unwrap_or_else(|_| dir.clone());
     if !canonical.starts_with(&ext_dir_canonical) {
-        return Err("Bundle path escapes extensions directory".to_string());
+        return Err("Bundle path escapes extensions directory".into());
     }
 
-    fs::read_to_string(&bundle_path).map_err(|e| {
+    Ok(fs::read_to_string(&bundle_path).map_err(|e| {
         format!(
             "Failed to read bundle for '{}': {}",
             ext_id, e
         )
-    })
+    })?)
 }
 
-pub fn load_extension_styles(ext_id: &str) -> Result<Option<String>, String> {
+pub fn load_extension_styles(ext_id: &str) -> Result<Option<String>, VantaError> {
     let dir = extensions_dir();
     let style_path = dir.join(ext_id).join("dist").join("style.css");
 
@@ -559,24 +560,24 @@ fn extension_data_dir() -> PathBuf {
     dir
 }
 
-fn load_storage_map(ext_id: &str) -> Result<HashMap<String, String>, String> {
+fn load_storage_map(ext_id: &str) -> Result<HashMap<String, String>, VantaError> {
     let path = extension_data_dir().join(format!("{}.json", ext_id));
     if !path.exists() {
         return Ok(HashMap::new());
     }
     let data = fs::read_to_string(&path).map_err(|e| format!("Failed to read storage: {}", e))?;
-    serde_json::from_str(&data).map_err(|e| format!("Failed to parse storage: {}", e))
+    Ok(serde_json::from_str(&data).map_err(|e| format!("Failed to parse storage: {}", e))?)
 }
 
-fn save_storage_map(ext_id: &str, map: &HashMap<String, String>) -> Result<(), String> {
+fn save_storage_map(ext_id: &str, map: &HashMap<String, String>) -> Result<(), VantaError> {
     let path = extension_data_dir().join(format!("{}.json", ext_id));
     let data = serde_json::to_string_pretty(map)
         .map_err(|e| format!("Failed to serialize storage: {}", e))?;
-    fs::write(&path, data).map_err(|e| format!("Failed to write storage: {}", e))
+    Ok(fs::write(&path, data).map_err(|e| format!("Failed to write storage: {}", e))?)
 }
 
 #[tauri::command]
-pub async fn extension_fetch(url: String, method: Option<String>) -> Result<String, String> {
+pub async fn extension_fetch(url: String, method: Option<String>) -> Result<String, VantaError> {
     let client = reqwest::Client::new();
     let req = match method.as_deref().unwrap_or("GET") {
         "POST" => client.post(&url),
@@ -588,16 +589,16 @@ pub async fn extension_fetch(url: String, method: Option<String>) -> Result<Stri
         .send()
         .await
         .map_err(|e| format!("HTTP request failed: {}", e))?;
-    resp.text()
+    Ok(resp.text()
         .await
-        .map_err(|e| format!("Failed to read response body: {}", e))
+        .map_err(|e| format!("Failed to read response body: {}", e))?)
 }
 
 #[tauri::command]
 pub async fn extension_shell_execute(
     command: String,
     args: Option<Vec<String>>,
-) -> Result<String, String> {
+) -> Result<String, VantaError> {
     let args = args.unwrap_or_default();
     let output = Command::new(&command)
         .args(&args)
@@ -608,7 +609,7 @@ pub async fn extension_shell_execute(
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(format!("Command failed ({}): {}", output.status, stderr))
+        Err(format!("Command failed ({}): {}", output.status, stderr).into())
     }
 }
 
@@ -616,7 +617,7 @@ pub async fn extension_shell_execute(
 pub async fn extension_storage_get(
     ext_id: String,
     key: String,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, VantaError> {
     let map = load_storage_map(&ext_id)?;
     Ok(map.get(&key).cloned())
 }
@@ -626,7 +627,7 @@ pub async fn extension_storage_set(
     ext_id: String,
     key: String,
     value: String,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let mut map = load_storage_map(&ext_id)?;
     map.insert(key, value);
     save_storage_map(&ext_id, &map)

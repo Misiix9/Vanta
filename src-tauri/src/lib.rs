@@ -25,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use clap::Parser;
 
 use config::{ProfileConfig, ProfilesConfig, VantaConfig, WorkflowMacro};
+use errors::VantaError;
 use history::History;
 use matcher::{ResultSource, SearchResult};
 use scanner::AppEntry;
@@ -1393,7 +1394,7 @@ mod relevance_ranking_tests {
 #[tauri::command]
 async fn get_config(
     state: tauri::State<'_, AppState>,
-) -> Result<VantaConfig, String> {
+) -> Result<VantaConfig, VantaError> {
     let config = state
         .config
         .lock()
@@ -1405,7 +1406,7 @@ async fn get_config(
 async fn save_config(
     mut new_config: VantaConfig,
     state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let new_files_config = new_config.files.clone();
 
     let _ = clamp_window_size(&mut new_config.window);
@@ -1434,7 +1435,7 @@ async fn save_config(
 #[tauri::command]
 async fn get_profiles(
     state: tauri::State<'_, AppState>,
-) -> Result<ProfilesConfig, String> {
+) -> Result<ProfilesConfig, VantaError> {
     let config = state
         .config
         .lock()
@@ -1447,7 +1448,7 @@ async fn switch_profile(
     profile_id: String,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<VantaConfig, String> {
+) -> Result<VantaConfig, VantaError> {
     let updated = {
         let mut config = state
             .config
@@ -1467,7 +1468,7 @@ async fn export_profile(
     profile_id: String,
     output_path: String,
     state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let config = state
         .config
         .lock()
@@ -1482,7 +1483,7 @@ async fn import_profile(
     activate: bool,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<ProfileConfig, String> {
+) -> Result<ProfileConfig, VantaError> {
     let (imported, updated_cfg) = {
         let mut config = state
             .config
@@ -1503,7 +1504,7 @@ async fn import_profile(
 #[tauri::command]
 async fn rebuild_file_index(
     state: tauri::State<'_, AppState>,
-) -> Result<Option<u64>, String> {
+) -> Result<Option<u64>, VantaError> {
     let files_config = {
         let cfg = state
             .config
@@ -1538,7 +1539,7 @@ async fn rebuild_file_index(
 async fn search(
     query: String,
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<SearchResult>, String> {
+) -> Result<Vec<SearchResult>, VantaError> {
     let search_start = Instant::now();
     let apps = state
         .apps
@@ -1729,7 +1730,7 @@ async fn search(
 async fn search_v3(
     query: String,
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<SearchResultV3>, String> {
+) -> Result<Vec<SearchResultV3>, VantaError> {
     let legacy = search(query, state).await?;
     Ok(legacy.into_iter().map(to_v3_result).collect())
 }
@@ -1739,7 +1740,7 @@ async fn launch_app(
     exec: String,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let launch_start = Instant::now();
     if let Ok(mut history) = state.history.lock() {
         history.increment(&exec);
@@ -1753,18 +1754,18 @@ async fn launch_app(
         &LAUNCH_TOTAL_MS,
         &LAUNCH_MAX_MS,
     );
-    result
+    Ok(result?)
 }
 
 #[tauri::command]
-async fn system_action(action: String) -> Result<(), String> {
-    launcher::system_action(&action)
+async fn system_action(action: String) -> Result<(), VantaError> {
+    Ok(launcher::system_action(&action)?)
 }
 
 #[tauri::command]
 async fn get_suggestions(
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<SearchResult>, String> {
+) -> Result<Vec<SearchResult>, VantaError> {
     let suggestions_start = Instant::now();
     let apps = state
         .apps
@@ -1922,7 +1923,7 @@ async fn get_suggestions(
 #[tauri::command]
 async fn get_suggestions_v3(
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<SearchResultV3>, String> {
+) -> Result<Vec<SearchResultV3>, VantaError> {
     let legacy = get_suggestions(state).await?;
     Ok(legacy.into_iter().map(to_v3_result).collect())
 }
@@ -1931,7 +1932,7 @@ async fn get_suggestions_v3(
 async fn run_contract_migration(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<ContractMigrationReport, String> {
+) -> Result<ContractMigrationReport, VantaError> {
     let config_report = config::migrate_config_on_disk()?;
     let extension_report = extensions::migrate_extension_manifests();
 
@@ -1963,7 +1964,7 @@ async fn run_contract_migration(
 }
 
 #[tauri::command]
-async fn get_search_diagnostics() -> Result<SearchDiagnostics, String> {
+async fn get_search_diagnostics() -> Result<SearchDiagnostics, VantaError> {
     Ok(SearchDiagnostics {
         search: snapshot_perf(&SEARCH_CALLS, &SEARCH_TOTAL_MS, &SEARCH_MAX_MS),
         suggestions: snapshot_perf(&SUGGEST_CALLS, &SUGGEST_TOTAL_MS, &SUGGEST_MAX_MS),
@@ -1974,7 +1975,7 @@ async fn get_search_diagnostics() -> Result<SearchDiagnostics, String> {
 #[tauri::command]
 async fn get_health_dashboard(
     state: tauri::State<'_, AppState>,
-) -> Result<HealthDashboard, String> {
+) -> Result<HealthDashboard, VantaError> {
     let cfg = state
         .config
         .lock()
@@ -2050,7 +2051,7 @@ async fn get_health_dashboard(
 async fn create_support_bundle(
     output_path: Option<String>,
     state: tauri::State<'_, AppState>,
-) -> Result<SupportBundleReport, String> {
+) -> Result<SupportBundleReport, VantaError> {
     let dashboard = get_health_dashboard(state.clone()).await?;
     let perf = get_search_diagnostics().await?;
     let cfg = state
@@ -2105,7 +2106,7 @@ async fn create_support_bundle(
 #[tauri::command]
 async fn get_recovery_hints(
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<RecoveryHint>, String> {
+) -> Result<Vec<RecoveryHint>, VantaError> {
     let cfg = state
         .config
         .lock()
@@ -2159,7 +2160,7 @@ async fn get_recovery_hints(
 #[tauri::command]
 async fn rescan_apps(
     state: tauri::State<'_, AppState>,
-) -> Result<usize, String> {
+) -> Result<usize, VantaError> {
     let apps = scanner::scan_desktop_entries();
     let count = apps.len();
     let mut cached = state
@@ -2173,7 +2174,7 @@ async fn rescan_apps(
 #[tauri::command]
 async fn get_apps(
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<scanner::AppEntry>, String> {
+) -> Result<Vec<scanner::AppEntry>, VantaError> {
     let apps = state
         .apps
         .lock()
@@ -2182,19 +2183,19 @@ async fn get_apps(
 }
 
 #[tauri::command]
-async fn hide_window(window: tauri::WebviewWindow) -> Result<(), String> {
+async fn hide_window(window: tauri::WebviewWindow) -> Result<(), VantaError> {
     window::hide_window(&window)
 }
 
 #[tauri::command]
-async fn show_window(window: tauri::WebviewWindow) -> Result<(), String> {
+async fn show_window(window: tauri::WebviewWindow) -> Result<(), VantaError> {
     window::show_window(&window)
 }
 
 #[tauri::command]
 async fn get_extensions(
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<ExtensionEntry>, String> {
+) -> Result<Vec<ExtensionEntry>, VantaError> {
     let cached = state
         .extensions_cache
         .lock()
@@ -2205,21 +2206,21 @@ async fn get_extensions(
 #[tauri::command]
 async fn get_extension_bundle(
     ext_id: String,
-) -> Result<String, String> {
+) -> Result<String, VantaError> {
     extensions::load_extension_bundle(&ext_id)
 }
 
 #[tauri::command]
 async fn get_extension_styles(
     ext_id: String,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, VantaError> {
     extensions::load_extension_styles(&ext_id)
 }
 
 #[tauri::command]
 async fn get_workflows(
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<WorkflowMacro>, String> {
+) -> Result<Vec<WorkflowMacro>, VantaError> {
     workflows::list_macros(&state)
 }
 
@@ -2228,7 +2229,7 @@ async fn dry_run_macro(
     macro_id: String,
     args: HashMap<String, String>,
     state: tauri::State<'_, AppState>,
-) -> Result<MacroDryRunResult, String> {
+) -> Result<MacroDryRunResult, VantaError> {
     workflows::dry_run_macro(&macro_id, args, &state)
 }
 
@@ -2238,7 +2239,7 @@ async fn run_macro(
     args: HashMap<String, String>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<MacroRunResult, String> {
+) -> Result<MacroRunResult, VantaError> {
     workflows::run_macro(&macro_id, args, &state, &app_handle)
 }
 
@@ -2248,7 +2249,7 @@ async fn start_macro_job(
     args: HashMap<String, String>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<MacroJobRecord, String> {
+) -> Result<MacroJobRecord, VantaError> {
     let preflight = workflows::dry_run_macro(&macro_id, args.clone(), &state)?;
     if let Some(step) = preflight
         .steps
@@ -2260,7 +2261,7 @@ async fn start_macro_job(
             "missing_caps": step.missing_caps,
             "requested_caps": step.capabilities,
         });
-        return Err(format!("PERMISSION_NEEDED:{}", payload));
+        return Err(format!("PERMISSION_NEEDED:{}", payload).into());
     }
     if preflight
         .steps
@@ -2271,7 +2272,7 @@ async fn start_macro_job(
             "script_id": format!("macro:{}", preflight.macro_id),
             "requested_caps": preflight.steps.into_iter().flat_map(|s| s.capabilities).collect::<Vec<_>>(),
         });
-        return Err(format!("PERMISSION_DENIED:{}", payload));
+        return Err(format!("PERMISSION_DENIED:{}", payload).into());
     }
 
     let macros = workflows::list_macros(&state)?;
@@ -2355,7 +2356,7 @@ async fn start_macro_job(
                         }
                         Ok(Err(err)) => {
                             job.status = MacroJobStatus::Failed;
-                            job.error = Some(err);
+                            job.error = Some(err.to_string());
                         }
                         Err(join_err) => {
                             job.status = MacroJobStatus::Failed;
@@ -2376,7 +2377,7 @@ async fn start_macro_job(
 #[tauri::command]
 async fn list_macro_jobs(
     state: tauri::State<'_, AppState>,
-) -> Result<Vec<MacroJobRecord>, String> {
+) -> Result<Vec<MacroJobRecord>, VantaError> {
     let jobs = state
         .macro_jobs
         .lock()
@@ -2389,7 +2390,7 @@ async fn cancel_macro_job(
     job_id: String,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     {
         let mut canceled = state
             .canceled_jobs
@@ -2423,7 +2424,7 @@ async fn retry_macro_job(
     job_id: String,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<MacroJobRecord, String> {
+) -> Result<MacroJobRecord, VantaError> {
     let (macro_id, args) = {
         let jobs = state
             .macro_jobs
@@ -2440,18 +2441,18 @@ async fn retry_macro_job(
 }
 
 #[tauri::command]
-async fn get_clipboard_history() -> Result<Vec<clipboard::ClipboardItem>, String> {
-    clipboard::get_history().map_err(|e| format!("Failed to get history: {}", e))
+async fn get_clipboard_history() -> Result<Vec<clipboard::ClipboardItem>, VantaError> {
+    Ok(clipboard::get_history().map_err(|e| format!("Failed to get history: {}", e))?)
 }
 
 #[tauri::command]
-async fn delete_clipboard_item(id: i64) -> Result<(), String> {
-    clipboard::delete_item(id).map_err(|e| format!("Failed to delete: {}", e))
+async fn delete_clipboard_item(id: i64) -> Result<(), VantaError> {
+    Ok(clipboard::delete_item(id).map_err(|e| format!("Failed to delete: {}", e))?)
 }
 
 #[tauri::command]
-async fn toggle_clipboard_pin(id: i64) -> Result<bool, String> {
-    clipboard::toggle_pin(id).map_err(|e| format!("Failed to toggle pin: {}", e))
+async fn toggle_clipboard_pin(id: i64) -> Result<bool, VantaError> {
+    Ok(clipboard::toggle_pin(id).map_err(|e| format!("Failed to toggle pin: {}", e))?)
 }
 
 #[tauri::command]
@@ -2459,10 +2460,10 @@ async fn open_path(
     path: String,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let path_obj = std::path::Path::new(&path);
     if !path_obj.exists() {
-        return Err("Path does not exist".to_string());
+        return Err("Path does not exist".into());
     }
 
     let is_dir = path_obj.is_dir();
@@ -2516,10 +2517,10 @@ async fn reveal_in_file_manager(
     path: String,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let target = std::path::Path::new(&path);
     if !target.exists() {
-        return Err("Path does not exist".to_string());
+        return Err("Path does not exist".into());
     }
 
     let dir = if target.is_dir() {
@@ -2586,13 +2587,13 @@ async fn open_with_editor(
     path: String,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let path_obj = std::path::Path::new(&path);
     if !path_obj.exists() {
-        return Err("Path does not exist".to_string());
+        return Err("Path does not exist".into());
     }
     if path_obj.is_dir() {
-        return Err("Cannot open directory with editor".to_string());
+        return Err("Cannot open directory with editor".into());
     }
 
     let editor_id = {
@@ -2644,7 +2645,7 @@ async fn open_with_editor(
 }
 
 #[tauri::command]
-async fn open_spotify_mini_player(app_handle: tauri::AppHandle) -> Result<(), String> {
+async fn open_spotify_mini_player(app_handle: tauri::AppHandle) -> Result<(), VantaError> {
     use tauri::WebviewUrl;
 
     if let Some(existing) = app_handle.get_webview_window("spotify-mini") {

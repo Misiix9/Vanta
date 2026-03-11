@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use tauri::{Emitter, State};
 
 use crate::config::{self, AppearanceConfig, ProfileConfig, WindowConfig, WorkflowMacro};
+use crate::errors::VantaError;
 use crate::permissions::Capability;
 use crate::AppState;
 
@@ -235,19 +236,19 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
     ]
 }
 
-fn sanitize_topic(topic: &str) -> Result<String, String> {
+fn sanitize_topic(topic: &str) -> Result<String, VantaError> {
     let trimmed = topic.trim().to_ascii_lowercase();
     if trimmed.is_empty() {
-        return Err("Roadmap topic cannot be empty".to_string());
+        return Err("Roadmap topic cannot be empty".into());
     }
     if trimmed.len() > MAX_TOPIC_LEN {
-        return Err(format!("Roadmap topic cannot exceed {} characters", MAX_TOPIC_LEN));
+        return Err(format!("Roadmap topic cannot exceed {} characters", MAX_TOPIC_LEN).into());
     }
     if !trimmed
         .chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
     {
-        return Err("Roadmap topic can only include letters, numbers, '-' and '_'".to_string());
+        return Err("Roadmap topic can only include letters, numbers, '-' and '_'".into());
     }
     Ok(trimmed)
 }
@@ -265,7 +266,7 @@ fn load_store() -> CommunityFeedbackStore {
     parsed
 }
 
-fn save_store(store: &CommunityFeedbackStore) -> Result<(), String> {
+fn save_store(store: &CommunityFeedbackStore) -> Result<(), VantaError> {
     let path = storage_path();
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)
@@ -275,7 +276,7 @@ fn save_store(store: &CommunityFeedbackStore) -> Result<(), String> {
     let data = serde_json::to_string_pretty(store)
         .map_err(|e| format!("Failed to serialize community feedback store: {}", e))?;
 
-    std::fs::write(path, data).map_err(|e| format!("Failed to persist community feedback: {}", e))
+    Ok(std::fs::write(path, data).map_err(|e| format!("Failed to persist community feedback: {}", e))?)
 }
 
 #[tauri::command]
@@ -283,13 +284,13 @@ pub async fn submit_community_feedback(
     message: String,
     contact: Option<String>,
     roadmap_topic: Option<String>,
-) -> Result<CommunityFeedbackReceipt, String> {
+) -> Result<CommunityFeedbackReceipt, VantaError> {
     let message = message.trim().to_string();
     if message.len() < 8 {
-        return Err("Feedback message must contain at least 8 characters".to_string());
+        return Err("Feedback message must contain at least 8 characters".into());
     }
     if message.len() > MAX_MESSAGE_LEN {
-        return Err(format!("Feedback message cannot exceed {} characters", MAX_MESSAGE_LEN));
+        return Err(format!("Feedback message cannot exceed {} characters", MAX_MESSAGE_LEN).into());
     }
 
     let contact = contact
@@ -297,7 +298,7 @@ pub async fn submit_community_feedback(
         .filter(|c| !c.is_empty());
     if let Some(c) = &contact {
         if c.len() > MAX_CONTACT_LEN {
-            return Err(format!("Contact field cannot exceed {} characters", MAX_CONTACT_LEN));
+            return Err(format!("Contact field cannot exceed {} characters", MAX_CONTACT_LEN).into());
         }
     }
 
@@ -337,7 +338,7 @@ pub async fn submit_community_feedback(
 }
 
 #[tauri::command]
-pub async fn vote_roadmap_item(topic: String) -> Result<CommunityVoteCount, String> {
+pub async fn vote_roadmap_item(topic: String) -> Result<CommunityVoteCount, VantaError> {
     let topic = sanitize_topic(&topic)?;
 
     let mut store = load_store();
@@ -352,7 +353,7 @@ pub async fn vote_roadmap_item(topic: String) -> Result<CommunityVoteCount, Stri
 }
 
 #[tauri::command]
-pub async fn get_community_feedback_summary() -> Result<CommunityFeedbackSummary, String> {
+pub async fn get_community_feedback_summary() -> Result<CommunityFeedbackSummary, VantaError> {
     let store = load_store();
     let mut vote_rows: Vec<CommunityVoteCount> = store
         .votes
@@ -377,7 +378,7 @@ pub async fn get_community_feedback_summary() -> Result<CommunityFeedbackSummary
 #[tauri::command]
 pub async fn get_popular_workflows_feed(
     state: State<'_, AppState>,
-) -> Result<Vec<PopularWorkflowFeedEntry>, String> {
+) -> Result<Vec<PopularWorkflowFeedEntry>, VantaError> {
     let cfg = state
         .config
         .lock()
@@ -394,7 +395,7 @@ pub async fn get_popular_workflows_feed(
 pub async fn install_popular_workflow(
     workflow_id: String,
     state: State<'_, AppState>,
-) -> Result<WorkflowMacro, String> {
+) -> Result<WorkflowMacro, VantaError> {
     let feed = popular_workflow_feed();
     let selected = feed
         .into_iter()
@@ -407,7 +408,7 @@ pub async fn install_popular_workflow(
         .map_err(|_| "Failed to access config".to_string())?;
 
     if !cfg.general.community_feed_opt_in {
-        return Err("Popular workflows feed is disabled. Enable opt-in first.".to_string());
+        return Err("Popular workflows feed is disabled. Enable opt-in first.".into());
     }
 
     if let Some(pos) = cfg
@@ -430,7 +431,7 @@ pub async fn export_community_snippet(
     kind: String,
     target_id: Option<String>,
     state: State<'_, AppState>,
-) -> Result<String, String> {
+) -> Result<String, VantaError> {
     let cfg = state
         .config
         .lock()
@@ -474,7 +475,7 @@ pub async fn export_community_snippet(
             (cfg.appearance.theme.clone(), payload)
         }
         _ => {
-            return Err("Unsupported snippet kind. Use workflow, profile, or theme.".to_string());
+            return Err("Unsupported snippet kind. Use workflow, profile, or theme.".into());
         }
     };
 
@@ -487,8 +488,8 @@ pub async fn export_community_snippet(
         payload,
     };
 
-    serde_json::to_string_pretty(&snippet)
-        .map_err(|e| format!("Failed to encode snippet: {}", e))
+    Ok(serde_json::to_string_pretty(&snippet)
+        .map_err(|e| format!("Failed to encode snippet: {}", e))?)
 }
 
 #[tauri::command]
@@ -496,7 +497,7 @@ pub async fn import_community_snippet(
     snippet_json: String,
     state: State<'_, AppState>,
     app_handle: tauri::AppHandle,
-) -> Result<String, String> {
+) -> Result<String, VantaError> {
     let snippet: CommunitySnippetPayload = serde_json::from_str(&snippet_json)
         .map_err(|e| format!("Invalid snippet payload: {}", e))?;
 
@@ -513,10 +514,10 @@ pub async fn import_community_snippet(
             let workflow: WorkflowMacro = serde_json::from_value(snippet.payload)
                 .map_err(|e| format!("Invalid workflow snippet: {}", e))?;
             if !is_valid_identifier(&workflow.id) {
-                return Err("Workflow id must be alphanumeric with '-' or '_'".to_string());
+                return Err("Workflow id must be alphanumeric with '-' or '_'".into());
             }
             if !snippet.trust.verified && workflow_has_risky_caps(&workflow) {
-                return Err("Unverified workflow snippet contains risky capabilities; import blocked.".to_string());
+                return Err("Unverified workflow snippet contains risky capabilities; import blocked.".into());
             }
 
             if let Some(pos) = cfg.workflows.macros.iter().position(|m| m.id == workflow.id) {
@@ -529,7 +530,7 @@ pub async fn import_community_snippet(
             let profile: ProfileConfig = serde_json::from_value(snippet.payload)
                 .map_err(|e| format!("Invalid profile snippet: {}", e))?;
             if !is_valid_identifier(&profile.id) {
-                return Err("Profile id must be alphanumeric with '-' or '_'".to_string());
+                return Err("Profile id must be alphanumeric with '-' or '_'".into());
             }
 
             if let Some(pos) = cfg.profiles.entries.iter().position(|p| p.id == profile.id) {
@@ -547,7 +548,7 @@ pub async fn import_community_snippet(
             cfg.window = theme.window;
         }
         _ => {
-            return Err("Unsupported snippet kind. Use workflow, profile, or theme.".to_string());
+            return Err("Unsupported snippet kind. Use workflow, profile, or theme.".into());
         }
     }
 

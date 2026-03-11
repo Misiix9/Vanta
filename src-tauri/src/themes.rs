@@ -1,3 +1,4 @@
+use crate::errors::VantaError;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -205,7 +206,7 @@ fn validate_theme_tokens(
 }
 
 #[tauri::command]
-pub fn get_installed_themes() -> Result<Vec<ThemeMeta>, String> {
+pub fn get_installed_themes() -> Result<Vec<ThemeMeta>, VantaError> {
     let dir = get_themes_dir();
     let mut themes = Vec::new();
 
@@ -288,10 +289,10 @@ pub fn resize_window_for_theme(
     width: f64,
     height: f64,
     window: tauri::Window,
-) -> Result<(), String> {
+) -> Result<(), VantaError> {
     let size = tauri::LogicalSize::new(width, height);
     if let Err(e) = window.set_size(size) {
-        return Err(format!("Failed to resize window: {}", e));
+        return Err(format!("Failed to resize window: {}", e).into());
     }
     // Also center it since dimensions changed
     let _ = window.center();
