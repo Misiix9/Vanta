@@ -35,10 +35,20 @@ sudo dpkg -i vanta_5.0.1_amd64.deb
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.2.0-1.x86_64.rpm
+sudo rpm -i vanta-5.3.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.2.0)
+### Latest Minor (v5.3.0)
+- Added `:focus-visible` rings on all interactive elements (buttons, inputs, accordion headers, links) with `!important` to override base resets.
+- Added `role="dialog"`, `aria-modal="true"`, and focus trapping on all modal surfaces (PermissionModal, ActionConfirmModal, SettingsView, StoreView).
+- Added `aria-live="polite"` regions for result count changes (StatusBar) and view transitions (+page.svelte announcer).
+- Replaced global scrollbar kill (`scrollbar-width: none !important`) with accessible thin scrollbar preserving scroll-position feedback.
+- Added keyboard shortcut help modal (Ctrl+?) listing all navigation shortcuts with focus trapping.
+- Fixed WCAG AA contrast violations: `--text-tertiary` bumped from `#6f7188` to `#8b8da6` (5:1 ratio); `.icon-fallback` opacity raised from 0.5 to 0.72.
+- Added skip-navigation link from search input to results region.
+- Added `aria-label` to search input for screen reader identification.
+
+### Previous Minor (v5.2.0)
 - Extracted `ranking.ts` module with all scoring, command routing, and utility functions (~280 lines of pure logic).
 - Split `+page.svelte` (1751 → 343 lines) into a thin view router plus a dedicated `LauncherView.svelte` component (461 lines).
 - Split `SettingsView.svelte` (1465 → 226 lines) into a thin orchestrator plus 7 focused sub-components: ThemeSettings, CommunitySettings, FeatureHubSettings, AccessibilitySettings, FileSearchSettings, DiagnosticsSettings.

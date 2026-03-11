@@ -17,7 +17,7 @@
   });
 </script>
 
-<div class="status-bar v2-hstack">
+<div class="status-bar v2-hstack" role="status" aria-live="polite" aria-atomic="true">
   <div class="status-left">
     <span class="status-badge v2-status-badge info">
       <img src="/32x32.png" alt="" class="status-badge-logo" />

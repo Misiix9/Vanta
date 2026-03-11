@@ -50,6 +50,7 @@
       placeholder=""
       spellcheck="false"
       autocomplete="off"
+      aria-label="Search applications, files, and commands"
     />
     {#if query.length === 0}
       <span class="vanta-caret" aria-hidden="true"></span>

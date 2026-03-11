@@ -251,7 +251,7 @@
 </script>
 
 {#if visibleRows.length > 0}
-  <div class="results-wrapper" class:grouped={groupBySection} class:flat={!groupBySection}>
+  <div class="results-wrapper" class:grouped={groupBySection} class:flat={!groupBySection} id="vanta-results">
     <div
       class="results-container no-scrollbar"
       bind:this={container}

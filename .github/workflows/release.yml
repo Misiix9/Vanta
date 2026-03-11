@@ -1,4 +1,4 @@
-name: Release Vanta v5.2.0
+name: Release Vanta v5.3.0
 
 on:
   push:
@@ -86,16 +86,18 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v5.2.0 -- Phase 33 Frontend Architecture Decomposition
+            ## Vanta v5.3.0 -- Phase 34 Accessibility Compliance
 
-            Minor release decomposing the two largest frontend components into focused, single-responsibility modules.
+            Minor release achieving WCAG AA compliance across all primary surfaces.
 
             ### Highlights
-            - Extracted `ranking.ts` module with all scoring, command routing, and utility functions (~280 lines of pure logic).
-            - Split `+page.svelte` (1751 → 343 lines) into a thin view router + dedicated `LauncherView.svelte` (461 lines).
-            - Split `SettingsView.svelte` (1465 → 226 lines) into orchestrator + 7 sub-components: ThemeSettings, CommunitySettings, FeatureHubSettings, AccessibilitySettings, FileSearchSettings, DiagnosticsSettings.
-            - Added `LoadingSkeleton.svelte` shimmer component for async loading states.
-            - Added `ErrorRecovery.svelte` for actionable error recovery UI.
+            - `:focus-visible` rings on all interactive elements with proper override precedence.
+            - Dialog roles, `aria-modal`, and focus trapping on all modal surfaces.
+            - `aria-live` regions for result count changes and view transitions.
+            - Accessible thin scrollbar replacing the hidden scrollbar kill.
+            - Keyboard shortcut help modal (Ctrl+?) with full navigation shortcut listing.
+            - WCAG AA contrast fixes: `--text-tertiary` and `.icon-fallback` now pass 4.5:1 ratio.
+            - Skip-navigation link from search input to results region.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.

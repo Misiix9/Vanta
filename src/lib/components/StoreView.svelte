@@ -182,7 +182,7 @@
   }
 </script>
 
-<div class="store-root hub-window-root ext-surface-root">
+<div class="store-root hub-window-root ext-surface-root" role="dialog" aria-modal="true" aria-label="Vanta Store">
   <div class="store-header hub-window-header ext-surface-header">
     <button class="back-btn btn-ghost icon-btn" onclick={onClose} aria-label="Close store">
       <i class="fa-solid fa-arrow-left"></i>

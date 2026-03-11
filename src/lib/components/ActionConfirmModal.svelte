@@ -20,6 +20,7 @@
   } = $props();
 
   let primaryBtn: HTMLButtonElement | null = null;
+  let modalEl: HTMLDivElement | null = null;
 
   onMount(() => {
     primaryBtn?.focus();
@@ -35,12 +36,26 @@
     if (event.key === "Enter") {
       event.preventDefault();
       if (!busy) onConfirm();
+      return;
+    }
+
+    if (event.key === "Tab" && modalEl) {
+      const focusables = Array.from(
+        modalEl.querySelectorAll<HTMLElement>("button:not(:disabled)")
+      ).filter((el) => el.offsetParent !== null);
+      if (focusables.length === 0) return;
+      const currentIndex = focusables.indexOf(document.activeElement as HTMLElement);
+      const nextIndex = event.shiftKey
+        ? (currentIndex <= 0 ? focusables.length - 1 : currentIndex - 1)
+        : (currentIndex + 1) % focusables.length;
+      focusables[nextIndex]?.focus();
+      event.preventDefault();
     }
   }
 </script>
 
 <div class="action-confirm-overlay" role="presentation" onkeydown={onKeydown}>
-  <div class="action-confirm-modal" role="dialog" aria-modal="true" aria-label={title}>
+  <div class="action-confirm-modal" bind:this={modalEl} role="dialog" aria-modal="true" aria-label={title}>
     <h3>{title}</h3>
     <p>{description}</p>
     <div class="action-confirm-actions">

@@ -25,7 +25,7 @@
     --surface-hover: rgba(56, 189, 248, 0.14);
     --text-primary: #eaf3ff;
     --text-secondary: #a1b4cd;
-    --text-tertiary: #7688a2;
+    --text-tertiary: #8b8da6;
     --purple: #38bdf8;
     --purple-bright: #7dd3fc;
     --purple-dim: rgba(56, 189, 248, 0.50);
@@ -348,9 +348,11 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
+a:focus-visible,
+.accordion-header:focus-visible,
 [role="button"]:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--vanta-accent, #7b35f0) 70%, #ffffff 30%);
-    outline-offset: 2px;
+    outline: 2px solid color-mix(in srgb, var(--vanta-accent, #7b35f0) 70%, #ffffff 30%) !important;
+    outline-offset: 2px !important;
 }
 
 /* ── Base Element Resets ───────────────────────────────────── */
@@ -397,17 +399,28 @@ a:hover {
     text-decoration: underline;
 }
 
-/* ── Scrollbar Kill ─────────────────────────────────────────── */
-*,
-*::before,
-*::after {
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
+/* ── Accessible Scrollbar ───────────────────────────────────── */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(123, 53, 240, 0.25) transparent;
 }
 
 ::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(123, 53, 240, 0.25);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(123, 53, 240, 0.40);
 }
 
 /* ── Window Shell ───────────────────────────────────────────── */
@@ -799,7 +812,7 @@ a:hover {
 }
 
 .icon-fallback {
-    opacity: 0.35;
+    opacity: 0.72;
 }
 
 .icon-img {
@@ -1211,11 +1224,8 @@ h3 {
     min-height: 0;
     overflow-y: auto;
     padding-right: calc(var(--space-1) * var(--vanta-space-scale, 1));
-    scrollbar-width: none;
-}
-
-.sections::-webkit-scrollbar {
-    display: none;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(123, 53, 240, 0.25) transparent;
 }
 
 .settings-search-status {
@@ -3351,4 +3361,108 @@ input[type="range"] {
 
 .input-universal::placeholder {
     color: var(--layout-text-dim);
+}
+
+/* ── Accessibility Utilities ────────────────────────────────── */
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.vanta-skip-link {
+    position: absolute;
+    top: -100%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    padding: 8px 16px;
+    background: var(--ds-accent, #7b35f0);
+    color: #fff;
+    border-radius: var(--radius-item, 9px);
+    font-size: var(--type-body, 12.5px);
+    font-weight: var(--weight-semibold, 600);
+    text-decoration: none;
+    transition: top var(--t-fast, 200ms) var(--ease-out);
+}
+
+.vanta-skip-link:focus {
+    top: 8px;
+}
+
+/* Keyboard shortcuts modal */
+.shortcuts-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+.shortcuts-modal {
+    background: var(--ds-surface-1, #0c0c0c);
+    border: 1px solid var(--ds-border, rgba(149, 118, 206, 0.30));
+    border-radius: var(--radius, 12px);
+    padding: var(--space-5, 20px);
+    width: min(420px, 90vw);
+    max-height: 70vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(123, 53, 240, 0.25) transparent;
+}
+
+.shortcuts-modal h3 {
+    margin: 0 0 var(--space-4, 16px);
+    font-size: var(--type-heading, 16px);
+    font-weight: var(--weight-semibold, 600);
+    color: var(--ds-text-primary);
+}
+
+.shortcuts-modal .shortcut-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2, 8px) 0;
+    border-bottom: 1px solid var(--border-separator, rgba(255, 255, 255, 0.05));
+    font-size: var(--type-body, 12.5px);
+    color: var(--ds-text-secondary);
+}
+
+.shortcuts-modal .shortcut-row:last-child {
+    border-bottom: none;
+}
+
+.shortcuts-modal .shortcut-row kbd {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: var(--font-mono);
+    font-size: var(--type-caption, 11px);
+    color: var(--ds-text-primary);
+    white-space: nowrap;
+}
+
+.shortcuts-modal .shortcuts-footer {
+    margin-top: var(--space-4, 16px);
+    text-align: right;
+}
+
+.shortcuts-modal .shortcuts-footer button {
+    padding: 6px 16px;
+    background: var(--ds-accent, #7b35f0);
+    color: #fff;
+    border-radius: var(--radius-item, 9px);
+    font-weight: var(--weight-medium, 500);
+    font-size: var(--type-body, 12.5px);
 }

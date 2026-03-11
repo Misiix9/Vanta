@@ -33,6 +33,7 @@
   import QuickTipsPanel from "$lib/components/QuickTipsPanel.svelte";
   import SearchExplainPanel from "$lib/components/SearchExplainPanel.svelte";
   import ActionConfirmModal from "$lib/components/ActionConfirmModal.svelte";
+  import KeyboardShortcutsModal from "$lib/components/KeyboardShortcutsModal.svelte";
 
   type ViewId = "launcher" | "settings" | "store" | "featureHub" | "communityHub" | "themeHub" | "extensionsHub";
 
@@ -100,6 +101,7 @@
   let onboardingOpen = $state(false);
   let quickTipsVisible = $state(false);
   let pendingConfirmResult = $state<SearchResult | null>(null);
+  let shortcutsOpen = $state(false);
   let groupBySection = $derived(query.trim() === "");
   let totalItems = $derived(visibleRowCount);
 
@@ -326,11 +328,13 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    if (shortcutsOpen) return;
     if (pendingConfirmResult) {
       if (e.key === "Escape") { e.preventDefault(); pendingConfirmResult = null; }
       return;
     }
     if (onboardingOpen || permissionPrompt) return;
+    if (e.key === "?" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); shortcutsOpen = true; return; }
     if (activeMacroId && e.key === "Escape") { resetMacroState(); return; }
     if (e.key === "," && e.ctrlKey) { e.preventDefault(); view = view === "launcher" ? "settings" : "launcher"; return; }
     if (view === "settings" || view === "store") {
@@ -402,6 +406,7 @@
   class={`launcher-grid v2-stack density-${config?.accessibility?.spacing_preset ?? "comfortable"}`}
   style="height: 100%; width: 100%;"
 >
+  <a href="#vanta-results" class="vanta-skip-link">Skip to results</a>
   <SearchInput bind:this={searchInputRef} bind:query onSearch={handleSearch} onEscape={handleEscape} />
 
   {#if !onboardingOpen && quickTipsVisible && query.trim() === ""}
@@ -440,6 +445,10 @@
         onConfirm={() => { const confirmed = pendingConfirmResult; pendingConfirmResult = null; if (confirmed) void handleActivate(confirmed, true); }}
       />
     {/if}
+  {/if}
+
+  {#if shortcutsOpen}
+    <KeyboardShortcutsModal onClose={() => (shortcutsOpen = false)} />
   {/if}
 
   {#if onboardingOpen && config}

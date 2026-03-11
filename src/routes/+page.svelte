@@ -49,6 +49,17 @@
   let clipboardHistory: any[] = $state([]);
   let launcherRef: LauncherView | undefined = $state();
 
+  const viewLabels: Record<ViewId, string> = {
+    launcher: "Search",
+    settings: "Settings",
+    store: "Vanta Store",
+    featureHub: "Feature Hub",
+    communityHub: "Community Hub",
+    themeHub: "Theme Studio",
+    extensionsHub: "Extensions Hub",
+  };
+  let viewAnnouncement = $derived(viewLabels[view] ?? "");
+
   const RESCAN_INTERVAL_MS = 15000;
   let lastAppRescan = $state(0);
   const unlisteners: Array<() => void> = [];
@@ -246,6 +257,8 @@
     class:css-blur={blurMode === "fallback"}
     role="application"
   >
+    <div class="sr-only" aria-live="polite" aria-atomic="true">{viewAnnouncement}</div>
+
     {#if view === "store"}
       <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
         <StoreView onClose={() => (view = "launcher")} />

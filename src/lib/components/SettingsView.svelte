@@ -120,7 +120,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="settings-panel v2-panel v2-stack">
+<div class="settings-panel v2-panel v2-stack" role="dialog" aria-modal="true" aria-label="Settings">
     <header class="settings-header sticky">
         <div class="settings-header-main">
             <h2>Settings</h2>
