@@ -1,13 +1,146 @@
-/* Theme Name: Vanta Default */
+/* Theme Name: Aurora Slate */
+/* Theme Version: 5.0 */
+
+/* ================================================================
+   Token Architecture — Phase 30 · Layered Inheritance
+   ─────────────────────────────────────────────────────
+   Layer 1  Context        Window dimensions & scale multipliers
+   Layer 2  Core           Palette, typography, spacing, shape, timing
+   Layer 3  Semantic       Design-system tokens derived from core
+   Layer 4  Component      Icon sizes, motion system, layout aliases
+   Layer 5  Compatibility  Legacy --vanta-* aliases via var() refs
+   ================================================================ */
+
 :root {
+    /* ── Layer 1 · Context ───────────────────────────────────── */
     --vanta-width: 680px;
     --vanta-height: 420px;
     --vanta-text-scale: 1;
     --vanta-space-scale: 1;
     --vanta-motion-scale: 1;
+
+    /* ── Layer 2 · Core Palette ──────────────────────────────── */
+    --bg: #050911;
+    --surface: #0f1726;
+    --surface-hover: rgba(56, 189, 248, 0.14);
+    --text-primary: #eaf3ff;
+    --text-secondary: #a1b4cd;
+    --text-tertiary: #7688a2;
+    --purple: #38bdf8;
+    --purple-bright: #7dd3fc;
+    --purple-dim: rgba(56, 189, 248, 0.50);
+    --purple-faint: rgba(56, 189, 248, 0.12);
+    --purple-ghost: rgba(56, 189, 248, 0.06);
+
+    /* ── Layer 2 · Core Typography ───────────────────────────── */
+    --font-ui: 'SN Pro', 'Inter', system-ui, -apple-system, 'Segoe UI', 'Noto Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', monospace;
+    --type-display: 26px;
+    --type-heading: 16px;
+    --type-subheading: 14px;
+    --type-title: 14px;
+    --type-body: 12.5px;
+    --type-caption: 11px;
+    --type-micro: 9.5px;
+    --leading-tight: 1.15;
+    --leading-snug: 1.3;
+    --leading-normal: 1.45;
+    --leading-relaxed: 1.6;
+    --weight-light: 300;
+    --weight-normal: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+    --weight-bold: 700;
+    --tracking-tight: -0.3px;
+    --tracking-snug: -0.1px;
+    --tracking-normal: 0;
+    --tracking-wide: 0.04em;
+    --tracking-wider: 0.08em;
+    --tracking-widest: 0.12em;
+    --measure-narrow: 45ch;
+    --measure-normal: 65ch;
+    --measure-wide: 80ch;
+
+    /* ── Layer 2 · Core Spacing & Shape ──────────────────────── */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --radius: 12px;
+    --radius-item: 9px;
+    --radius-icon: 8px;
+
+    /* ── Layer 2 · Core Timing ───────────────────────────────── */
+    --t-fast: 200ms;
+    --t-med: 300ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-std: cubic-bezier(0.25, 1, 0.5, 1);
+
+    /* ── Layer 3 · Semantic Tokens ───────────────────────────── */
+    --ds-surface-0: var(--bg);
+    --ds-surface-1: var(--surface);
+    --ds-surface-2: #162338;
+    --ds-surface-3: #1e2f4b;
+    --ds-accent: #38bdf8;
+    --ds-accent-glow: rgba(56, 189, 248, 0.34);
+    --ds-text-primary: var(--text-primary);
+    --ds-text-secondary: var(--text-secondary);
+    --ds-text-muted: #7f97b8;
+    --ds-border: rgba(99, 154, 215, 0.34);
+    --ds-success: #34d399;
+    --ds-warning: #f59e0b;
+    --ds-danger: #ef4444;
+    --ds-info: #38bdf8;
+    --ds-neutral: #a1b4cd;
+    --ds-success-muted: rgba(52, 211, 153, 0.15);
+    --ds-warning-muted: rgba(245, 158, 11, 0.15);
+    --ds-danger-muted: rgba(239, 68, 68, 0.15);
+    --ds-info-muted: rgba(56, 189, 248, 0.15);
+    --border-window: var(--ds-border);
+    --border-separator: rgba(255, 255, 255, 0.05);
+
+    /* ── Layer 4 · Component Tokens ──────────────────────────── */
     --icon-neutral: #d0d0d0;
     --icon-control: #b8b8b8;
     --icon-extension: #ffffff;
+    --icon-xs:  12px;
+    --icon-sm:  16px;
+    --icon-md:  20px;
+    --icon-lg:  24px;
+    --icon-xl:  28px;
+    --icon-2xl: 32px;
+    --icon-3xl: 36px;
+    --icon-4xl: 56px;
+    --motion-enter-duration: calc(200ms * var(--vanta-motion-scale, 1));
+    --motion-exit-duration: calc(160ms * var(--vanta-motion-scale, 1));
+    --motion-emphasis-duration: calc(260ms * var(--vanta-motion-scale, 1));
+    --motion-hierarchy-duration: calc(320ms * var(--vanta-motion-scale, 1));
+    --motion-stagger-step: calc(26ms * var(--vanta-motion-scale, 1));
+    --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+    --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --motion-ease-emphasis: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --motion-ease-hierarchy: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-lift-y: 4px;
+    --motion-focus-scale: 1.015;
+    --layout-shell-bg: var(--ds-surface-0);
+    --layout-panel-bg: color-mix(in srgb, var(--surface) 86%, transparent);
+    --layout-card-bg: color-mix(in srgb, var(--surface) 80%, transparent);
+    --layout-border: color-mix(in srgb, var(--purple) 20%, transparent);
+    --layout-accent: var(--ds-accent);
+    --layout-text: var(--text-primary);
+    --layout-text-dim: var(--text-secondary);
+
+    /* ── Layer 5 · Compatibility Aliases ─────────────────────── */
+    --vanta-bg: var(--bg);
+    --vanta-text: var(--text-primary);
+    --vanta-text-dim: var(--text-secondary);
+    --vanta-accent: var(--ds-accent);
+    --vanta-purple: var(--purple);
+    --vanta-purple-bright: var(--purple-bright);
+    --vanta-surface: var(--surface);
+    --vanta-border: color-mix(in srgb, var(--purple) 20%, transparent);
+    --result-item-bg: color-mix(in srgb, var(--purple) 10%, transparent);
 }
 
 /* ================================================================
@@ -94,96 +227,7 @@
 @import url('https://fonts.cdnfonts.com/css/sn-pro');
 @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600&display=swap');
 
-/* ================================================================
-    Vanta — Universal Theme  ·  Aurora Slate
-    ================================================================ */
-
-:root {
-    /* Palette */
-    --bg: #050911;
-    --surface: #0f1726;
-    --surface-hover: rgba(56, 189, 248, 0.14);
-    --text-primary: #eaf3ff;
-    --text-secondary: #a1b4cd;
-    --text-tertiary: #7688a2;
-
-    /* Semantic design-system tokens (Phase 04) */
-    --ds-surface-0: var(--bg);
-    --ds-surface-1: var(--surface);
-    --ds-surface-2: #162338;
-    --ds-surface-3: #1e2f4b;
-    --ds-accent: #38bdf8;
-    --ds-accent-glow: rgba(56, 189, 248, 0.34);
-    --ds-text-primary: var(--text-primary);
-    --ds-text-secondary: var(--text-secondary);
-    --ds-text-muted: #7f97b8;
-    --ds-border: rgba(99, 154, 215, 0.34);
-    --ds-success: #34d399;
-    --ds-warning: #f59e0b;
-    --ds-danger: #ef4444;
-    --ds-info: #38bdf8;
-
-    /* Typography */
-    --font-ui: 'SN Pro', 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-    --type-display: 26px;
-    --type-title: 14px;
-    --type-body: 12.5px;
-    --type-caption: 11px;
-
-    /* Spacing rhythm */
-    --space-1: 4px;
-    --space-2: 8px;
-    --space-3: 12px;
-    --space-4: 16px;
-    --space-5: 20px;
-
-    /* Purple System */
-    --purple: #38bdf8;
-    --purple-bright: #7dd3fc;
-    --purple-dim: rgba(56, 189, 248, 0.50);
-    --purple-faint: rgba(56, 189, 248, 0.12);
-    --purple-ghost: rgba(56, 189, 248, 0.06);
-
-    /* Borders */
-    --border-window: var(--ds-border);
-    --border-separator: rgba(255, 255, 255, 0.05);
-
-    /* Legacy aliases for settings/misc components */
-    --vanta-bg: #050911;
-    --vanta-text: var(--text-primary);
-    --vanta-text-dim: var(--text-secondary);
-    --vanta-accent: #38bdf8;
-    --vanta-purple: #38bdf8;
-    --vanta-purple-bright: #7dd3fc;
-    --vanta-surface: #0f1726;
-    --vanta-border: rgba(56, 189, 248, 0.2);
-    --result-item-bg: rgba(56, 189, 248, 0.1);
-
-    /* Shape */
-    --radius: 12px;
-    --radius-item: 9px;
-    --radius-icon: 8px;
-
-    /* Timing */
-    --t-fast: 200ms;
-    --t-med: 300ms;
-    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-std: cubic-bezier(0.25, 1, 0.5, 1);
-
-    /* Phase 27 Motion System */
-    --motion-enter-duration: calc(200ms * var(--vanta-motion-scale, 1));
-    --motion-exit-duration: calc(160ms * var(--vanta-motion-scale, 1));
-    --motion-emphasis-duration: calc(260ms * var(--vanta-motion-scale, 1));
-    --motion-hierarchy-duration: calc(320ms * var(--vanta-motion-scale, 1));
-    --motion-stagger-step: calc(26ms * var(--vanta-motion-scale, 1));
-    --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
-    --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
-    --motion-ease-emphasis: cubic-bezier(0.34, 1.56, 0.64, 1);
-    --motion-ease-hierarchy: cubic-bezier(0.16, 1, 0.3, 1);
-    --motion-lift-y: 4px;
-    --motion-focus-scale: 1.015;
-}
+/* ── Universal Theme  ·  Aurora Slate  (tokens in merged :root above) ── */
 
 /* ── Phase 22 Primitives (Design Language v2) ─────────────── */
 .v2-shell {
@@ -3250,17 +3294,7 @@ input[type="range"] {
     }
 }
 
-/* ── Universal Layout Compatibility Layer ──────────────────── */
-:root {
-    /* Aliases used by new universal layouts */
-    --layout-shell-bg: var(--ds-surface-0);
-    --layout-panel-bg: color-mix(in srgb, var(--vanta-surface, #0a0a0a) 86%, transparent);
-    --layout-card-bg: color-mix(in srgb, var(--vanta-surface, #0a0a0a) 80%, transparent);
-    --layout-border: var(--vanta-border, rgba(123, 53, 240, 0.2));
-    --layout-accent: var(--vanta-accent, #7b35f0);
-    --layout-text: var(--vanta-text, #f5f5f5);
-    --layout-text-dim: var(--vanta-text-dim, #9a9a9a);
-}
+/* ── Universal Layout Compatibility Layer (tokens in merged :root above) ── */
 
 .layout-shell-v2 {
     background: var(--layout-shell-bg);

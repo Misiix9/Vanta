@@ -21,12 +21,19 @@ export interface AppearanceConfig {
     colors: VantaColors;
 }
 
+export interface ThemeDiagnostic {
+    level: "error" | "warning" | "info";
+    token: string;
+    message: string;
+}
+
 export interface ThemeMeta {
     id: string;
     name: string;
     width: number;
     height: number;
     css_content: string;
+    diagnostics: ThemeDiagnostic[];
 }
 
 export interface GeneralConfig {

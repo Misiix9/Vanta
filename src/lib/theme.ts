@@ -1,4 +1,108 @@
-import type { VantaConfig, VantaColors, AppearanceConfig } from "./types";
+import type { VantaConfig, VantaColors, AppearanceConfig, ThemeDiagnostic } from "./types";
+
+// ── Phase 30 · Theme Token Contract ──────────────────────────
+
+/** Tokens every theme MUST define for safe rendering. */
+export const REQUIRED_TOKENS: string[] = [
+    "--vanta-width",
+    "--vanta-height",
+    "--bg",
+    "--surface",
+    "--text-primary",
+    "--text-secondary",
+    "--purple",
+    "--ds-accent",
+    "--ds-surface-0",
+    "--ds-surface-1",
+    "--ds-border",
+    "--ds-text-primary",
+    "--ds-text-secondary",
+    "--font-ui",
+    "--radius",
+];
+
+/** Tokens themes SHOULD define for full visual fidelity. */
+export const RECOMMENDED_TOKENS: string[] = [
+    "--ds-surface-2",
+    "--ds-surface-3",
+    "--ds-accent-glow",
+    "--ds-text-muted",
+    "--ds-success",
+    "--ds-warning",
+    "--ds-danger",
+    "--ds-info",
+    "--ds-neutral",
+    "--font-mono",
+    "--type-display",
+    "--type-heading",
+    "--type-body",
+    "--type-caption",
+    "--space-1",
+    "--space-2",
+    "--space-3",
+    "--radius-item",
+    "--motion-enter-duration",
+    "--motion-ease-enter",
+    "--icon-sm",
+    "--icon-md",
+    "--icon-lg",
+    "--icon-xl",
+    "--border-window",
+];
+
+const TOKEN_DEF_RE = /--([\w-]+)\s*:/g;
+const DIMENSION_RE = /--vanta-(width|height)\s*:\s*(\d+(?:\.\d+)?)\s*px/g;
+
+/**
+ * Validate a theme CSS string against the token contract.
+ * Returns an array of diagnostics (empty = healthy theme).
+ */
+export function validateThemeTokens(cssContent: string): ThemeDiagnostic[] {
+    const diagnostics: ThemeDiagnostic[] = [];
+    const defined = new Set<string>();
+
+    let m: RegExpExecArray | null;
+    TOKEN_DEF_RE.lastIndex = 0;
+    while ((m = TOKEN_DEF_RE.exec(cssContent)) !== null) {
+        defined.add("--" + m[1]);
+    }
+
+    for (const token of REQUIRED_TOKENS) {
+        if (!defined.has(token)) {
+            diagnostics.push({
+                level: "error",
+                token,
+                message: `Required token ${token} is missing. The UI may not render correctly.`,
+            });
+        }
+    }
+
+    for (const token of RECOMMENDED_TOKENS) {
+        if (!defined.has(token)) {
+            diagnostics.push({
+                level: "warning",
+                token,
+                message: `Recommended token ${token} is missing. Some visual details may fall back to defaults.`,
+            });
+        }
+    }
+
+    // Validate dimension ranges
+    DIMENSION_RE.lastIndex = 0;
+    while ((m = DIMENSION_RE.exec(cssContent)) !== null) {
+        const dim = m[1]; // "width" or "height"
+        const val = parseFloat(m[2]);
+        if (val < 400 || val > 1200) {
+            diagnostics.push({
+                level: "warning",
+                token: `--vanta-${dim}`,
+                message: `--vanta-${dim} is ${val}px (expected 400–1200px). Window may be unusable.`,
+            });
+        }
+    }
+
+    return diagnostics;
+}
 
 // Applies theme CSS variables to :root.
 export function applyTheme(config: VantaConfig): void {

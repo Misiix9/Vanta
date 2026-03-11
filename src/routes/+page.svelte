@@ -17,7 +17,7 @@
     MacroJobRecord,
     ExtensionEntry,
   } from "$lib/types";
-  import { applyTheme } from "$lib/theme";
+  import { applyTheme, validateThemeTokens } from "$lib/theme";
   import SearchInput from "$lib/components/SearchInput.svelte";
   import ResultsList from "$lib/components/ResultsList.svelte";
   import StatusBar from "$lib/components/StatusBar.svelte";
@@ -402,6 +402,11 @@
         availableThemes.find((t) => t.id === "default");
       if (targetTheme) {
         injectThemeCss(targetTheme.css_content);
+        const diags = validateThemeTokens(targetTheme.css_content);
+        for (const d of diags) {
+          if (d.level === "error") console.warn(`[theme] ${d.token}: ${d.message}`);
+          else console.info(`[theme] ${d.token}: ${d.message}`);
+        }
       }
     } catch (e) {
       console.error("Failed to load config:", e);
@@ -442,6 +447,11 @@
           availableThemes.find((t) => t.id === "default");
         if (targetTheme) {
           injectThemeCss(targetTheme.css_content);
+          const diags = validateThemeTokens(targetTheme.css_content);
+          for (const d of diags) {
+            if (d.level === "error") console.warn(`[theme] ${d.token}: ${d.message}`);
+            else console.info(`[theme] ${d.token}: ${d.message}`);
+          }
         }
 
         if (currentMode === "launcher") {
@@ -972,6 +982,11 @@
       availableThemes.find((t) => t.id === "default");
     if (targetTheme) {
       injectThemeCss(targetTheme.css_content);
+      const diags = validateThemeTokens(targetTheme.css_content);
+      for (const d of diags) {
+        if (d.level === "error") console.warn(`[theme] ${d.token}: ${d.message}`);
+        else console.info(`[theme] ${d.token}: ${d.message}`);
+      }
     }
 
     try {
@@ -1195,6 +1210,11 @@
             availableThemes.find((t) => t.id === "default");
           if (targetTheme) {
             injectThemeCss(targetTheme.css_content);
+            const diags = validateThemeTokens(targetTheme.css_content);
+            for (const d of diags) {
+              if (d.level === "error") console.warn(`[theme] ${d.token}: ${d.message}`);
+              else console.info(`[theme] ${d.token}: ${d.message}`);
+            }
           }
           await loadSuggestions();
           searchInputRef?.focus?.();
