@@ -1,4 +1,4 @@
-name: Release Vanta v5.0.0
+name: Release Vanta v5.0.1
 
 on:
   push:
@@ -86,16 +86,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v5.0.0 -- Phase 30 Theme Engine v3 & Token Inheritance
+            ## Vanta v5.0.1 -- Phase 31 Critical Security & Crash Prevention
 
-            Major release introducing a structured 5-layer token architecture and theme diagnostics system.
+            Patch release hardening crash paths, input validation, and offline resilience.
 
             ### Highlights
-            - Merged scattered :root blocks into a single layered block with 5 inheritance layers (Context → Core → Semantic → Component → Compatibility).
-            - Added theme token contract: 15 required tokens (error if missing) + 25 recommended tokens (warning if missing).
-            - Added dual-side validateThemeTokens() in both TypeScript and Rust with dimension range validation.
-            - Converted hardcoded legacy aliases to var() references across both built-in themes.
-            - Added ~30 missing Phase 28/29 tokens to the Aurora Slate universal theme.
+            - Replaced per-call Regex::new().unwrap() with static LazyLock<Regex> in workflow token rendering.
+            - Added length (256 char) and null-byte validation on $TERMINAL env before shell_words parsing.
+            - Wrapped root layout in <svelte:boundary> error boundary with recovery UI.
+            - Bundled Font Awesome locally — removed CDN <link> for offline-safe operation.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.

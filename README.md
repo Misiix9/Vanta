@@ -29,14 +29,20 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_5.0.0_amd64.deb
+sudo dpkg -i vanta_5.0.1_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.0.0-1.x86_64.rpm
+sudo rpm -i vanta-5.0.1-1.x86_64.rpm
 ```
+
+### Latest Patch (v5.0.1)
+- Replaced per-call `Regex::new().unwrap()` in workflow token rendering with a static `LazyLock<Regex>` (crash prevention).
+- Added length and null-byte validation on `$TERMINAL` env before `shell_words` parsing (DoS mitigation).
+- Wrapped root layout in `<svelte:boundary>` error boundary — uncaught JS errors now show a recovery UI instead of killing the window.
+- Bundled Font Awesome locally via `@fortawesome/fontawesome-free` — removed CDN dependency for offline resilience.
 
 ### Latest Major (v5.0.0)
 - Added Phase 30 Theme Engine v3 with 5-layer token inheritance (Context → Core → Semantic → Component → Compatibility).
