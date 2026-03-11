@@ -102,6 +102,39 @@ struct SupabaseMetricRow {
     install_count: u64,
 }
 
+#[derive(Debug, Serialize)]
+struct SupabaseStoreExtensionRow {
+    name: String,
+    title: String,
+    version: String,
+    description: String,
+    author: String,
+    publisher: String,
+    safe: bool,
+    icon: Option<String>,
+    category: String,
+    trust_badge: String,
+    permission_risk: String,
+    commands_count: i32,
+    installed: bool,
+    synced_at: String,
+    updated_at: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SupabaseStorePermissionRow {
+    extension_name: String,
+    permission: String,
+    position: i32,
+}
+
+#[derive(Debug, Serialize)]
+struct SupabaseStoreChangelogRow {
+    extension_name: String,
+    entry: String,
+    position: i32,
+}
+
 fn supabase_config_from_env() -> Option<(String, String)> {
     let url = std::env::var(SUPABASE_URL_ENV).ok()?;
     let key = std::env::var(SUPABASE_KEY_ENV).ok()?;
@@ -158,6 +191,167 @@ async fn fetch_supabase_metrics(
 
     serde_json::from_str::<Vec<SupabaseMetricRow>>(&text)
         .map_err(|e| format!("Failed to decode Supabase metrics response: {}", e))
+}
+
+async fn sync_store_metadata_to_supabase(
+    client: &reqwest::Client,
+    supabase_url: &str,
+    supabase_key: &str,
+    exts: &[StoreExtensionInfo],
+) -> Result<(), String> {
+    let now = chrono::Utc::now().to_rfc3339();
+
+    let base_rows: Vec<SupabaseStoreExtensionRow> = exts
+        .iter()
+        .map(|ext| SupabaseStoreExtensionRow {
+            name: ext.name.clone(),
+            title: ext.title.clone(),
+            version: ext.version.clone(),
+            description: ext.description.clone(),
+            author: ext.author.clone(),
+            publisher: ext.publisher.clone(),
+            safe: ext.safe,
+            icon: ext.icon.clone(),
+            category: ext.category.clone(),
+            trust_badge: ext.trust_badge.clone(),
+            permission_risk: ext.permission_risk.clone(),
+            commands_count: ext.commands_count as i32,
+            installed: false,
+            synced_at: now.clone(),
+            updated_at: now.clone(),
+        })
+        .collect();
+
+    let body = serde_json::to_string(&base_rows)
+        .map_err(|e| format!("Failed to encode store extension rows: {}", e))?;
+
+    let upsert_url = format!(
+        "{}/rest/v1/store_extensions?on_conflict=name",
+        supabase_url
+    );
+    let upsert_resp = client
+        .post(&upsert_url)
+        .header("apikey", supabase_key)
+        .header("Authorization", format!("Bearer {}", supabase_key))
+        .header("Content-Type", "application/json")
+        .header("Prefer", "resolution=merge-duplicates,return=minimal")
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to upsert store extensions: {}", e))?;
+
+    if !upsert_resp.status().is_success() {
+        return Err(format!(
+            "Store extension upsert HTTP {}",
+            upsert_resp.status()
+        ));
+    }
+
+    let delete_permissions_url = format!(
+        "{}/rest/v1/store_extension_permissions?id=gt.0",
+        supabase_url
+    );
+    let del_perm_resp = client
+        .delete(&delete_permissions_url)
+        .header("apikey", supabase_key)
+        .header("Authorization", format!("Bearer {}", supabase_key))
+        .header("Prefer", "return=minimal")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to clear store permissions rows: {}", e))?;
+    if !del_perm_resp.status().is_success() {
+        return Err(format!(
+            "Store permissions clear HTTP {}",
+            del_perm_resp.status()
+        ));
+    }
+
+    let mut permission_rows: Vec<SupabaseStorePermissionRow> = Vec::new();
+    for ext in exts {
+        for (idx, perm) in ext.permissions.iter().enumerate() {
+            permission_rows.push(SupabaseStorePermissionRow {
+                extension_name: ext.name.clone(),
+                permission: perm.clone(),
+                position: idx as i32,
+            });
+        }
+    }
+
+    if !permission_rows.is_empty() {
+        let body = serde_json::to_string(&permission_rows)
+            .map_err(|e| format!("Failed to encode permission rows: {}", e))?;
+        let perm_url = format!("{}/rest/v1/store_extension_permissions", supabase_url);
+        let perm_resp = client
+            .post(&perm_url)
+            .header("apikey", supabase_key)
+            .header("Authorization", format!("Bearer {}", supabase_key))
+            .header("Content-Type", "application/json")
+            .header("Prefer", "return=minimal")
+            .body(body)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to insert store permissions rows: {}", e))?;
+        if !perm_resp.status().is_success() {
+            return Err(format!(
+                "Store permissions insert HTTP {}",
+                perm_resp.status()
+            ));
+        }
+    }
+
+    let delete_changelog_url = format!(
+        "{}/rest/v1/store_extension_changelog?id=gt.0",
+        supabase_url
+    );
+    let del_changelog_resp = client
+        .delete(&delete_changelog_url)
+        .header("apikey", supabase_key)
+        .header("Authorization", format!("Bearer {}", supabase_key))
+        .header("Prefer", "return=minimal")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to clear store changelog rows: {}", e))?;
+    if !del_changelog_resp.status().is_success() {
+        return Err(format!(
+            "Store changelog clear HTTP {}",
+            del_changelog_resp.status()
+        ));
+    }
+
+    let mut changelog_rows: Vec<SupabaseStoreChangelogRow> = Vec::new();
+    for ext in exts {
+        for (idx, entry) in ext.changelog.iter().enumerate() {
+            changelog_rows.push(SupabaseStoreChangelogRow {
+                extension_name: ext.name.clone(),
+                entry: entry.clone(),
+                position: idx as i32,
+            });
+        }
+    }
+
+    if !changelog_rows.is_empty() {
+        let body = serde_json::to_string(&changelog_rows)
+            .map_err(|e| format!("Failed to encode changelog rows: {}", e))?;
+        let changelog_url = format!("{}/rest/v1/store_extension_changelog", supabase_url);
+        let changelog_resp = client
+            .post(&changelog_url)
+            .header("apikey", supabase_key)
+            .header("Authorization", format!("Bearer {}", supabase_key))
+            .header("Content-Type", "application/json")
+            .header("Prefer", "return=minimal")
+            .body(body)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to insert store changelog rows: {}", e))?;
+        if !changelog_resp.status().is_success() {
+            return Err(format!(
+                "Store changelog insert HTTP {}",
+                changelog_resp.status()
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 async fn submit_supabase_rating_rpc(
@@ -383,7 +577,15 @@ pub async fn fetch_store_registry() -> Result<Vec<StoreExtensionInfo>, String> {
         }
     }
 
+    for ext in &mut exts {
+        normalize_store_entry(ext);
+    }
+
     if let Some((supabase_url, supabase_key)) = supabase_config_from_env() {
+        match sync_store_metadata_to_supabase(&client, &supabase_url, &supabase_key, &exts).await {
+            Ok(_) => {}
+            Err(err) => log::warn!("Store metadata sync to Supabase failed: {}", err),
+        }
         match fetch_supabase_metrics(&client, &supabase_url, &supabase_key).await {
             Ok(rows) => apply_supabase_metrics(&mut exts, rows),
             Err(err) => log::warn!("Store metrics fallback to JSON snapshot: {}", err),
@@ -392,7 +594,6 @@ pub async fn fetch_store_registry() -> Result<Vec<StoreExtensionInfo>, String> {
 
     let installed = installed_extension_names();
     for ext in &mut exts {
-        normalize_store_entry(ext);
         ext.installed = installed.contains(&ext.name);
     }
 
