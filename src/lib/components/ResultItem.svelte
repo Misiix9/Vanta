@@ -10,6 +10,7 @@
         isSelected = false,
         onSelect,
         onActivate,
+        onActionClick,
     }: {
         result: SearchResult;
         index: number;
@@ -17,6 +18,7 @@
         isSelected: boolean;
         onSelect: (index: number) => void;
         onActivate: (result: SearchResult) => void;
+        onActionClick?: (result: SearchResult, action: import("$lib/types").ResultAction) => void;
     } = $props();
 
     let loadFailed = $state(false);
@@ -179,14 +181,26 @@
 
     {#if isSelected}
         <div class="action-hints">
-            <span class="action-chip">
+            <div
+                class="action-chip action-chip-btn"
+                role="button"
+                tabindex="-1"
+                onclick={(e) => { e.stopPropagation(); onActivate(result); }}
+                onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onActivate(result); } }}
+            >
                 <span>{primaryActionLabel()}</span>
                 <kbd>↵</kbd>
-            </span>
+            </div>
 
             {#if result.actions}
                 {#each result.actions as action}
-                    <span class="action-chip">
+                    <div
+                        class="action-chip action-chip-btn"
+                        role="button"
+                        tabindex="-1"
+                        onclick={(e) => { e.stopPropagation(); onActionClick?.(result, action); }}
+                        onkeydown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onActionClick?.(result, action); } }}
+                    >
                         <span>{action.label}</span>
                         {#if action.shortcut}
                             <kbd>
@@ -197,7 +211,7 @@
                                     .replace("Enter", "↵")}
                             </kbd>
                         {/if}
-                    </span>
+                    </div>
                 {/each}
             {/if}
         </div>

@@ -98,3 +98,7 @@ pub const SHORT_MATCH_THRESHOLD: usize = 2;
 
 // ── Documents in suggestions ─────────────────────────────────────────
 pub const SUGGESTION_DOC_LIMIT: usize = 12;
+
+// ── Typo tolerance ───────────────────────────────────────────────────
+/// Score for "Did you mean?" suggestions shown when results are sparse.
+pub const TYPO_SUGGESTION_SCORE: u32 = 500;

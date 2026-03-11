@@ -314,6 +314,127 @@ fn weighted_score(base: u32, weight: u32) -> u32 {
     scaled.min(u32::MAX as u128) as u32
 }
 
+// ── Search Filters ───────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq)]
+enum FilterSource {
+    App,
+    File,
+    Window,
+    Clipboard,
+    Extension,
+}
+
+#[derive(Debug, Clone)]
+struct SearchFilter {
+    source: Option<FilterSource>,
+    extension_id: Option<String>,
+    raw_query: String,
+}
+
+fn parse_search_filters(query: &str) -> SearchFilter {
+    let mut source = None;
+    let mut extension_id = None;
+    let mut remaining = Vec::new();
+
+    for token in query.split_whitespace() {
+        if let Some(val) = token.strip_prefix("type:") {
+            match val.to_lowercase().as_str() {
+                "app" | "application" | "apps" => source = Some(FilterSource::App),
+                "file" | "files" | "document" | "documents" => source = Some(FilterSource::File),
+                "window" | "windows" => source = Some(FilterSource::Window),
+                "clipboard" | "clip" => source = Some(FilterSource::Clipboard),
+                "extension" | "ext" | "extensions" => source = Some(FilterSource::Extension),
+                _ => remaining.push(token.to_string()),
+            }
+        } else if let Some(val) = token.strip_prefix("in:") {
+            match val.to_lowercase().as_str() {
+                "clipboard" | "clip" => source = Some(FilterSource::Clipboard),
+                "apps" | "app" => source = Some(FilterSource::App),
+                "files" | "file" => source = Some(FilterSource::File),
+                "windows" | "window" => source = Some(FilterSource::Window),
+                _ => remaining.push(token.to_string()),
+            }
+        } else if let Some(val) = token.strip_prefix("ext:") {
+            extension_id = Some(val.to_string());
+            source = Some(FilterSource::Extension);
+        } else {
+            remaining.push(token.to_string());
+        }
+    }
+
+    SearchFilter {
+        source,
+        extension_id,
+        raw_query: remaining.join(" "),
+    }
+}
+
+fn filter_matches_source(filter: &SearchFilter, source: &ResultSource) -> bool {
+    let Some(ref fs) = filter.source else {
+        return true;
+    };
+    match fs {
+        FilterSource::App => matches!(source, ResultSource::Application),
+        FilterSource::File => matches!(source, ResultSource::File),
+        FilterSource::Window => matches!(source, ResultSource::Window),
+        FilterSource::Clipboard => matches!(source, ResultSource::Clipboard),
+        FilterSource::Extension => {
+            if let ResultSource::Extension { ref ext_id } = source {
+                filter
+                    .extension_id
+                    .as_ref()
+                    .map(|f| ext_id.to_lowercase().contains(&f.to_lowercase()))
+                    .unwrap_or(true)
+            } else {
+                false
+            }
+        }
+    }
+}
+
+// ── Typo tolerance (edit distance) ───────────────────────────────────
+
+fn edit_distance(a: &str, b: &str) -> usize {
+    let a_ch: Vec<char> = a.chars().collect();
+    let b_ch: Vec<char> = b.chars().collect();
+    let (m, n) = (a_ch.len(), b_ch.len());
+    let mut prev = (0..=n).collect::<Vec<_>>();
+    let mut curr = vec![0; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_ch[i - 1] == b_ch[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+fn typo_suggestions(query: &str, apps: &[AppEntry], max: usize) -> Vec<String> {
+    let q = query.trim().to_lowercase();
+    if q.len() < 2 {
+        return Vec::new();
+    }
+    let threshold = if q.len() <= 4 { 1 } else { 2 };
+    let mut candidates: Vec<(usize, String)> = apps
+        .iter()
+        .filter_map(|app| {
+            let name_lower = app.name.to_lowercase();
+            let dist = edit_distance(&q, &name_lower);
+            if dist > 0 && dist <= threshold {
+                Some((dist, app.name.clone()))
+            } else {
+                None
+            }
+        })
+        .collect();
+    candidates.sort_by_key(|(dist, _)| *dist);
+    candidates.dedup_by(|a, b| a.1.to_lowercase() == b.1.to_lowercase());
+    candidates.into_iter().take(max).map(|(_, name)| name).collect()
+}
+
 fn split_intent_steps(query: &str) -> Vec<String> {
     let normalized = query
         .replace(" and then ", " then ")
@@ -1593,8 +1714,17 @@ async fn search(
         return Ok(Vec::new());
     }
 
-    let query_lower = query.to_lowercase();
-    let app_limit = if query.trim().is_empty() {
+    // ── Parse search filters ─────────────────────────────────────────
+    let filter = parse_search_filters(&query);
+    let effective_query = if filter.source.is_some() {
+        filter.raw_query.clone()
+    } else {
+        query.clone()
+    };
+    let effective_lower = effective_query.to_lowercase();
+    let has_filter = filter.source.is_some();
+
+    let app_limit = if effective_query.trim().is_empty() {
         apps_snapshot.len()
     } else {
         max_results
@@ -1609,12 +1739,12 @@ async fn search(
 
     // ── Parallel source queries ──────────────────────────────────────
     // Clone references for move into async blocks.
-    let q1 = query.clone();
-    let q2 = query.clone();
-    let q3 = query.clone();
-    let q4 = query.clone();
-    let q5 = query.clone();
-    let ql1 = query_lower.clone();
+    let q1 = effective_query.clone();
+    let q2 = effective_query.clone();
+    let q3 = effective_query.clone();
+    let q4 = effective_query.clone();
+    let q5 = effective_query.clone();
+    let ql1 = effective_lower.clone();
     let apps1 = apps_snapshot.clone();
     let apps2 = apps_snapshot.clone();
     let apps3 = apps_snapshot.clone();
@@ -1624,11 +1754,17 @@ async fn search(
 
     let app_handle_stream = app_handle.clone();
 
+    let skip_apps = has_filter && !matches!(filter.source, Some(FilterSource::App));
+    let skip_windows = has_filter && !matches!(filter.source, Some(FilterSource::Window));
+    let skip_files = has_filter && !matches!(filter.source, Some(FilterSource::File));
+    let skip_clipboard = has_filter && !matches!(filter.source, Some(FilterSource::Clipboard));
+    let skip_misc = has_filter && !matches!(filter.source, Some(FilterSource::App | FilterSource::Extension));
+
     // Task 1: Fuzzy app search
     let app_task = tokio::task::spawn_blocking({
         let sc = sc.clone();
         move || -> Vec<SearchResult> {
-            if !sc.applications.enabled {
+            if skip_apps || !sc.applications.enabled {
                 return Vec::new();
             }
             matcher::fuzzy_search(&q1, &apps1, app_limit, &um1, sc.applications.weight)
@@ -1639,7 +1775,7 @@ async fn search(
     let window_task = tokio::task::spawn_blocking({
         let sc = sc.clone();
         move || -> Vec<SearchResult> {
-            if !sc.windows.enabled {
+            if skip_windows || !sc.windows.enabled {
                 return Vec::new();
             }
             build_window_results(&q2, &ql1, window_cap, &apps2, sc.windows.weight, |cap| {
@@ -1652,7 +1788,7 @@ async fn search(
     let file_task = tokio::task::spawn_blocking({
         let sc = sc.clone();
         move || -> Vec<SearchResult> {
-            if !sc.files.enabled {
+            if skip_files || !sc.files.enabled {
                 return Vec::new();
             }
             let mut file_results = files::search_index(&file_index_snapshot, &q3, max_results);
@@ -1667,7 +1803,7 @@ async fn search(
     let clipboard_task = tokio::task::spawn_blocking({
         let sc = sc.clone();
         move || -> Vec<SearchResult> {
-            if q4.trim().is_empty() {
+            if skip_clipboard || q4.trim().is_empty() {
                 return Vec::new();
             }
             build_clipboard_results(&q4, sc.files.weight, max_results / 2)
@@ -1678,6 +1814,9 @@ async fn search(
     let misc_task = tokio::task::spawn_blocking({
         let sc = sc.clone();
         move || -> Vec<SearchResult> {
+            if skip_misc {
+                return Vec::new();
+            }
             let mut results = Vec::new();
             if sc.applications.enabled {
                 results.extend(build_profile_results(&q5, &pc, sc.applications.weight));
@@ -1712,8 +1851,8 @@ async fn search(
     results.extend(misc_res.unwrap_or_default());
 
     // Calculator (fast, synchronous)
-    if search_config.calculator.enabled {
-        if let Some(val) = math::evaluate(&query) {
+    if search_config.calculator.enabled && !has_filter {
+        if let Some(val) = math::evaluate(&effective_query) {
             let val_str = format!("{}", val);
             results.push(SearchResult {
                 title: format!("= {}", val_str),
@@ -1732,57 +1871,64 @@ async fn search(
     }
 
     // Store / Settings injection
-    let wants_store = query_lower.contains("store")
-        || query_lower.contains("install")
-        || query_lower.contains("extension")
-        || query_lower.contains("marketplace");
+    if !has_filter {
+        let wants_store = effective_lower.contains("store")
+            || effective_lower.contains("install")
+            || effective_lower.contains("extension")
+            || effective_lower.contains("marketplace");
 
-    if wants_store {
-        results.push(SearchResult {
-            title: "Vanta Store".to_string(),
-            subtitle: Some("Browse and install extensions".to_string()),
-            icon: Some("fa-solid fa-store".to_string()),
-            exec: "open-store".to_string(),
-            score: weighted_score(ranking_config::STORE_SEARCH_SCORE, 100),
-            match_indices: vec![],
-            source: ResultSource::Application,
-            actions: None,
-            id: Some("vanta-store".to_string()),
-            group: None,
-            section: Some("Vanta".to_string()),
-        });
-    }
-
-    let wants_settings = query_lower.contains("setting")
-        || query_lower.contains("preferences")
-        || query_lower.contains("config")
-        || query_lower.contains("option");
-
-    if wants_settings && search_config.applications.enabled {
-        if let Some((raw_score, indices)) = matcher::fuzzy_score_text(&query, "Open Vanta Settings") {
-            let base = ranking_config::SETTINGS_BASE_SCORE.saturating_add(raw_score.saturating_mul(ranking_config::SETTINGS_FUZZY_MULTIPLIER));
+        if wants_store {
             results.push(SearchResult {
-                title: "Settings".to_string(),
-                subtitle: Some("Open Vanta settings".to_string()),
-                icon: Some("fa-solid fa-gear".to_string()),
-                exec: "open-settings".to_string(),
-                score: weighted_score(base, search_config.applications.weight),
-                match_indices: indices,
-                source: matcher::ResultSource::Application,
+                title: "Vanta Store".to_string(),
+                subtitle: Some("Browse and install extensions".to_string()),
+                icon: Some("fa-solid fa-store".to_string()),
+                exec: "open-store".to_string(),
+                score: weighted_score(ranking_config::STORE_SEARCH_SCORE, 100),
+                match_indices: vec![],
+                source: ResultSource::Application,
                 actions: None,
-                id: Some("settings".to_string()),
+                id: Some("vanta-store".to_string()),
                 group: None,
-                section: Some("Settings".to_string()),
+                section: Some("Vanta".to_string()),
             });
+        }
+
+        let wants_settings = effective_lower.contains("setting")
+            || effective_lower.contains("preferences")
+            || effective_lower.contains("config")
+            || effective_lower.contains("option");
+
+        if wants_settings && search_config.applications.enabled {
+            if let Some((raw_score, indices)) = matcher::fuzzy_score_text(&effective_query, "Open Vanta Settings") {
+                let base = ranking_config::SETTINGS_BASE_SCORE.saturating_add(raw_score.saturating_mul(ranking_config::SETTINGS_FUZZY_MULTIPLIER));
+                results.push(SearchResult {
+                    title: "Settings".to_string(),
+                    subtitle: Some("Open Vanta settings".to_string()),
+                    icon: Some("fa-solid fa-gear".to_string()),
+                    exec: "open-settings".to_string(),
+                    score: weighted_score(base, search_config.applications.weight),
+                    match_indices: indices,
+                    source: matcher::ResultSource::Application,
+                    actions: None,
+                    id: Some("settings".to_string()),
+                    group: None,
+                    section: Some("Settings".to_string()),
+                });
+            }
         }
     }
 
+    // ── Apply source filter on merged results ────────────────────────
+    if has_filter {
+        results.retain(|r| filter_matches_source(&filter, &r.source));
+    }
+
     // ── Bonus scoring & negative scoring ─────────────────────────────
-    if !query.trim().is_empty() {
+    if !effective_query.trim().is_empty() {
         for result in &mut results {
-            let bonus = query_relevance_bonus(&query, result)
-                .saturating_add(source_intent_bonus(&query, result))
-                .saturating_add(app_entity_bonus(&query, result));
+            let bonus = query_relevance_bonus(&effective_query, result)
+                .saturating_add(source_intent_bonus(&effective_query, result))
+                .saturating_add(app_entity_bonus(&effective_query, result));
             result.score = result.score.saturating_add(bonus);
 
             // Negative scoring: penalise short fuzzy matches (likely noise).
@@ -1796,6 +1942,26 @@ async fn search(
 
         // Suppress below-threshold results.
         results.retain(|r| r.score >= ranking_config::NEGATIVE_SCORE_THRESHOLD);
+    }
+
+    // ── Typo suggestions when results are sparse ─────────────────────
+    if !effective_query.trim().is_empty() && results.len() <= 2 {
+        let suggestions = typo_suggestions(&effective_query, &apps_snapshot, 3);
+        for suggestion in suggestions {
+            results.push(SearchResult {
+                title: format!("Did you mean: {}?", suggestion),
+                subtitle: Some("Typo correction".to_string()),
+                icon: Some("fa-solid fa-spell-check".to_string()),
+                exec: format!("fill:{}", suggestion),
+                score: ranking_config::TYPO_SUGGESTION_SCORE,
+                match_indices: vec![],
+                source: ResultSource::Application,
+                actions: None,
+                id: Some(format!("typo:{}", suggestion)),
+                group: None,
+                section: Some("Suggestions".to_string()),
+            });
+        }
     }
 
     results.sort_by(|a, b| b.score.cmp(&a.score));
@@ -1818,6 +1984,30 @@ async fn search_v3(
 ) -> Result<Vec<SearchResultV3>, VantaError> {
     let legacy = search(query, state, app_handle).await?;
     Ok(legacy.into_iter().map(to_v3_result).collect())
+}
+
+#[tauri::command]
+async fn save_query_history(
+    query: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<(), VantaError> {
+    let mut history = state
+        .history
+        .lock()
+        .map_err(|_| "Failed to access history".to_string())?;
+    history.push_query(&query);
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_query_history(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<String>, VantaError> {
+    let history = state
+        .history
+        .lock()
+        .map_err(|_| "Failed to access history".to_string())?;
+    Ok(history.get_recent_queries().to_vec())
 }
 
 #[tauri::command]
@@ -2889,6 +3079,8 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             import_profile,
             search,
             search_v3,
+            save_query_history,
+            get_query_history,
             launch_app,
             system_action,
             rescan_apps,

@@ -13,6 +13,7 @@
     ExtensionEntry,
     Capability,
     PermissionNeededPayload,
+    ResultAction,
   } from "$lib/types";
   import {
     composeResults,
@@ -87,6 +88,8 @@
   let searchInputRef: SearchInput | undefined = $state();
   let resultsListRef: ResultsList | undefined = $state();
   let pendingScrollFrame: number | null = null;
+  let isSearching = $state(false);
+  let queryHistory: string[] = $state([]);
 
   let activeMacroId = $state<string | null>(null);
   let macroArgs = $state<Record<string, string>>({});
@@ -124,6 +127,8 @@
   onMount(async () => {
     onboardingOpen = localStorage.getItem(ONBOARDING_SEEN_KEY) !== "1";
     quickTipsVisible = localStorage.getItem(QUICK_TIPS_HIDDEN_KEY) !== "1";
+
+    try { queryHistory = await invoke<string[]>("get_query_history"); } catch (_) {}
 
     partialUnlisten = await listen<SearchResult[]>("search-partial", (event) => {
       if (query.trim() && event.payload.length > 0) {
@@ -228,8 +233,9 @@
 
   async function handleSearch(q: string) {
     const requestId = ++searchRequestId;
-    if (!q.trim()) { resetMacroState(); searchTime = null; await loadSuggestions(); return; }
+    if (!q.trim()) { resetMacroState(); searchTime = null; isSearching = false; await loadSuggestions(); return; }
     resetMacroState();
+    isSearching = true;
     try {
       const start = performance.now();
       const searchResults = await invoke<SearchResult[]>("search_v3", { query: q });
@@ -238,9 +244,17 @@
       results = composeResults(baseResults, q, availableMacros, config);
       selectedIndex = 0;
       searchTime = performance.now() - start;
+      // Save non-trivial queries to history
+      if (q.trim().length >= 2) {
+        invoke("save_query_history", { query: q.trim() }).then((r) => {
+          invoke<string[]>("get_query_history").then((h) => { queryHistory = h; }).catch(() => {});
+        }).catch(() => {});
+      }
     } catch (e) {
       if (requestId !== searchRequestId) return;
       baseResults = []; results = []; searchTime = null;
+    } finally {
+      if (requestId === searchRequestId) isSearching = false;
     }
   }
 
@@ -330,6 +344,16 @@
     if (extensionView) { extensionView = null; return; }
     if (activeMacroId) { resetMacroState(); return; }
     onResetAndHide();
+  }
+
+  function handleActionClick(result: SearchResult, action: ResultAction) {
+    const exec = execForAction(result, action);
+    handleActivate({ ...result, exec, command: action.command }, false);
+  }
+
+  function handleHistoryRecall(q: string) {
+    query = q;
+    handleSearch(q);
   }
 
   function completeOnboarding() {
@@ -427,7 +451,7 @@
   style="height: 100%; width: 100%;"
 >
   <a href="#vanta-results" class="vanta-skip-link">Skip to results</a>
-  <SearchInput bind:this={searchInputRef} bind:query onSearch={handleSearch} onEscape={handleEscape} />
+  <SearchInput bind:this={searchInputRef} bind:query onSearch={handleSearch} onEscape={handleEscape} {queryHistory} onHistoryRecall={handleHistoryRecall} />
 
   {#if !onboardingOpen && quickTipsVisible && query.trim() === ""}
     <QuickTipsPanel onTry={applyTipQuery} onDismiss={dismissQuickTips} />
@@ -446,6 +470,7 @@
     <ResultsList
       bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
       onActivate={handleActivate}
+      onActionClick={handleActionClick}
       on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
     />
     {#if query.trim() !== "" && config && config.search.show_explain_panel !== false}
@@ -454,7 +479,7 @@
   {/if}
 
   <NowPlayingBar />
-  <StatusBar resultCount={activeMacroId ? macroDryRun?.steps.length ?? 0 : visibleRowCount} {searchTime} />
+  <StatusBar resultCount={activeMacroId ? macroDryRun?.steps.length ?? 0 : visibleRowCount} {searchTime} {isSearching} />
 
   {#if pendingConfirmResult}
     {@const confirmSpec = getConfirmSpec(pendingConfirmResult)}

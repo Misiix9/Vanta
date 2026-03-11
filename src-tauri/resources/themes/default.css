@@ -1799,6 +1799,21 @@ input[type="range"] {
     font-family: inherit;
 }
 
+.action-chip-btn {
+    background: none;
+    cursor: pointer;
+    font: inherit;
+    outline: none;
+}
+
+.action-chip-btn:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.action-chip-btn:active {
+    background: rgba(255,255,255,0.14);
+}
+
 /* ── Store View ─────────────────────────────────────────────── */
 .store-root {
     height: 100%;

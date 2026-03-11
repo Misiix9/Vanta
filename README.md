@@ -29,16 +29,25 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_5.0.1_amd64.deb
+sudo dpkg -i vanta_5.5.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.4.0-1.x86_64.rpm
+sudo rpm -i vanta-5.5.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.4.0)
+### Latest Minor (v5.5.0)
+- Added search source filters: `type:app`, `type:file`, `type:window`, `in:clipboard`, `ext:<id>` narrow results to a specific source; non-matching parallel tasks are skipped entirely for efficiency.
+- Added query history with up-arrow recall in empty search input; recent queries (up to 50) persisted in history file with deduplication.
+- Added typo tolerance / "Did you mean?" — when results are sparse, Levenshtein edit-distance suggestions from app names surface as clickable fill-query results.
+- Contextual search placeholder ("Search apps, files, scripts…") replaces empty placeholder.
+- Added searching spinner animation in status bar while queries are in-flight.
+- Enhanced `aria-live` result count announcements with explicit `aria-label` for screen readers.
+- Made action chips clickable — mouse clicks on action chips now execute the corresponding action (reveal, copy path, open-with, etc.).
+
+### Previous Minor (v5.4.0)
 - Parallelized search pipeline using `tokio::join!` / `spawn_blocking` — apps, windows, files, clipboard, and extensions now query concurrently instead of sequentially.
 - Added search cancellation via atomic generation counter — new keystrokes abort stale in-flight queries.
 - Added result streaming: `search-partial` Tauri events emit partial results as each source completes; frontend merges progressively.

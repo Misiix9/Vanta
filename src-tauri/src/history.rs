@@ -61,6 +61,9 @@ pub struct History {
     /// Legacy field — only present when migrating old data.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub usage: HashMap<String, u32>,
+    /// Recent search queries for recall (most-recent first, capped at 50).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recent_queries: Vec<String>,
     #[serde(skip)]
     file_path: Option<PathBuf>,
     #[serde(skip)]
@@ -74,6 +77,7 @@ impl History {
         Self {
             entries: HashMap::new(),
             usage: HashMap::new(),
+            recent_queries: Vec::new(),
             file_path: None,
             dirty_count: 0,
             last_save_at: Some(Instant::now()),
@@ -121,18 +125,7 @@ impl History {
             .or_insert_with(|| FrecencyEntry::new(ts));
 
         self.dirty_count = self.dirty_count.saturating_add(1);
-
-        let should_flush_by_count = self.dirty_count >= 20;
-        let should_flush_by_time = self
-            .last_save_at
-            .map(|t| t.elapsed() >= Duration::from_secs(2))
-            .unwrap_or(true);
-
-        if should_flush_by_count || should_flush_by_time {
-            self.save();
-            self.dirty_count = 0;
-            self.last_save_at = Some(Instant::now());
-        }
+        self.flush_if_needed();
     }
 
     /// Return a frecency score for the given exec, suitable for ranking.
@@ -157,6 +150,39 @@ impl History {
                 (k.clone(), (f as u64).min(u32::MAX as u64) as u32)
             })
             .collect()
+    }
+
+    /// Record a search query for later recall.  Deduplicates and caps at 50.
+    pub fn push_query(&mut self, query: &str) {
+        let q = query.trim().to_string();
+        if q.is_empty() {
+            return;
+        }
+        // Remove duplicate if already present.
+        self.recent_queries.retain(|existing| existing != &q);
+        self.recent_queries.insert(0, q);
+        if self.recent_queries.len() > 50 {
+            self.recent_queries.truncate(50);
+        }
+        self.dirty_count = self.dirty_count.saturating_add(1);
+        self.flush_if_needed();
+    }
+
+    pub fn get_recent_queries(&self) -> &[String] {
+        &self.recent_queries
+    }
+
+    fn flush_if_needed(&mut self) {
+        let should_flush_by_count = self.dirty_count >= 20;
+        let should_flush_by_time = self
+            .last_save_at
+            .map(|t| t.elapsed() >= Duration::from_secs(2))
+            .unwrap_or(true);
+        if should_flush_by_count || should_flush_by_time {
+            self.save();
+            self.dirty_count = 0;
+            self.last_save_at = Some(Instant::now());
+        }
     }
 
     fn save(&self) {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import type { SearchResult } from "$lib/types";
+  import type { SearchResult, ResultAction } from "$lib/types";
   import ResultItem from "./ResultItem.svelte";
   import SectionHeader from "./SectionHeader.svelte";
   type VisibleRow =
@@ -28,11 +28,13 @@
     selectedIndex = $bindable(0),
     groupBySection = true,
     onActivate,
+    onActionClick,
   }: {
     results: SearchResult[];
     selectedIndex: number;
     groupBySection?: boolean;
     onActivate: (result: SearchResult) => void;
+    onActionClick?: (result: SearchResult, action: ResultAction) => void;
   } = $props();
 
   let container: HTMLDivElement | null = $state(null);
@@ -287,6 +289,7 @@
               isSelected={i === selectedIndex}
               onSelect={handleSelect}
               {onActivate}
+              {onActionClick}
             />
           </div>
         {/if}

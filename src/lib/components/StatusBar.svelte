@@ -5,9 +5,11 @@
   let {
     resultCount = 0,
     searchTime = null,
+    isSearching = false,
   }: {
     resultCount: number;
     searchTime: number | null;
+    isSearching?: boolean;
   } = $props();
 
   let appVersion = $state("…");
@@ -26,8 +28,13 @@
   </div>
 
   <div class="status-right">
-    {#if searchTime !== null}
-      <span class="status-info">
+    {#if isSearching}
+      <span class="status-info status-searching" aria-label="Searching">
+        <span class="search-spinner" aria-hidden="true"></span>
+        Searching…
+      </span>
+    {:else if searchTime !== null}
+      <span class="status-info" aria-label="{resultCount} result{resultCount !== 1 ? 's' : ''} found">
         {resultCount} result{resultCount !== 1 ? "s" : ""}
         · {searchTime.toFixed(1)}ms
       </span>
@@ -71,5 +78,25 @@
 
   .status-version {
     opacity: 0.5;
+  }
+
+  .status-searching {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .search-spinner {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid var(--ds-text-secondary, #999);
+    border-top-color: var(--ds-accent, #6af);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 </style>
