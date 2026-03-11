@@ -29,16 +29,22 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_4.4.0_amd64.deb
+sudo dpkg -i vanta_4.5.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-4.4.0-1.x86_64.rpm
+sudo rpm -i vanta-4.5.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v4.4.0)
+### Latest Minor (v4.5.0)
+- Added Phase 25 Store and extensions surface redesign with shared visual primitives.
+- Improved trust and risk metadata scanability in store cards with clearer grouping.
+- Improved install and uninstall action feedback consistency across extension surfaces.
+- Improved settings extensions section with extension-surface parity and direct store access.
+
+### Previous Minor (v4.4.0)
 - Added Phase 24 settings IA refresh with sticky settings header and in-settings section search jump.
 - Added canonical settings section alias handling for more reliable deep-link navigation.
 - Improved settings panel consistency by replacing inline layout styles with reusable utility classes.

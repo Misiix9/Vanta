@@ -182,13 +182,13 @@
   }
 </script>
 
-<div class="store-root">
-  <div class="store-header">
-    <button class="back-btn" onclick={onClose} aria-label="Close store">
+<div class="store-root hub-window-root ext-surface-root">
+  <div class="store-header hub-window-header ext-surface-header">
+    <button class="back-btn btn-ghost icon-btn" onclick={onClose} aria-label="Close store">
       <i class="fa-solid fa-arrow-left"></i>
     </button>
     <h1>Vanta Store</h1>
-    <button class="refresh-btn" onclick={fetchRegistry} aria-label="Refresh store">
+    <button class="refresh-btn btn-ghost icon-btn" onclick={fetchRegistry} aria-label="Refresh store">
       <i class="fa-solid fa-rotate-right" class:spin={loading}></i>
     </button>
   </div>
@@ -222,7 +222,7 @@
     <div class="store-filters" role="tablist" aria-label="Store categories">
       {#each categories as category}
         <button
-          class="store-filter"
+          class="store-filter btn-tag"
           class:active={selectedCategory === category}
           role="tab"
           aria-selected={selectedCategory === category}
@@ -239,9 +239,9 @@
         <span>No extensions in this category yet.</span>
       </div>
     {:else}
-    <div class="store-grid">
+    <div class="store-grid hub-window-scroll">
       {#each visibleExtensions as ext (ext.name)}
-        <div class="ext-card" class:installed={ext.installed}>
+        <div class="ext-card ext-surface-card" class:installed={ext.installed}>
           <div class="ext-icon">
             {#if isInlineSvg(ext.icon)}
               <span class="icon-svg extension-svg" aria-label={ext.title}>
@@ -259,17 +259,19 @@
               <span class={`trust-badge ${ext.trust_badge}`}>{ext.trust_badge}</span>
             </div>
             <p class="ext-desc">{ext.description}</p>
-            <div class="ext-meta">
+            <div class="ext-meta ext-meta-trust">
+              {#if ext.safe}
+                <span class="risk-badge risk-low">Safe</span>
+              {/if}
+              <span class={`risk-badge risk-${ext.permission_risk.toLowerCase()}`}>{ext.permission_risk} Risk</span>
+            </div>
+            <div class="ext-meta ext-meta-stats">
               <span class="ext-category">{ext.category}</span>
               <span class="ext-author">{ext.publisher}</span>
               <span class="ext-version">v{ext.version}</span>
               <span class="ext-rating"><i class="fa-solid fa-star"></i> {formatRating(ext.rating)}</span>
               <span class="ext-rating-count">({ext.rating_count || 0})</span>
               <span class="ext-installs"><i class="fa-solid fa-download"></i> {formatInstallCount(ext.install_count)}</span>
-              {#if ext.safe}
-                <span class="risk-badge risk-low">Safe</span>
-              {/if}
-              <span class={`risk-badge risk-${ext.permission_risk.toLowerCase()}`}>{ext.permission_risk} Risk</span>
             </div>
             {#if ext.permissions.length > 0}
               <div class="ext-perms">
@@ -282,7 +284,7 @@
               <div class="ext-changelog">Latest: {ext.changelog[0]}</div>
             {/if}
           </div>
-          <div class="ext-actions">
+          <div class="ext-actions ext-surface-actions">
             <div class="ext-rate-actions">
               {#each [1, 2, 3, 4, 5] as score}
                 <button
@@ -297,12 +299,12 @@
             </div>
             {#if ext.installed}
               <button
-                class="btn-uninstall"
+                class="btn-uninstall btn-secondary"
                 disabled={uninstallingSet.has(ext.name)}
                 onclick={() => uninstallExtension(ext.name)}
               >
                 {#if uninstallingSet.has(ext.name)}
-                  <i class="fa-solid fa-spinner spin"></i>
+                  <i class="fa-solid fa-spinner spin"></i> Removing...
                 {:else}
                   Uninstall
                 {/if}
@@ -312,7 +314,7 @@
               </span>
             {:else}
               <button
-                class="btn-install"
+                class="btn-install btn-primary"
                 disabled={installingSet.has(ext.name)}
                 onclick={() => installExtension(ext.name)}
               >
@@ -322,6 +324,11 @@
                   <i class="fa-solid fa-download"></i> Install
                 {/if}
               </button>
+            {/if}
+            {#if installingSet.has(ext.name) || uninstallingSet.has(ext.name)}
+              <span class="ext-action-state">
+                {installingSet.has(ext.name) ? "Installing package and assets..." : "Removing extension files..."}
+              </span>
             {/if}
           </div>
         </div>

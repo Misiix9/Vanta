@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.5.0
+- Added Phase 25 Store and extensions surface redesign with shared visual primitives across Store, Extensions Hub, and Extension Host.
+- Improved trust and install decision scanability by separating risk/trust badges from metadata stats in store cards.
+- Improved extension action clarity with stronger install/uninstall status feedback and consistent action rhythm.
+- Improved settings extension section alignment with extension ecosystem primitives and direct store entry actions.
+
 ## 4.4.0
 - Added Phase 24 settings information architecture refresh with a sticky context header and in-settings section search jump.
 - Added canonical settings section alias handling so deep-links resolve reliably across legacy and normalized section names.

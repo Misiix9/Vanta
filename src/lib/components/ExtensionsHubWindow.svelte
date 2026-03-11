@@ -35,14 +35,14 @@
 </script>
 
 <div class="hub-window-root">
-  <div class="hub-window-header">
-    <button class="link-btn" onclick={onClose}>Back</button>
+  <div class="hub-window-header ext-surface-header">
+    <button class="link-btn btn-ghost" onclick={onClose}>Back</button>
     <h2>Extensions Hub</h2>
-    <button class="link-btn" onclick={onOpenStore}>Open Store</button>
+    <button class="link-btn btn-secondary" onclick={onOpenStore}>Open Store</button>
   </div>
 
   <div class="hub-window-scroll">
-    <div class="control-group" style="display:block;">
+    <div class="control-group control-group-block ext-surface-card">
       <h3>Extension Template Generator</h3>
       <p class="hub-window-subtitle">Create a complete starter extension in one click.</p>
       <label>
@@ -60,7 +60,7 @@
       {/if}
     </div>
 
-    <div class="control-group" style="display:block;">
+    <div class="control-group control-group-block ext-surface-card">
       <h3>Template Workflow</h3>
       <ul class="hint-list">
         <li>1. Create template.</li>

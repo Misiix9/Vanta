@@ -193,14 +193,14 @@
       </div>
     </div>
   {:else}
-    <div class="ext-header">
+    <div class="ext-header hub-window-header ext-surface-header">
       {#if navStack.length > 1}
-        <button class="ext-back" onclick={handlePop} aria-label="Back">
+        <button class="ext-back btn-ghost icon-btn" onclick={handlePop} aria-label="Back">
           <i class="fa-solid fa-arrow-left"></i>
         </button>
       {/if}
       <span class="ext-title">{extId}</span>
-      <button class="ext-close" onclick={() => onClose?.()} aria-label="Close">
+      <button class="ext-close btn-ghost icon-btn" onclick={() => onClose?.()} aria-label="Close">
         <i class="fa-solid fa-xmark"></i>
       </button>
     </div>

@@ -1,4 +1,4 @@
-name: Release Vanta v4.4.0
+name: Release Vanta v4.5.0
 
 on:
   push:
@@ -86,15 +86,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v4.4.0 -- Phase 24 Settings IA And Visual Refresh
+            ## Vanta v4.5.0 -- Phase 25 Store And Extensions Surface Redesign
 
-            Minor release focused on settings discoverability, sticky context navigation, and standardized settings control styling.
+            Minor release focused on unified extension discovery surfaces, trust signal clarity, and consistent install action feedback.
 
             ### Highlights
-            - Added sticky settings header with in-settings section search jump.
-            - Added canonical settings section alias handling to preserve deep-link compatibility.
-            - Improved settings visual consistency with reusable control-group utility classes.
-            - Added shared hint-list and hub-window styling primitives for settings-adjacent surfaces.
+            - Added shared visual primitives across Store, Extensions Hub, and Extension Host.
+            - Improved trust and risk scanability in store cards with clearer metadata grouping.
+            - Improved install and uninstall feedback rhythm with more consistent action states.
+            - Improved settings extensions section parity and direct entry to extension discovery.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.

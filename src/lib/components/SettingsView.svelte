@@ -825,7 +825,8 @@
             </button>
             {#if activeSection === "Extensions"}
                 <div class="accordion-content">
-                    <div class="control-group">
+                    <div class="control-group control-group-block ext-surface-card">
+                        <h4>Extension Runtime</h4>
                         <label>
                             Extensions Directory
                             <input
@@ -835,8 +836,6 @@
                                 readonly
                             />
                         </label>
-                    </div>
-                    <div class="control-group">
                         <label>
                             Developer Mode
                             <input
@@ -845,6 +844,15 @@
                                 onchange={debouncedSave}
                             />
                         </label>
+                    </div>
+
+                    <div class="control-group control-group-block ext-surface-card">
+                        <h4>Discovery</h4>
+                        <p class="hub-window-subtitle">Browse verified and community extensions with trust and permission risk metadata.</p>
+                        <div class="preset-row">
+                            <button class="preset-btn btn-secondary" onclick={onOpenStore}>Open Vanta Store</button>
+                            <button class="preset-btn" onclick={() => jumpToSection("Community")}>Shareable Snippets</button>
+                        </div>
                     </div>
                 </div>
             {/if}
