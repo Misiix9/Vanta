@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 
@@ -14,6 +15,8 @@ const BASE_URL: &str =
     "https://raw.githubusercontent.com/Misiix9/vanta-extensions/main/extensions";
 const RATINGS_FEEDBACK_URL: &str =
     "https://github.com/Misiix9/vanta-extensions/issues/new?labels=rating";
+const SUPABASE_URL_ENV: &str = "VANTA_SUPABASE_URL";
+const SUPABASE_KEY_ENV: &str = "VANTA_SUPABASE_ANON_KEY";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StoreExtensionInfo {
@@ -86,6 +89,141 @@ struct RatingEntry {
     name: String,
     average: f32,
     count: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct SupabaseMetricRow {
+    name: String,
+    #[serde(default)]
+    rating: Option<f32>,
+    #[serde(default)]
+    rating_count: u64,
+    #[serde(default)]
+    install_count: u64,
+}
+
+fn supabase_config_from_env() -> Option<(String, String)> {
+    let url = std::env::var(SUPABASE_URL_ENV).ok()?;
+    let key = std::env::var(SUPABASE_KEY_ENV).ok()?;
+    let normalized = url.trim_end_matches('/').to_string();
+    if normalized.is_empty() || key.trim().is_empty() {
+        return None;
+    }
+    Some((normalized, key))
+}
+
+fn apply_supabase_metrics(exts: &mut [StoreExtensionInfo], rows: Vec<SupabaseMetricRow>) {
+    let mut by_name = std::collections::HashMap::new();
+    for row in rows {
+        let key = row.name.clone();
+        by_name.insert(key, row);
+    }
+
+    for ext in exts {
+        if let Some(row) = by_name.get(&ext.name) {
+            ext.rating = row.rating.map(|v| v.clamp(0.0, 5.0));
+            ext.rating_count = row.rating_count;
+            ext.install_count = row.install_count;
+        }
+    }
+}
+
+async fn fetch_supabase_metrics(
+    client: &reqwest::Client,
+    supabase_url: &str,
+    supabase_key: &str,
+) -> Result<Vec<SupabaseMetricRow>, String> {
+    let url = format!(
+        "{}/rest/v1/v_store_extensions_with_metrics?select=name,rating,rating_count,install_count",
+        supabase_url
+    );
+
+    let resp = client
+        .get(&url)
+        .header("apikey", supabase_key)
+        .header("Authorization", format!("Bearer {}", supabase_key))
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch Supabase metrics: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Supabase metrics HTTP {}", resp.status()));
+    }
+
+    let text = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read Supabase metrics response: {}", e))?;
+
+    serde_json::from_str::<Vec<SupabaseMetricRow>>(&text)
+        .map_err(|e| format!("Failed to decode Supabase metrics response: {}", e))
+}
+
+async fn submit_supabase_rating_rpc(
+    client: &reqwest::Client,
+    supabase_url: &str,
+    supabase_key: &str,
+    name: &str,
+    rating: u8,
+    comment: Option<String>,
+) -> Result<(), String> {
+    let url = format!("{}/rest/v1/rpc/submit_extension_rating", supabase_url);
+    let payload = json!({
+        "p_extension_name": name,
+        "p_rating": rating,
+        "p_comment": comment,
+        "p_source": "vanta_app"
+    })
+    .to_string();
+
+    let resp = client
+        .post(&url)
+        .header("apikey", supabase_key)
+        .header("Authorization", format!("Bearer {}", supabase_key))
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .body(payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to submit Supabase rating RPC: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Supabase rating RPC HTTP {}", resp.status()));
+    }
+
+    Ok(())
+}
+
+async fn increment_supabase_download_rpc(
+    client: &reqwest::Client,
+    supabase_url: &str,
+    supabase_key: &str,
+    name: &str,
+) -> Result<(), String> {
+    let url = format!("{}/rest/v1/rpc/increment_extension_download", supabase_url);
+    let payload = json!({
+        "p_extension_name": name,
+        "p_source": "vanta_app_install"
+    })
+    .to_string();
+
+    let resp = client
+        .post(&url)
+        .header("apikey", supabase_key)
+        .header("Authorization", format!("Bearer {}", supabase_key))
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .body(payload)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to submit Supabase download RPC: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Supabase download RPC HTTP {}", resp.status()));
+    }
+
+    Ok(())
 }
 
 fn installed_extension_names() -> Vec<String> {
@@ -245,6 +383,13 @@ pub async fn fetch_store_registry() -> Result<Vec<StoreExtensionInfo>, String> {
         }
     }
 
+    if let Some((supabase_url, supabase_key)) = supabase_config_from_env() {
+        match fetch_supabase_metrics(&client, &supabase_url, &supabase_key).await {
+            Ok(rows) => apply_supabase_metrics(&mut exts, rows),
+            Err(err) => log::warn!("Store metrics fallback to JSON snapshot: {}", err),
+        }
+    }
+
     let installed = installed_extension_names();
     for ext in &mut exts {
         normalize_store_entry(ext);
@@ -263,6 +408,14 @@ pub async fn submit_extension_rating(
     validate_requested_name(&name)?;
     if !(1..=5).contains(&rating) {
         return Err("Rating must be between 1 and 5".to_string());
+    }
+
+    let client = reqwest::Client::new();
+    if let Some((supabase_url, supabase_key)) = supabase_config_from_env() {
+        match submit_supabase_rating_rpc(&client, &supabase_url, &supabase_key, &name, rating, comment.clone()).await {
+            Ok(_) => return Ok("submitted_to_supabase".to_string()),
+            Err(err) => log::warn!("Supabase rating submit failed, falling back to issue form: {}", err),
+        }
     }
 
     let mut url = format!(
@@ -408,6 +561,13 @@ pub async fn install_store_extension(name: String) -> Result<(), String> {
         "allowed",
         Some(format!("commands={}", manifest.commands.len())),
     );
+
+    if let Some((supabase_url, supabase_key)) = supabase_config_from_env() {
+        if let Err(err) = increment_supabase_download_rpc(&client, &supabase_url, &supabase_key, &name).await {
+            log::warn!("Failed to increment Supabase download metric for '{}': {}", name, err);
+        }
+    }
+
     Ok(())
 }
 
