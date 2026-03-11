@@ -5938,7 +5938,7 @@ checksum = "7ba6f5989077681266825251a52748b8c1d8a4ad098cc37e440103d0ea717fc0"
 
 [[package]]
 name = "vanta"
-version = "5.1.0"
+version = "5.2.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",

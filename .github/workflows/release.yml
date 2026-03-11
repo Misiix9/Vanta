@@ -1,4 +1,4 @@
-name: Release Vanta v5.1.0
+name: Release Vanta v5.2.0
 
 on:
   push:
@@ -86,15 +86,16 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v5.1.0 -- Phase 32 Unified Error Architecture
+            ## Vanta v5.2.0 -- Phase 33 Frontend Architecture Decomposition
 
-            Minor release replacing all Result<T, String> with a typed VantaError system.
+            Minor release decomposing the two largest frontend components into focused, single-responsibility modules.
 
             ### Highlights
-            - Rewrote errors.rs with thiserror derive macros — 15 domain-specific variants.
-            - Structured error codes (1000-9999) and kind tags delivered as { code, kind, message } via Tauri IPC.
-            - Replaced all Result<T, String> with Result<T, VantaError> across 109 functions.
-            - From<String> and From<&str> bridges for gradual migration; zero production unwrap()/expect().
+            - Extracted `ranking.ts` module with all scoring, command routing, and utility functions (~280 lines of pure logic).
+            - Split `+page.svelte` (1751 → 343 lines) into a thin view router + dedicated `LauncherView.svelte` (461 lines).
+            - Split `SettingsView.svelte` (1465 → 226 lines) into orchestrator + 7 sub-components: ThemeSettings, CommunitySettings, FeatureHubSettings, AccessibilitySettings, FileSearchSettings, DiagnosticsSettings.
+            - Added `LoadingSkeleton.svelte` shimmer component for async loading states.
+            - Added `ErrorRecovery.svelte` for actionable error recovery UI.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.

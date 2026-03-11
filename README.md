@@ -35,10 +35,17 @@ sudo dpkg -i vanta_5.0.1_amd64.deb
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.1.0-1.x86_64.rpm
+sudo rpm -i vanta-5.2.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.1.0)
+### Latest Minor (v5.2.0)
+- Extracted `ranking.ts` module with all scoring, command routing, and utility functions (~280 lines of pure logic).
+- Split `+page.svelte` (1751 → 343 lines) into a thin view router plus a dedicated `LauncherView.svelte` component (461 lines).
+- Split `SettingsView.svelte` (1465 → 226 lines) into a thin orchestrator plus 7 focused sub-components: ThemeSettings, CommunitySettings, FeatureHubSettings, AccessibilitySettings, FileSearchSettings, DiagnosticsSettings.
+- Added `LoadingSkeleton.svelte` shimmer component for async loading states.
+- Added `ErrorRecovery.svelte` for actionable error recovery UI with retry support.
+
+### Previous Minor (v5.1.0)
 - Rewrote `errors.rs` with `thiserror` derive macros — 15 domain-specific error variants (Io, Json, Config, Scanner, Matcher, Launcher, Window, Script, Extension, Store, Workflow, Clipboard, Permission, Community, Theme).
 - Added structured error codes (1000–9999) and kind tags; frontend receives `{ code, kind, message }` via Tauri IPC.
 - Replaced all `Result<T, String>` with `Result<T, VantaError>` across 109 functions in 10+ modules.
