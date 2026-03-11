@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.3.0
+- Added Phase 23 launcher layout recomposition with balanced search, results, and status regions.
+- Added adaptive density-aware spacing behavior across launcher surfaces using shared spacing tokens.
+- Improved result affordance clarity with stronger selected-row contrast, cleaner hover states, and grouped/flat spacing harmony.
+- Improved grouped section navigation feedback with selected-state parity for section headers.
+
 ## 4.2.0
 - Added Phase 22 design primitive foundations with reusable shell, panel, card, stack, and status patterns.
 - Added expanded semantic theme token mapping and runtime fallbacks for elevated surfaces, status roles, and border hierarchy.

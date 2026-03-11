@@ -1,4 +1,4 @@
-name: Release Vanta v4.2.0
+name: Release Vanta v4.3.0
 
 on:
   push:
@@ -86,15 +86,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v4.2.0 -- Phase 22 UI Primitive Foundation
+            ## Vanta v4.3.0 -- Phase 23 Launcher Layout Recomposition
 
-            Minor release focused on semantic UI primitives, tokenized spacing, and consistency improvements across launcher surfaces.
+            Minor release focused on launcher spatial balance, adaptive density behavior, and clearer item affordances.
 
             ### Highlights
-            - Added reusable UI primitives (`v2-shell`, `v2-panel`, `v2-card`, stack and status patterns).
-            - Added expanded semantic token mapping with runtime fallbacks for status and elevated surfaces.
-            - Improved launcher and settings spacing consistency with density-aware token-based layout.
-            - Improved result and status visual hierarchy with cleaner card and badge styling.
+            - Added launcher layout recomposition for balanced search, results, and status regions.
+            - Added density-aware spacing consistency across launcher surfaces using shared spacing tokens.
+            - Improved row affordances with stronger selected states and cleaner hover behavior.
+            - Improved grouped navigation feedback with selected-state section headers.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.

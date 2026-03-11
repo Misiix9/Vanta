@@ -29,16 +29,22 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_4.2.0_amd64.deb
+sudo dpkg -i vanta_4.3.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-4.2.0-1.x86_64.rpm
+sudo rpm -i vanta-4.3.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v4.2.0)
+### Latest Minor (v4.3.0)
+- Added Phase 23 launcher layout recomposition with balanced search, results, and status regions.
+- Added density-aware spacing behavior across launcher surfaces using shared spacing tokens.
+- Improved result row affordances with clearer hover/selected distinction and cleaner action hint rhythm.
+- Improved grouped-mode navigation feedback with selected-state section headers.
+
+### Previous Minor (v4.2.0)
 - Added Phase 22 UI primitive foundations with reusable shell, panel, card, and stack patterns.
 - Added expanded semantic token mapping with runtime fallbacks for elevated surfaces and status roles.
 - Improved launcher and settings visual consistency with density-aware spacing and shared layout primitives.

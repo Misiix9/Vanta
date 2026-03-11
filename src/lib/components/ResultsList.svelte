@@ -251,7 +251,7 @@
 </script>
 
 {#if visibleRows.length > 0}
-  <div class="results-wrapper">
+  <div class="results-wrapper" class:grouped={groupBySection} class:flat={!groupBySection}>
     <div
       class="results-container no-scrollbar"
       bind:this={container}
@@ -264,6 +264,7 @@
             bind:element={itemElements[i]}
             label={row.label}
             count={row.count}
+            isSelected={i === selectedIndex}
           />
         {:else if row.type === "subheader"}
           <div

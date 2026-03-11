@@ -1586,7 +1586,7 @@
   {:else}
     <div
       in:fade={{ duration: fadeDuration }}
-      class="launcher-grid v2-stack"
+      class={`launcher-grid v2-stack density-${vantaConfig?.accessibility?.spacing_preset ?? "comfortable"}`}
       style="height: 100%; width: 100%;"
     >
       <SearchInput
