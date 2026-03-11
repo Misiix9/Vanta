@@ -29,16 +29,22 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_4.5.0_amd64.deb
+sudo dpkg -i vanta_4.6.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-4.5.0-1.x86_64.rpm
+sudo rpm -i vanta-4.6.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v4.5.0)
+### Latest Minor (v4.6.0)
+- Added Phase 26 Dedicated Window UX Suite v2 with shared shell, header, action, and scroll primitives.
+- Added consistent breadcrumb and action grammar across dedicated hub windows and the extension runtime host.
+- Improved responsive dedicated-window behavior with stacked action bars and tighter mobile-safe panel spacing.
+- Improved maintainability by replacing remaining inline dedicated-window block layout styles.
+
+### Previous Minor (v4.5.0)
 - Added Phase 25 Store and extensions surface redesign with shared visual primitives.
 - Improved trust and risk metadata scanability in store cards with clearer grouping.
 - Improved install and uninstall action feedback consistency across extension surfaces.

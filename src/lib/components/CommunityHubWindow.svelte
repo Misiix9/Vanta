@@ -130,14 +130,19 @@
   });
 </script>
 
-<div class="hub-window-root">
-  <div class="hub-window-header">
-    <button class="link-btn" onclick={onClose}>Back</button>
-    <h2>Community Hub</h2>
-    <button class="link-btn" onclick={refresh}>Refresh</button>
+<div class="hub-window-root window-shell">
+  <div class="hub-window-header window-header">
+    <div class="window-header-main">
+      <span class="window-breadcrumb">Feature Hub</span>
+      <h2>Community Hub</h2>
+    </div>
+    <div class="window-actions">
+      <button class="link-btn btn-ghost" onclick={onClose}>Back</button>
+      <button class="link-btn btn-secondary" onclick={refresh}>Refresh</button>
+    </div>
   </div>
 
-  <div class="hub-window-scroll">
+  <div class="hub-window-scroll window-scroll">
     <div class="control-group">
       <label>
         Popular Workflows Feed (Opt-in)
@@ -149,7 +154,7 @@
       </label>
     </div>
 
-    <div class="control-group" style="display:block;">
+    <div class="control-group control-group-block">
       <h3>Feedback And Votes</h3>
       <label>
         Feedback Message
@@ -178,7 +183,7 @@
       {/if}
     </div>
 
-    <div class="control-group" style="display:block;">
+    <div class="control-group control-group-block">
       <h3>Shareable Snippets</h3>
       <div class="preset-row">
         <button class="preset-btn" onclick={() => (snippetKind = "workflow")}>Workflow</button>
@@ -202,7 +207,7 @@
     </div>
 
     {#if communityFeedOptIn}
-      <div class="control-group" style="display:block;">
+      <div class="control-group control-group-block">
         <h3>Popular Workflows</h3>
         <ul class="hint-list">
           {#each popularFeed as wf}

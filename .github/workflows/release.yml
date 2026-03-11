@@ -1,4 +1,4 @@
-name: Release Vanta v4.5.0
+name: Release Vanta v4.6.0
 
 on:
   push:
@@ -86,15 +86,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v4.5.0 -- Phase 25 Store And Extensions Surface Redesign
+            ## Vanta v4.6.0 -- Phase 26 Dedicated Window UX Suite v2
 
-            Minor release focused on unified extension discovery surfaces, trust signal clarity, and consistent install action feedback.
+            Minor release focused on dedicated window shell consistency, action grammar parity, and responsive UX improvements.
 
             ### Highlights
-            - Added shared visual primitives across Store, Extensions Hub, and Extension Host.
-            - Improved trust and risk scanability in store cards with clearer metadata grouping.
-            - Improved install and uninstall feedback rhythm with more consistent action states.
-            - Improved settings extensions section parity and direct entry to extension discovery.
+            - Added shared dedicated-window primitives for shell, header, action bars, and scroll regions.
+            - Added consistent breadcrumb/action grammar across Feature, Community, Theme, Extensions, and Extension Host views.
+            - Improved responsive behavior with mobile-safe header/action stacking and tighter panel spacing.
+            - Improved maintainability by removing remaining inline dedicated-window layout blocks.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.

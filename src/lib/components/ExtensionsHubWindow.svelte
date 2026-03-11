@@ -34,14 +34,19 @@
   }
 </script>
 
-<div class="hub-window-root">
-  <div class="hub-window-header ext-surface-header">
-    <button class="link-btn btn-ghost" onclick={onClose}>Back</button>
-    <h2>Extensions Hub</h2>
-    <button class="link-btn btn-secondary" onclick={onOpenStore}>Open Store</button>
+<div class="hub-window-root window-shell">
+  <div class="hub-window-header window-header ext-surface-header">
+    <div class="window-header-main">
+      <span class="window-breadcrumb">Feature Hub</span>
+      <h2>Extensions Hub</h2>
+    </div>
+    <div class="window-actions">
+      <button class="link-btn btn-ghost" onclick={onClose}>Back</button>
+      <button class="link-btn btn-secondary" onclick={onOpenStore}>Open Store</button>
+    </div>
   </div>
 
-  <div class="hub-window-scroll">
+  <div class="hub-window-scroll window-scroll">
     <div class="control-group control-group-block ext-surface-card">
       <h3>Extension Template Generator</h3>
       <p class="hub-window-subtitle">Create a complete starter extension in one click.</p>

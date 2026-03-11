@@ -1367,6 +1367,12 @@ input[type="range"] {
     overflow: hidden;
 }
 
+.window-shell {
+    background: color-mix(in srgb, var(--ds-surface-0) 92%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ds-border) 56%, transparent);
+    border-radius: var(--radius-panel);
+}
+
 .hub-window-header {
     display: flex;
     align-items: center;
@@ -1376,10 +1382,49 @@ input[type="range"] {
     border-bottom: 1px solid color-mix(in srgb, var(--ds-border) 62%, transparent);
 }
 
+.window-header {
+    gap: calc(var(--space-3) * var(--vanta-space-scale, 1));
+    padding: calc(var(--space-3) * var(--vanta-space-scale, 1)) calc(var(--space-4) * var(--vanta-space-scale, 1));
+    background: color-mix(in srgb, var(--ds-surface-1) 72%, transparent);
+    backdrop-filter: blur(4px);
+}
+
+.window-header-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-1) * var(--vanta-space-scale, 1));
+}
+
+.window-header-main h2 {
+    margin: 0;
+}
+
+.window-breadcrumb {
+    font-size: var(--type-caption);
+    color: var(--ds-text-muted);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.window-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
 .hub-window-scroll {
     flex: 1;
     min-height: 0;
     overflow: auto;
+}
+
+.window-scroll {
+    padding: calc(var(--space-3) * var(--vanta-space-scale, 1));
+}
+
+.window-scroll > :first-child {
+    margin-top: 0;
 }
 
 .ext-surface-root {
@@ -1443,6 +1488,10 @@ input[type="range"] {
     color: var(--ds-text-secondary);
     font-size: var(--type-body);
     line-height: 1.35;
+}
+
+.window-shell .hub-window-subtitle {
+    margin-bottom: calc(var(--space-3) * var(--vanta-space-scale, 1));
 }
 /* FontAwesome Icon Styling */
 .item-icon i.fa-solid, 
@@ -2041,10 +2090,10 @@ input[type="range"] {
 
 .ext-title {
     flex: 1;
-    font-size: 12px;
-    color: var(--vanta-text-dim, #888);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: var(--type-body);
+    color: var(--ds-text-primary);
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .ext-back,
@@ -3100,6 +3149,22 @@ input[type="range"] {
 
     .onboarding-grid {
         grid-template-columns: 1fr;
+    }
+
+    .window-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+    }
+
+    .window-actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .window-scroll {
+        padding: calc(var(--space-2) * var(--vanta-space-scale, 1));
     }
 }
 

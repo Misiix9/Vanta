@@ -75,14 +75,19 @@
   }
 </script>
 
-<div class="hub-window-root">
-  <div class="hub-window-header">
-    <button class="link-btn" onclick={onClose}>Back</button>
-    <h2>Theme And Profile Studio</h2>
-    <button class="link-btn" onclick={saveConfig}>Save</button>
+<div class="hub-window-root window-shell">
+  <div class="hub-window-header window-header">
+    <div class="window-header-main">
+      <span class="window-breadcrumb">Feature Hub</span>
+      <h2>Theme And Profile Studio</h2>
+    </div>
+    <div class="window-actions">
+      <button class="link-btn btn-ghost" onclick={onClose}>Back</button>
+      <button class="link-btn btn-secondary" onclick={saveConfig}>Save</button>
+    </div>
   </div>
 
-  <div class="hub-window-scroll">
+  <div class="hub-window-scroll window-scroll">
     <div class="control-group">
       <label>
         Active Theme
@@ -107,7 +112,7 @@
       <label>Opacity <input type="range" min="0.1" max="1" step="0.05" bind:value={config.appearance.opacity} oninput={saveConfig} /></label>
     </div>
 
-    <div class="control-group" style="display:block;">
+    <div class="control-group control-group-block">
       <h3>Theme Profile JSON</h3>
       <div class="preset-row">
         <button class="preset-btn" onclick={exportProfile}>Export</button>

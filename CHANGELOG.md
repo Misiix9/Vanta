@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.6.0
+- Added Phase 26 Dedicated Window UX Suite v2 with shared shell, header, action, and scroll primitives for dedicated windows.
+- Added consistent breadcrumb and action grammar across Feature Hub, Community Hub, Theme Studio, Extensions Hub, and Extension Host.
+- Improved responsive dedicated-window behavior with stacked header actions and tighter mobile-safe panel spacing.
+- Improved maintainability by removing remaining inline block layout styles in dedicated window views.
+
 ## 4.5.0
 - Added Phase 25 Store and extensions surface redesign with shared visual primitives across Store, Extensions Hub, and Extension Host.
 - Improved trust and install decision scanability by separating risk/trust badges from metadata stats in store cards.
