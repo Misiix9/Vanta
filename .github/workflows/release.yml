@@ -1,4 +1,4 @@
-name: Release Vanta v4.6.0
+name: Release Vanta v4.7.0
 
 on:
   push:
@@ -86,15 +86,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v4.6.0 -- Phase 26 Dedicated Window UX Suite v2
+            ## Vanta v4.7.0 -- Phase 27 Motion System And Interaction Choreography
 
-            Minor release focused on dedicated window shell consistency, action grammar parity, and responsive UX improvements.
+            Minor release focused on systemized motion choreography, universal micro-interactions, and a redesigned universal visual theme.
 
             ### Highlights
-            - Added shared dedicated-window primitives for shell, header, action bars, and scroll regions.
-            - Added consistent breadcrumb/action grammar across Feature, Community, Theme, Extensions, and Extension Host views.
-            - Improved responsive behavior with mobile-safe header/action stacking and tighter panel spacing.
-            - Improved maintainability by removing remaining inline dedicated-window layout blocks.
+            - Added reusable motion primitives for enter, emphasis, hierarchy, and stagger interactions.
+            - Added consistent hover/focus/selection/action-feedback choreography across major first-party surfaces.
+            - Added Aurora Slate redesign for universal theme with richer depth, cleaner contrast, and elevated card hierarchy.
+            - Improved responsiveness by keeping motion transform/opacity-first with reduced-motion-safe fallbacks.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.

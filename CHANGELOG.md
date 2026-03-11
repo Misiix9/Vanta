@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.7.0
+- Added Phase 27 motion system primitives (enter, emphasis, hierarchy, and stagger cadence) with reduced-motion-safe fallbacks.
+- Added consistent micro-interaction choreography across launcher results, grouped headers, store filters, and extension cards.
+- Added a full universal theme redesign (Aurora Slate) with refreshed palette depth, elevated surfaces, and refined visual hierarchy.
+- Improved interaction responsiveness by keeping motion transform/opacity-first and non-blocking for typing and keyboard navigation.
+
 ## 4.6.0
 - Added Phase 26 Dedicated Window UX Suite v2 with shared shell, header, action, and scroll primitives for dedicated windows.
 - Added consistent breadcrumb and action grammar across Feature Hub, Community Hub, Theme Studio, Extensions Hub, and Extension Host.

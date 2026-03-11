@@ -29,16 +29,22 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_4.6.0_amd64.deb
+sudo dpkg -i vanta_4.7.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-4.6.0-1.x86_64.rpm
+sudo rpm -i vanta-4.7.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v4.6.0)
+### Latest Minor (v4.7.0)
+- Added Phase 27 motion system primitives with reduced-motion-safe fallbacks across major views.
+- Added consistent micro-interaction choreography for hover, focus, selection, and action feedback.
+- Added full Aurora Slate redesign for universal theme surfaces with richer depth and hierarchy.
+- Improved interaction performance with non-blocking transform/opacity-first motion behavior.
+
+### Previous Minor (v4.6.0)
 - Added Phase 26 Dedicated Window UX Suite v2 with shared shell, header, action, and scroll primitives.
 - Added consistent breadcrumb and action grammar across dedicated hub windows and the extension runtime host.
 - Improved responsive dedicated-window behavior with stacked action bars and tighter mobile-safe panel spacing.

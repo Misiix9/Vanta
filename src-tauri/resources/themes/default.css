@@ -26,8 +26,10 @@
     color: var(--ds-text-secondary);
     background: linear-gradient(90deg, rgba(123, 53, 240, 0.08), rgba(255, 255, 255, 0.02));
     border: 1px solid color-mix(in srgb, var(--ds-border) 62%, transparent);
-    transition: background var(--t-fast, 160ms) var(--ease-out, ease),
-        color var(--t-fast, 160ms) var(--ease-out, ease);
+    transition: background var(--motion-enter-duration) var(--motion-ease-enter),
+        color var(--motion-enter-duration) var(--motion-ease-enter),
+        border-color var(--motion-enter-duration) var(--motion-ease-enter),
+        transform var(--motion-enter-duration) var(--motion-ease-enter);
     border-radius: var(--radius-item, 9px);
     cursor: default;
     user-select: none;
@@ -38,6 +40,7 @@
 .group-header:focus-visible {
     background: var(--surface-hover, rgba(255, 255, 255, 0.04));
     border-color: var(--border-separator, rgba(255, 255, 255, 0.08));
+    transform: translateY(-1px);
 }
 
 .group-header.selected {
@@ -167,6 +170,19 @@
     --t-med: 300ms;
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     --ease-std: cubic-bezier(0.25, 1, 0.5, 1);
+
+    /* Phase 27 Motion System */
+    --motion-enter-duration: calc(200ms * var(--vanta-motion-scale, 1));
+    --motion-exit-duration: calc(160ms * var(--vanta-motion-scale, 1));
+    --motion-emphasis-duration: calc(260ms * var(--vanta-motion-scale, 1));
+    --motion-hierarchy-duration: calc(320ms * var(--vanta-motion-scale, 1));
+    --motion-stagger-step: calc(26ms * var(--vanta-motion-scale, 1));
+    --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+    --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --motion-ease-emphasis: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --motion-ease-hierarchy: cubic-bezier(0.16, 1, 0.3, 1);
+    --motion-lift-y: 4px;
+    --motion-focus-scale: 1.015;
 }
 
 /* ── Phase 22 Primitives (Design Language v2) ─────────────── */
@@ -251,6 +267,11 @@
 }
 
 [data-reduced-motion="true"] * {
+    --motion-enter-duration: 1ms !important;
+    --motion-exit-duration: 1ms !important;
+    --motion-emphasis-duration: 1ms !important;
+    --motion-hierarchy-duration: 1ms !important;
+    --motion-stagger-step: 0ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -450,6 +471,35 @@ a:hover {
     }
 }
 
+@keyframes motionPopIn {
+    from {
+        opacity: 0;
+        transform: translateY(var(--motion-lift-y)) scale(0.985);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes motionEmphasisPulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(123, 53, 240, 0);
+    }
+
+    50% {
+        transform: scale(var(--motion-focus-scale));
+        box-shadow: 0 0 0 4px rgba(123, 53, 240, 0.16);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(123, 53, 240, 0);
+    }
+}
+
 @keyframes spin {
     to {
         transform: rotate(360deg);
@@ -589,6 +639,17 @@ a:hover {
     height: 100%;
 }
 
+.results-container > * {
+    animation: motionPopIn var(--motion-enter-duration) var(--motion-ease-enter) both;
+}
+
+.results-container > *:nth-child(1) { animation-delay: calc(var(--motion-stagger-step) * 1); }
+.results-container > *:nth-child(2) { animation-delay: calc(var(--motion-stagger-step) * 2); }
+.results-container > *:nth-child(3) { animation-delay: calc(var(--motion-stagger-step) * 3); }
+.results-container > *:nth-child(4) { animation-delay: calc(var(--motion-stagger-step) * 4); }
+.results-container > *:nth-child(5) { animation-delay: calc(var(--motion-stagger-step) * 5); }
+.results-container > *:nth-child(n + 6) { animation-delay: calc(var(--motion-stagger-step) * 6); }
+
 .results-wrapper.grouped .results-container {
     gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
 }
@@ -609,10 +670,10 @@ a:hover {
     border: 1px solid transparent;
     border-radius: var(--radius-item);
     transition:
-        background var(--t-fast) var(--ease-std),
-        box-shadow var(--t-fast) var(--ease-std),
-        transform var(--t-fast) var(--ease-std),
-        border-color var(--t-fast) var(--ease-std);
+        background var(--motion-enter-duration) var(--motion-ease-enter),
+        box-shadow var(--motion-enter-duration) var(--motion-ease-enter),
+        transform var(--motion-enter-duration) var(--motion-ease-enter),
+        border-color var(--motion-enter-duration) var(--motion-ease-enter);
     cursor: pointer;
     position: relative;
     overflow: visible;
@@ -635,7 +696,8 @@ a:hover {
 .result-item:hover {
     background: color-mix(in srgb, var(--surface-hover) 86%, transparent);
     border-color: color-mix(in srgb, var(--ds-border) 74%, transparent);
-    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.18);
+    box-shadow: 0 8px 18px rgba(9, 14, 32, 0.28);
+    transform: translateY(calc(-1 * var(--motion-lift-y)));
     z-index: 6;
 }
 
@@ -645,8 +707,9 @@ a:hover {
     box-shadow:
         0 0 0 1px color-mix(in srgb, var(--ds-accent) 42%, transparent),
         0 8px 20px rgba(123, 53, 240, 0.22);
-    transform: translateY(-1px);
+    transform: translateY(calc(-1 * var(--motion-lift-y)));
     z-index: 10;
+    animation: motionEmphasisPulse var(--motion-emphasis-duration) var(--motion-ease-emphasis) 1;
 }
 
 .result-item:not(.selected):hover::before {
@@ -1668,6 +1731,14 @@ input[type="range"] {
     font-size: 0.74rem;
     cursor: pointer;
     white-space: nowrap;
+    transition: background var(--motion-enter-duration) var(--motion-ease-enter),
+        border-color var(--motion-enter-duration) var(--motion-ease-enter),
+        color var(--motion-enter-duration) var(--motion-ease-enter),
+        transform var(--motion-enter-duration) var(--motion-ease-enter);
+}
+
+.store-filter:hover {
+    transform: translateY(-1px);
 }
 
 .store-filter.active {
@@ -1684,12 +1755,15 @@ input[type="range"] {
     border-radius: 10px;
     border: 1px solid var(--vanta-border, rgba(255,255,255,0.08));
     background: var(--vanta-surface, #0a0a0a);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color var(--motion-enter-duration) var(--motion-ease-enter),
+        box-shadow var(--motion-enter-duration) var(--motion-ease-enter),
+        transform var(--motion-enter-duration) var(--motion-ease-enter);
 }
 
 .ext-card:hover {
     border-color: var(--vanta-accent, #7b35f0);
     box-shadow: 0 6px 18px color-mix(in srgb, var(--ds-accent) 16%, transparent);
+    transform: translateY(calc(-0.75 * var(--motion-lift-y)));
 }
 
 .ext-card.installed {
