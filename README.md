@@ -35,16 +35,22 @@ sudo dpkg -i vanta_5.0.1_amd64.deb
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.0.1-1.x86_64.rpm
+sudo rpm -i vanta-5.1.0-1.x86_64.rpm
 ```
 
-### Latest Patch (v5.0.1)
+### Latest Minor (v5.1.0)
+- Rewrote `errors.rs` with `thiserror` derive macros — 15 domain-specific error variants (Io, Json, Config, Scanner, Matcher, Launcher, Window, Script, Extension, Store, Workflow, Clipboard, Permission, Community, Theme).
+- Added structured error codes (1000–9999) and kind tags; frontend receives `{ code, kind, message }` via Tauri IPC.
+- Replaced all `Result<T, String>` with `Result<T, VantaError>` across 109 functions in 10+ modules.
+- Added `From<String>` and `From<&str>` bridges for gradual migration; zero production `unwrap()`/`expect()`.
+
+### Previous Patch (v5.0.1)
 - Replaced per-call `Regex::new().unwrap()` in workflow token rendering with a static `LazyLock<Regex>` (crash prevention).
 - Added length and null-byte validation on `$TERMINAL` env before `shell_words` parsing (DoS mitigation).
 - Wrapped root layout in `<svelte:boundary>` error boundary — uncaught JS errors now show a recovery UI instead of killing the window.
 - Bundled Font Awesome locally via `@fortawesome/fontawesome-free` — removed CDN dependency for offline resilience.
 
-### Latest Major (v5.0.0)
+### Previous Major (v5.0.0)
 - Added Phase 30 Theme Engine v3 with 5-layer token inheritance (Context → Core → Semantic → Component → Compatibility).
 - Added theme token contract enforcing 15 required and 25 recommended tokens with diagnostics.
 - Added dual-side theme validation in both TypeScript and Rust with error/warning reporting.

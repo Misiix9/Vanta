@@ -1,4 +1,4 @@
-name: Release Vanta v5.0.1
+name: Release Vanta v5.1.0
 
 on:
   push:
@@ -86,15 +86,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v5.0.1 -- Phase 31 Critical Security & Crash Prevention
+            ## Vanta v5.1.0 -- Phase 32 Unified Error Architecture
 
-            Patch release hardening crash paths, input validation, and offline resilience.
+            Minor release replacing all Result<T, String> with a typed VantaError system.
 
             ### Highlights
-            - Replaced per-call Regex::new().unwrap() with static LazyLock<Regex> in workflow token rendering.
-            - Added length (256 char) and null-byte validation on $TERMINAL env before shell_words parsing.
-            - Wrapped root layout in <svelte:boundary> error boundary with recovery UI.
-            - Bundled Font Awesome locally — removed CDN <link> for offline-safe operation.
+            - Rewrote errors.rs with thiserror derive macros — 15 domain-specific variants.
+            - Structured error codes (1000-9999) and kind tags delivered as { code, kind, message } via Tauri IPC.
+            - Replaced all Result<T, String> with Result<T, VantaError> across 109 functions.
+            - From<String> and From<&str> bridges for gradual migration; zero production unwrap()/expect().
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.
