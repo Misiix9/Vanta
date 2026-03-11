@@ -35,10 +35,19 @@ sudo dpkg -i vanta_5.0.1_amd64.deb
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.3.0-1.x86_64.rpm
+sudo rpm -i vanta-5.4.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.3.0)
+### Latest Minor (v5.4.0)
+- Parallelized search pipeline using `tokio::join!` / `spawn_blocking` — apps, windows, files, clipboard, and extensions now query concurrently instead of sequentially.
+- Added search cancellation via atomic generation counter — new keystrokes abort stale in-flight queries.
+- Added result streaming: `search-partial` Tauri events emit partial results as each source completes; frontend merges progressively.
+- Replaced raw `HashMap<String, u32>` history counters with time-weighted frecency scoring (`FrecencyEntry` with exponential decay, 12-hour half-life, 10 most recent timestamps).
+- Extracted 30+ hardcoded magic scoring numbers into `ranking_config.rs` with documented constants (calculator, windows, clipboard, extensions, profiles, intents, query relevance, source intent, app entity bonuses).
+- Added negative scoring: short fuzzy matches penalized, below-threshold results suppressed.
+- Backward-compatible history migration: old `vanta_history.json` format auto-migrates to frecency entries on first load.
+
+### Previous Minor (v5.3.0)
 - Added `:focus-visible` rings on all interactive elements (buttons, inputs, accordion headers, links) with `!important` to override base resets.
 - Added `role="dialog"`, `aria-modal="true"`, and focus trapping on all modal surfaces (PermissionModal, ActionConfirmModal, SettingsView, StoreView).
 - Added `aria-live="polite"` regions for result count changes (StatusBar) and view transitions (+page.svelte announcer).

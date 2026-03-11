@@ -2,6 +2,7 @@ use nucleo_matcher::pattern::{Atom, AtomKind, CaseMatching, Normalization};
 use nucleo_matcher::{Config, Matcher, Utf32Str};
 use serde::{Deserialize, Serialize};
 
+use crate::ranking_config;
 use crate::scanner::AppEntry;
 
 /// Search result returned to the frontend.
@@ -43,7 +44,7 @@ pub enum ResultSource {
 }
 
 fn apply_weight(score: u32, weight: u32) -> u32 {
-    let clamped = weight.clamp(10, 300);
+    let clamped = weight.clamp(ranking_config::WEIGHT_MIN, ranking_config::WEIGHT_MAX);
     let scaled = (score as u128 * clamped as u128) / 100;
     scaled.min(u32::MAX as u128) as u32
 }
@@ -54,10 +55,10 @@ fn usage_relevance_bonus(usage: u32, text_score: u32) -> u32 {
     }
 
     // Stronger log-shaped growth helps frequent launches in close calls.
-    let learned = ((usage as f64 + 1.0).ln() * 130.0).round() as u32;
+    let learned = ((usage as f64 + 1.0).ln() * ranking_config::USAGE_LN_MULTIPLIER).round() as u32;
     // Hard bound based on textual match quality keeps relevance primary.
-    let relevance_cap = text_score / 3 + 180;
-    learned.min(1_400).min(relevance_cap)
+    let relevance_cap = text_score / ranking_config::USAGE_RELEVANCE_DIVISOR + ranking_config::USAGE_RELEVANCE_ADDEND;
+    learned.min(ranking_config::USAGE_HARD_CAP).min(relevance_cap)
 }
 
 /// Perform fuzzy search across cached app entries using nucleo-matcher.
@@ -134,9 +135,9 @@ pub fn fuzzy_search(
             if !query_lower.is_empty() {
                 let name_lower = app.name.to_lowercase();
                 if name_lower == query_lower {
-                    final_score = final_score.saturating_add(800);
+                    final_score = final_score.saturating_add(ranking_config::APP_EXACT_NAME_BONUS);
                 } else if name_lower.starts_with(&query_lower) {
-                    final_score = final_score.saturating_add(260);
+                    final_score = final_score.saturating_add(ranking_config::APP_PREFIX_NAME_BONUS);
                 }
             }
             scored.push((final_score, indices.clone(), app));
@@ -150,7 +151,7 @@ pub fn fuzzy_search(
             let haystack = Utf32Str::new(gname, &mut haystack_buf);
             if let Some(score) = pattern.indices(haystack, &mut matcher, &mut indices) {
                 // Slightly lower score for secondary matches
-                let text_score = score.saturating_sub(10) as u32;
+                let text_score = score.saturating_sub(ranking_config::APP_SECONDARY_PENALTY as u16) as u32;
                 let final_score = text_score + usage_relevance_bonus(usage, text_score);
                 scored.push((final_score, indices.clone(), app));
                 continue;
@@ -163,7 +164,7 @@ pub fn fuzzy_search(
             indices.clear();
             let haystack = Utf32Str::new(comment, &mut haystack_buf);
             if let Some(score) = pattern.indices(haystack, &mut matcher, &mut indices) {
-                let text_score = score.saturating_sub(20) as u32;
+                let text_score = score.saturating_sub(ranking_config::APP_TERTIARY_PENALTY as u16) as u32;
                 let final_score = text_score + usage_relevance_bonus(usage, text_score);
                 scored.push((final_score, indices.clone(), app));
             }

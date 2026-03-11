@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount } from "svelte";
+  import { listen } from "@tauri-apps/api/event";
+  import { onMount, onDestroy } from "svelte";
   import type {
     VantaConfig,
     SearchResult,
@@ -118,9 +119,28 @@
     if (selectedIndex >= count) selectedIndex = count - 1;
   });
 
-  onMount(() => {
+  let partialUnlisten: (() => void) | null = null;
+
+  onMount(async () => {
     onboardingOpen = localStorage.getItem(ONBOARDING_SEEN_KEY) !== "1";
     quickTipsVisible = localStorage.getItem(QUICK_TIPS_HIDDEN_KEY) !== "1";
+
+    partialUnlisten = await listen<SearchResult[]>("search-partial", (event) => {
+      if (query.trim() && event.payload.length > 0) {
+        // Merge partial results into current display for progressive rendering.
+        const partial = event.payload;
+        const existingIds = new Set(baseResults.map((r) => r.exec));
+        const fresh = partial.filter((r) => !existingIds.has(r.exec));
+        if (fresh.length > 0) {
+          baseResults = [...baseResults, ...fresh].sort((a, b) => b.score - a.score);
+          results = composeResults(baseResults, query, availableMacros, config);
+        }
+      }
+    });
+  });
+
+  onDestroy(() => {
+    partialUnlisten?.();
   });
 
   function scheduleScrollToSelected() {

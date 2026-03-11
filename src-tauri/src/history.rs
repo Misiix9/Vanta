@@ -2,10 +2,64 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+/// Half-life in seconds for frecency decay (12 hours).
+const HALF_LIFE_SECS: f64 = 43200.0;
+
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// A single access record used for frecency computation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FrecencyEntry {
+    /// Total number of accesses (kept for backward compat / debugging).
+    pub count: u32,
+    /// Unix timestamps (seconds) of recent accesses, capped at 10.
+    pub timestamps: Vec<u64>,
+}
+
+impl FrecencyEntry {
+    fn new(ts: u64) -> Self {
+        Self {
+            count: 1,
+            timestamps: vec![ts],
+        }
+    }
+
+    fn record_access(&mut self, ts: u64) {
+        self.count = self.count.saturating_add(1);
+        self.timestamps.push(ts);
+        // Keep only the 10 most recent timestamps.
+        if self.timestamps.len() > 10 {
+            self.timestamps.sort_unstable();
+            let excess = self.timestamps.len() - 10;
+            self.timestamps.drain(..excess);
+        }
+    }
+
+    /// Compute frecency score using exponential decay over access timestamps.
+    pub fn frecency(&self, now: u64) -> f64 {
+        self.timestamps
+            .iter()
+            .map(|&ts| {
+                let age = now.saturating_sub(ts) as f64;
+                (-age * (2.0_f64.ln()) / HALF_LIFE_SECS).exp()
+            })
+            .sum()
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct History {
+    /// Frecency entries keyed by exec string.
+    pub entries: HashMap<String, FrecencyEntry>,
+    /// Legacy field — only present when migrating old data.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub usage: HashMap<String, u32>,
     #[serde(skip)]
     file_path: Option<PathBuf>,
@@ -18,6 +72,7 @@ pub struct History {
 impl History {
     pub fn new() -> Self {
         Self {
+            entries: HashMap::new(),
             usage: HashMap::new(),
             file_path: None,
             dirty_count: 0,
@@ -27,8 +82,8 @@ impl History {
 
     pub fn load_or_create(config_dir: &Path) -> Self {
         let file_path = config_dir.join("vanta_history.json");
-        
-        let mut history = if file_path.exists() {
+
+        let mut history: History = if file_path.exists() {
             fs::read_to_string(&file_path)
                 .ok()
                 .and_then(|content| serde_json::from_str(&content).ok())
@@ -36,7 +91,22 @@ impl History {
         } else {
             Self::default()
         };
-        
+
+        // Migrate legacy `usage` counts into frecency entries.
+        if !history.usage.is_empty() && history.entries.is_empty() {
+            let now = now_secs();
+            for (exec, count) in &history.usage {
+                let entry = FrecencyEntry {
+                    count: *count,
+                    // Seed with a single "now" timestamp so migrated items
+                    // don't start at zero frecency.
+                    timestamps: vec![now],
+                };
+                history.entries.insert(exec.clone(), entry);
+            }
+            history.usage.clear();
+        }
+
         history.file_path = Some(file_path);
         history.dirty_count = 0;
         history.last_save_at = Some(Instant::now());
@@ -44,7 +114,12 @@ impl History {
     }
 
     pub fn increment(&mut self, exec: &str) {
-        *self.usage.entry(exec.to_string()).or_insert(0) += 1;
+        let ts = now_secs();
+        self.entries
+            .entry(exec.to_string())
+            .and_modify(|e| e.record_access(ts))
+            .or_insert_with(|| FrecencyEntry::new(ts));
+
         self.dirty_count = self.dirty_count.saturating_add(1);
 
         let should_flush_by_count = self.dirty_count >= 20;
@@ -60,8 +135,28 @@ impl History {
         }
     }
 
+    /// Return a frecency score for the given exec, suitable for ranking.
+    /// Returned as u32 (frecency × 1000, clamped) for parity with old API.
     pub fn get_usage(&self, exec: &str) -> u32 {
-        *self.usage.get(exec).unwrap_or(&0)
+        match self.entries.get(exec) {
+            Some(entry) => {
+                let f = entry.frecency(now_secs()) * 1000.0;
+                (f as u64).min(u32::MAX as u64) as u32
+            }
+            None => 0,
+        }
+    }
+
+    /// Build a snapshot map of exec → frecency-score for bulk lookups.
+    pub fn usage_map(&self) -> HashMap<String, u32> {
+        let now = now_secs();
+        self.entries
+            .iter()
+            .map(|(k, v)| {
+                let f = v.frecency(now) * 1000.0;
+                (k.clone(), (f as u64).min(u32::MAX as u64) as u32)
+            })
+            .collect()
     }
 
     fn save(&self) {

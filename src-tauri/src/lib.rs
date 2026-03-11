@@ -6,6 +6,7 @@ pub mod history;
 pub mod launcher;
 pub mod matcher;
 pub mod math;
+pub mod ranking_config;
 pub mod scanner;
 pub mod files;
 pub mod store;
@@ -308,7 +309,7 @@ struct SearchResultV3 {
 }
 
 fn weighted_score(base: u32, weight: u32) -> u32 {
-    let clamped = weight.clamp(10, 300);
+    let clamped = weight.clamp(ranking_config::WEIGHT_MIN, ranking_config::WEIGHT_MAX);
     let scaled = (base as u128 * clamped as u128) / 100;
     scaled.min(u32::MAX as u128) as u32
 }
@@ -442,12 +443,12 @@ fn infer_intent_step_exec(step: &str, apps: &[AppEntry]) -> Option<String> {
 
 fn build_intent_results(query: &str, weight: u32, apps: &[AppEntry]) -> Vec<SearchResult> {
     let trimmed = query.trim();
-    if trimmed.len() < 8 {
+    if trimmed.len() < ranking_config::INTENT_MIN_QUERY_LEN {
         return Vec::new();
     }
 
     let steps = split_intent_steps(trimmed);
-    if steps.len() < 2 {
+    if steps.len() < ranking_config::INTENT_MIN_STEPS {
         return Vec::new();
     }
 
@@ -471,7 +472,7 @@ fn build_intent_results(query: &str, weight: u32, apps: &[AppEntry]) -> Vec<Sear
         )),
         icon: Some("fa-solid fa-route".to_string()),
         exec: workflow_exec,
-        score: weighted_score(970_000, weight),
+        score: weighted_score(ranking_config::INTENT_BASE_SCORE, weight),
         match_indices: vec![],
         source: ResultSource::Application,
         actions: Some(vec![matcher::ActionHint {
@@ -501,23 +502,23 @@ fn query_relevance_bonus(query: &str, result: &SearchResult) -> u32 {
 
     let mut bonus = 0u32;
     if title == q {
-        bonus += 18_000;
+        bonus += ranking_config::QR_TITLE_EXACT;
     } else if title.starts_with(&q) {
-        bonus += 12_000;
+        bonus += ranking_config::QR_TITLE_PREFIX;
     } else if title.contains(&q) {
-        bonus += 7_000;
+        bonus += ranking_config::QR_TITLE_CONTAINS;
     }
 
     if !subtitle.is_empty() && subtitle.contains(&q) {
-        bonus += 3_000;
+        bonus += ranking_config::QR_SUBTITLE_CONTAINS;
     }
 
     if exec.starts_with(&q) || exec.contains(&q) {
-        bonus += 2_500;
+        bonus += ranking_config::QR_EXEC_CONTAINS;
     }
 
     if q.split_whitespace().count() > 1 && q.split_whitespace().all(|t| title.contains(t)) {
-        bonus += 4_000;
+        bonus += ranking_config::QR_MULTI_TOKEN_ALL;
     }
 
     bonus
@@ -532,7 +533,7 @@ fn source_intent_bonus(query: &str, result: &SearchResult) -> u32 {
     match result.source {
         ResultSource::Application => {
             if q.starts_with("open ") || q.starts_with("launch ") || q.starts_with("run ") {
-                8_000
+                ranking_config::SI_APPLICATION
             } else {
                 0
             }
@@ -544,35 +545,35 @@ fn source_intent_bonus(query: &str, result: &SearchResult) -> u32 {
                 || q.contains("path")
                 || q.contains("download")
             {
-                4_500
+                ranking_config::SI_FILE
             } else {
                 0
             }
         }
         ResultSource::Window => {
             if q.contains("window") || q.contains("switch") || q.contains("focus") {
-                4_500
+                ranking_config::SI_WINDOW
             } else {
                 0
             }
         }
         ResultSource::Calculator => {
             if q.chars().any(|c| c.is_ascii_digit()) {
-                4_000
+                ranking_config::SI_CALCULATOR
             } else {
                 0
             }
         }
         ResultSource::Extension { .. } => {
             if q.contains("extension") || q.contains("plugin") {
-                3_500
+                ranking_config::SI_EXTENSION
             } else {
                 0
             }
         }
         ResultSource::Clipboard => {
             if q.contains("clipboard") || q.contains("copy") || q.contains("snippet") {
-                3_200
+                ranking_config::SI_CLIPBOARD
             } else {
                 0
             }
@@ -592,11 +593,11 @@ fn app_entity_bonus(query: &str, result: &SearchResult) -> u32 {
 
     let title = result.title.to_lowercase();
     if title == q {
-        8_000
+        ranking_config::AE_EXACT
     } else if title.starts_with(&q) {
-        5_000
+        ranking_config::AE_PREFIX
     } else if title.contains(&q) {
-        2_000
+        ranking_config::AE_CONTAINS
     } else {
         0
     }
@@ -759,9 +760,9 @@ fn build_profile_results(
             }
 
             let (base, indices) = if let Some((raw, idxs)) = matcher::fuzzy_score_text(query, &title) {
-                (1_000u32.saturating_add(raw.saturating_mul(10)), idxs)
+                (ranking_config::PROFILE_FUZZY_BASE.saturating_add(raw.saturating_mul(ranking_config::PROFILE_FUZZY_MULTIPLIER)), idxs)
             } else {
-                (900u32.saturating_sub(idx as u32), Vec::new())
+                (ranking_config::PROFILE_FALLBACK_BASE.saturating_sub(idx as u32), Vec::new())
             };
 
             Some(SearchResult {
@@ -970,20 +971,20 @@ where
                 subtitle.push_str(" • Limited actions");
             }
 
-            let mut base_score = 650u32;
+            let mut base_score = ranking_config::WINDOW_NO_QUERY_BASE;
             let mut match_indices = Vec::new();
             if !query.trim().is_empty() {
                 if let Some((raw, idxs)) = matcher::fuzzy_score_text(query, &win.title) {
-                    base_score = 850u32.saturating_add(raw.saturating_mul(8));
+                    base_score = ranking_config::WINDOW_FUZZY_TITLE_BASE.saturating_add(raw.saturating_mul(ranking_config::WINDOW_FUZZY_TITLE_MULTIPLIER));
                     match_indices = idxs;
                 } else if let Some((raw, _)) = matcher::fuzzy_score_text(query, &win.class) {
-                    base_score = 760u32.saturating_add(raw.saturating_mul(6));
+                    base_score = ranking_config::WINDOW_FUZZY_CLASS_BASE.saturating_add(raw.saturating_mul(ranking_config::WINDOW_FUZZY_CLASS_MULTIPLIER));
                 } else {
-                    base_score = 500;
+                    base_score = ranking_config::WINDOW_NO_MATCH_BASE;
                 }
             }
             // Earlier entries are usually more recent in grouped providers.
-            let recency_bonus = (window_cap.saturating_sub(entry_idx) as u32).saturating_mul(8).min(180);
+            let recency_bonus = (window_cap.saturating_sub(entry_idx) as u32).saturating_mul(ranking_config::WINDOW_RECENCY_MULTIPLIER).min(ranking_config::WINDOW_RECENCY_CAP);
             base_score = base_score.saturating_add(recency_bonus);
 
             results.push(SearchResult {
@@ -1044,7 +1045,7 @@ fn build_extension_results(
                             &ext.path,
                         ),
                         exec: format!("{}:{}:{}", exec_prefix, ext.manifest.name, cmd.name),
-                        score: weighted_score(700u32.saturating_add(score.saturating_mul(6)), weight),
+                        score: weighted_score(ranking_config::EXTENSION_FUZZY_BASE.saturating_add(score.saturating_mul(ranking_config::EXTENSION_FUZZY_MULTIPLIER)), weight),
                         match_indices: indices,
                         source: ResultSource::Extension {
                             ext_id: ext.manifest.name.clone(),
@@ -1071,7 +1072,7 @@ fn build_extension_results(
                         &ext.path,
                     ),
                 exec: format!("{}:{}:{}", exec_prefix, ext.manifest.name, cmd.name),
-                score: weighted_score(1_050, weight),
+                score: weighted_score(ranking_config::EXTENSION_EXACT_SCORE, weight),
                 match_indices: vec![],
                 source: ResultSource::Extension {
                     ext_id: ext.manifest.name.clone(),
@@ -1100,7 +1101,7 @@ fn build_clipboard_results(query: &str, weight: u32, max_results: usize) -> Vec<
     let lower = trimmed.to_lowercase();
     let mut results = Vec::new();
 
-    for item in history.into_iter().take(80) {
+    for item in history.into_iter().take(ranking_config::CLIPBOARD_SCAN_LIMIT) {
         let content = item.content.replace('\n', " ");
         let title = content.chars().take(100).collect::<String>();
         let matched = title.to_lowercase().contains(&lower);
@@ -1110,14 +1111,14 @@ fn build_clipboard_results(query: &str, weight: u32, max_results: usize) -> Vec<
             continue;
         }
 
-        let mut score: u32 = if matched { 900 } else { 700 };
+        let mut score: u32 = if matched { ranking_config::CLIPBOARD_EXACT_BASE } else { ranking_config::CLIPBOARD_FUZZY_BASE };
         let mut indices = Vec::new();
         if let Some((raw, idxs)) = fuzzy {
-            score = score.saturating_add(raw.saturating_mul(5));
+            score = score.saturating_add(raw.saturating_mul(ranking_config::CLIPBOARD_FUZZY_MULTIPLIER));
             indices = idxs;
         }
         if item.pinned {
-            score = score.saturating_add(220);
+            score = score.saturating_add(ranking_config::CLIPBOARD_PINNED_BONUS);
         }
 
         results.push(SearchResult {
@@ -1535,131 +1536,202 @@ async fn rebuild_file_index(
     Ok(index_state.indexed_at)
 }
 
+/// Monotonically increasing search generation counter for cancellation.
+static SEARCH_GENERATION: AtomicU64 = AtomicU64::new(0);
+
 #[tauri::command]
 async fn search(
     query: String,
     state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<Vec<SearchResult>, VantaError> {
     let search_start = Instant::now();
-    let apps = state
-        .apps
-        .lock()
-        .map_err(|_| "Failed to access application cache".to_string())?;
-    let (max_results, search_config, profiles_config) = {
+    let generation = SEARCH_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+
+    // ── Snapshot state under locks, release immediately ──────────────
+    let apps_snapshot;
+    let max_results;
+    let search_config;
+    let profiles_config;
+    let usage_map;
+    let ext_snapshot;
+    let file_index_snapshot;
+    {
+        apps_snapshot = state
+            .apps
+            .lock()
+            .map_err(|_| "Failed to access application cache".to_string())?
+            .clone();
         let config = state
             .config
             .lock()
             .map_err(|_| "Failed to access config".to_string())?;
-        (
-            config.general.max_results,
-            config.search.clone(),
-            config.profiles.clone(),
-        )
-    };
+        max_results = config.general.max_results;
+        search_config = config.search.clone();
+        profiles_config = config.profiles.clone();
+        drop(config);
 
-    let usage_map = {
-        let history = state
+        usage_map = state
             .history
             .lock()
-            .map_err(|_| "Failed to access history".to_string())?;
-        history.usage.clone()
-    };
+            .map_err(|_| "Failed to access history".to_string())?
+            .usage_map();
+        ext_snapshot = state
+            .extensions_cache
+            .lock()
+            .map_err(|_| "Failed to access extensions cache".to_string())?
+            .clone();
+        file_index_snapshot = state
+            .file_index
+            .lock()
+            .map_err(|_| "Failed to access file index".to_string())?
+            .clone();
+    }
 
+    // Check cancellation early.
+    if SEARCH_GENERATION.load(Ordering::SeqCst) != generation {
+        return Ok(Vec::new());
+    }
+
+    let query_lower = query.to_lowercase();
     let app_limit = if query.trim().is_empty() {
-        apps.len()
+        apps_snapshot.len()
     } else {
         max_results
     };
 
-    let mut results = if search_config.applications.enabled {
-        matcher::fuzzy_search(
-            &query,
-            &apps,
-            app_limit,
-            &usage_map,
-            search_config.applications.weight,
-        )
-    } else {
-        Vec::new()
-    };
-
-    let query_lower = query.to_lowercase();
     let derived_cap = std::cmp::max(1, max_results / 2);
     let window_cap = if search_config.windows_max_results > 0 {
         search_config.windows_max_results
     } else {
         derived_cap
     };
-    if search_config.windows.enabled {
-        let window_results = build_window_results(
-            &query,
-            &query_lower,
-            window_cap,
-            &apps,
-            search_config.windows.weight,
-            |cap| list_windows_grouped(cap),
-        );
-        results.extend(window_results);
+
+    // ── Parallel source queries ──────────────────────────────────────
+    // Clone references for move into async blocks.
+    let q1 = query.clone();
+    let q2 = query.clone();
+    let q3 = query.clone();
+    let q4 = query.clone();
+    let q5 = query.clone();
+    let ql1 = query_lower.clone();
+    let apps1 = apps_snapshot.clone();
+    let apps2 = apps_snapshot.clone();
+    let apps3 = apps_snapshot.clone();
+    let um1 = usage_map.clone();
+    let sc = search_config.clone();
+    let pc = profiles_config.clone();
+
+    let app_handle_stream = app_handle.clone();
+
+    // Task 1: Fuzzy app search
+    let app_task = tokio::task::spawn_blocking({
+        let sc = sc.clone();
+        move || -> Vec<SearchResult> {
+            if !sc.applications.enabled {
+                return Vec::new();
+            }
+            matcher::fuzzy_search(&q1, &apps1, app_limit, &um1, sc.applications.weight)
+        }
+    });
+
+    // Task 2: Window search
+    let window_task = tokio::task::spawn_blocking({
+        let sc = sc.clone();
+        move || -> Vec<SearchResult> {
+            if !sc.windows.enabled {
+                return Vec::new();
+            }
+            build_window_results(&q2, &ql1, window_cap, &apps2, sc.windows.weight, |cap| {
+                list_windows_grouped(cap)
+            })
+        }
+    });
+
+    // Task 3: File search
+    let file_task = tokio::task::spawn_blocking({
+        let sc = sc.clone();
+        move || -> Vec<SearchResult> {
+            if !sc.files.enabled {
+                return Vec::new();
+            }
+            let mut file_results = files::search_index(&file_index_snapshot, &q3, max_results);
+            for fr in &mut file_results {
+                fr.score = weighted_score(fr.score, sc.files.weight);
+            }
+            file_results
+        }
+    });
+
+    // Task 4: Clipboard search
+    let clipboard_task = tokio::task::spawn_blocking({
+        let sc = sc.clone();
+        move || -> Vec<SearchResult> {
+            if q4.trim().is_empty() {
+                return Vec::new();
+            }
+            build_clipboard_results(&q4, sc.files.weight, max_results / 2)
+        }
+    });
+
+    // Task 5: Extensions, profiles, intents (lightweight — group together)
+    let misc_task = tokio::task::spawn_blocking({
+        let sc = sc.clone();
+        move || -> Vec<SearchResult> {
+            let mut results = Vec::new();
+            if sc.applications.enabled {
+                results.extend(build_profile_results(&q5, &pc, sc.applications.weight));
+                results.extend(build_intent_results(&q5, sc.applications.weight, &apps3));
+                results.extend(build_extension_results(&q5, &ext_snapshot, sc.applications.weight));
+            }
+            results
+        }
+    });
+
+    // Await all concurrently.
+    let (app_res, win_res, file_res, clip_res, misc_res) =
+        tokio::join!(app_task, window_task, file_task, clipboard_task, misc_task);
+
+    // Check cancellation after parallel work completes.
+    if SEARCH_GENERATION.load(Ordering::SeqCst) != generation {
+        return Ok(Vec::new());
     }
 
+    // ── Merge results ────────────────────────────────────────────────
+    let mut results: Vec<SearchResult> = Vec::new();
+
+    let app_results = app_res.unwrap_or_default();
+    if !app_results.is_empty() {
+        let _ = app_handle_stream.emit("search-partial", &app_results.iter().map(|r| to_v3_result(r.clone())).collect::<Vec<_>>());
+    }
+    results.extend(app_results);
+
+    results.extend(win_res.unwrap_or_default());
+    results.extend(file_res.unwrap_or_default());
+    results.extend(clip_res.unwrap_or_default());
+    results.extend(misc_res.unwrap_or_default());
+
+    // Calculator (fast, synchronous)
     if search_config.calculator.enabled {
         if let Some(val) = math::evaluate(&query) {
             let val_str = format!("{}", val);
-            let calc_result = SearchResult {
+            results.push(SearchResult {
                 title: format!("= {}", val_str),
                 subtitle: Some("Click to Copy".to_string()),
                 icon: Some("calculator".to_string()),
                 exec: format!("copy:{}", val_str),
-                score: weighted_score(900_000, search_config.calculator.weight),
+                score: weighted_score(ranking_config::CALCULATOR_BASE_SCORE, search_config.calculator.weight),
                 match_indices: vec![],
                 source: matcher::ResultSource::Calculator,
                 actions: None,
                 id: None,
                 group: None,
                 section: Some("Calculator".to_string()),
-            };
-            results.push(calc_result);
+            });
         }
     }
 
-    if search_config.files.enabled {
-        let index_guard = state
-            .file_index
-            .lock()
-            .map_err(|_| "Failed to access file index".to_string())?;
-        let mut file_results = files::search_index(&index_guard, &query, max_results);
-        for file_result in &mut file_results {
-            file_result.score = weighted_score(file_result.score, search_config.files.weight);
-        }
-        results.extend(file_results);
-    }
-
-    if !query.trim().is_empty() {
-        let clipboard_results = build_clipboard_results(&query, search_config.files.weight, max_results / 2);
-        results.extend(clipboard_results);
-    }
-
-    if search_config.applications.enabled {
-        let profile_results =
-            build_profile_results(&query, &profiles_config, search_config.applications.weight);
-        results.extend(profile_results);
-    }
-
-    if search_config.applications.enabled {
-        let intent_results = build_intent_results(&query, search_config.applications.weight, &apps);
-        results.extend(intent_results);
-    }
-
-    // Extension command search
-    if search_config.applications.enabled {
-        let ext_cache = state
-            .extensions_cache
-            .lock()
-            .map_err(|_| "Failed to access extensions cache".to_string())?;
-        let ext_results = build_extension_results(&query, &ext_cache, search_config.applications.weight);
-        results.extend(ext_results);
-    }
-
+    // Store / Settings injection
     let wants_store = query_lower.contains("store")
         || query_lower.contains("install")
         || query_lower.contains("extension")
@@ -1671,7 +1743,7 @@ async fn search(
             subtitle: Some("Browse and install extensions".to_string()),
             icon: Some("fa-solid fa-store".to_string()),
             exec: "open-store".to_string(),
-            score: weighted_score(2_600, 100),
+            score: weighted_score(ranking_config::STORE_SEARCH_SCORE, 100),
             match_indices: vec![],
             source: ResultSource::Application,
             actions: None,
@@ -1688,7 +1760,7 @@ async fn search(
 
     if wants_settings && search_config.applications.enabled {
         if let Some((raw_score, indices)) = matcher::fuzzy_score_text(&query, "Open Vanta Settings") {
-            let base = 1_100u32.saturating_add(raw_score.saturating_mul(8));
+            let base = ranking_config::SETTINGS_BASE_SCORE.saturating_add(raw_score.saturating_mul(ranking_config::SETTINGS_FUZZY_MULTIPLIER));
             results.push(SearchResult {
                 title: "Settings".to_string(),
                 subtitle: Some("Open Vanta settings".to_string()),
@@ -1705,13 +1777,25 @@ async fn search(
         }
     }
 
+    // ── Bonus scoring & negative scoring ─────────────────────────────
     if !query.trim().is_empty() {
         for result in &mut results {
             let bonus = query_relevance_bonus(&query, result)
                 .saturating_add(source_intent_bonus(&query, result))
                 .saturating_add(app_entity_bonus(&query, result));
             result.score = result.score.saturating_add(bonus);
+
+            // Negative scoring: penalise short fuzzy matches (likely noise).
+            if result.match_indices.len() <= ranking_config::SHORT_MATCH_THRESHOLD
+                && result.score > 0
+                && !result.match_indices.is_empty()
+            {
+                result.score = result.score.saturating_sub(ranking_config::SHORT_MATCH_PENALTY);
+            }
         }
+
+        // Suppress below-threshold results.
+        results.retain(|r| r.score >= ranking_config::NEGATIVE_SCORE_THRESHOLD);
     }
 
     results.sort_by(|a, b| b.score.cmp(&a.score));
@@ -1730,8 +1814,9 @@ async fn search(
 async fn search_v3(
     query: String,
     state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
 ) -> Result<Vec<SearchResultV3>, VantaError> {
-    let legacy = search(query, state).await?;
+    let legacy = search(query, state, app_handle).await?;
     Ok(legacy.into_iter().map(to_v3_result).collect())
 }
 
@@ -1824,7 +1909,7 @@ async fn get_suggestions(
             subtitle: app.generic_name.clone().or_else(|| app.comment.clone()),
             icon: app.icon.clone(),
             exec: app.exec.clone(),
-            score: weighted_score(100, search_config.applications.weight),
+            score: weighted_score(ranking_config::APP_SUGGESTION_WEIGHT, search_config.applications.weight),
             match_indices: vec![],
             source: ResultSource::Application,
             actions: None,
@@ -1836,7 +1921,7 @@ async fn get_suggestions(
 
     results.extend(app_results);
 
-    let mut doc_results = files::search_index(&file_index, "", 12);
+    let mut doc_results = files::search_index(&file_index, "", ranking_config::SUGGESTION_DOC_LIMIT);
     doc_results.sort_by(|a, b| {
         let a_dir = a.icon.as_deref() == Some("dir");
         let b_dir = b.icon.as_deref() == Some("dir");
@@ -1865,7 +1950,7 @@ async fn get_suggestions(
                         &ext.path,
                     ),
                     exec: format!("{}:{}:{}", exec_prefix, ext.manifest.name, cmd.name),
-                    score: weighted_score(850_000, search_config.applications.weight),
+                    score: weighted_score(ranking_config::EXTENSION_SUGGESTION_SCORE, search_config.applications.weight),
                     match_indices: vec![],
                     source: ResultSource::Extension {
                         ext_id: ext.manifest.name.clone(),
@@ -1887,7 +1972,7 @@ async fn get_suggestions(
         subtitle: Some("Browse and install extensions".to_string()),
         icon: Some("fa-solid fa-store".to_string()),
         exec: "open-store".to_string(),
-        score: 800_000,
+        score: ranking_config::STORE_SUGGESTION_SCORE,
         match_indices: vec![],
         source: ResultSource::Application,
         actions: None,
@@ -1901,7 +1986,7 @@ async fn get_suggestions(
         subtitle: Some("Open Vanta settings".to_string()),
         icon: Some("fa-solid fa-gear".to_string()),
         exec: "open-settings".to_string(),
-        score: 1_200_000,
+        score: ranking_config::SETTINGS_SUGGESTION_SCORE,
         match_indices: vec![],
         source: ResultSource::Application,
         actions: None,
