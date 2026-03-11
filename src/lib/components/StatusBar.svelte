@@ -40,7 +40,7 @@
   .status-bar {
     justify-content: space-between;
     padding: calc(var(--space-1) * var(--vanta-space-scale, 1)) calc(var(--space-3) * var(--vanta-space-scale, 1));
-    font-size: 11px;
+    font-size: var(--type-caption);
     color: var(--ds-text-secondary, #999);
     border-top: 1px solid var(--ds-border, rgba(255, 255, 255, 0.08));
     flex-shrink: 0;
@@ -56,7 +56,7 @@
 
   .status-badge {
     gap: 4px;
-    font-weight: 500;
+    font-weight: var(--weight-medium);
   }
 
   .status-badge-logo {

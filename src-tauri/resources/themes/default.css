@@ -53,8 +53,9 @@
     display: inline-flex;
     align-items: center;
     gap: calc(var(--space-1) * var(--vanta-space-scale, 1));
-    font-weight: 520;
-    letter-spacing: 0.12em;
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-widest);
+    line-height: var(--leading-snug);
 }
 
 .chevron {
@@ -74,20 +75,22 @@
     padding: calc(var(--space-1) * var(--vanta-space-scale, 1)) calc(var(--space-2) * var(--vanta-space-scale, 1));
     border-radius: 999px;
     border: 1px solid var(--border-separator, rgba(255, 255, 255, 0.08));
-    font-size: 11px;
+    font-size: var(--type-caption);
     color: var(--ds-text-primary);
     background: var(--purple-ghost, rgba(123, 53, 240, 0.12));
     box-shadow: 0 0 0 1px rgba(123, 53, 240, 0.05) inset;
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
 }
 
 .subheader {
     padding: 6px 12px;
-    font-size: 12px;
+    font-size: var(--type-body);
     color: var(--text-secondary);
     opacity: 0.8;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: var(--tracking-wider);
+    line-height: var(--leading-normal);
 }
 
 
@@ -123,13 +126,44 @@
     --ds-danger: #ef4444;
     --ds-info: #7b35f0;
 
-    /* Typography */
-    --font-ui: 'SN Pro', 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+    /* Typography — Phase 28 Readability Program */
+    --font-ui: 'SN Pro', 'Inter', system-ui, -apple-system, 'Segoe UI', 'Noto Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', monospace;
+
+    /* Type scale (display → micro) */
     --type-display: 26px;
+    --type-heading: 16px;
+    --type-subheading: 14px;
     --type-title: 14px;
     --type-body: 12.5px;
     --type-caption: 11px;
+    --type-micro: 9.5px;
+
+    /* Line-height scale */
+    --leading-tight: 1.15;
+    --leading-snug: 1.3;
+    --leading-normal: 1.45;
+    --leading-relaxed: 1.6;
+
+    /* Font-weight scale */
+    --weight-light: 300;
+    --weight-normal: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+    --weight-bold: 700;
+
+    /* Letter-spacing presets */
+    --tracking-tight: -0.3px;
+    --tracking-snug: -0.1px;
+    --tracking-normal: 0;
+    --tracking-wide: 0.04em;
+    --tracking-wider: 0.08em;
+    --tracking-widest: 0.12em;
+
+    /* Measure (max line width for readability) */
+    --measure-narrow: 45ch;
+    --measure-normal: 65ch;
+    --measure-wide: 80ch;
 
     /* Spacing rhythm */
     --space-1: 4px;
@@ -278,6 +312,101 @@
     scroll-behavior: auto !important;
 }
 
+/* ── Phase 28: Typography & Readability Program ────────────── */
+
+/* Semantic type classes — use these instead of one-off font rules */
+.type-display {
+    font-size: var(--type-display);
+    font-weight: var(--weight-bold);
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-tight);
+}
+
+.type-heading {
+    font-size: var(--type-heading);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-snug);
+}
+
+.type-subheading {
+    font-size: var(--type-subheading);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-snug);
+}
+
+.type-title {
+    font-size: var(--type-title);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-snug);
+}
+
+.type-body {
+    font-size: var(--type-body);
+    font-weight: var(--weight-normal);
+    line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-normal);
+}
+
+.type-caption {
+    font-size: var(--type-caption);
+    font-weight: var(--weight-normal);
+    line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-wide);
+}
+
+.type-micro {
+    font-size: var(--type-micro);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+}
+
+/* Truncation utilities */
+.truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Monospace utility */
+.type-mono {
+    font-family: var(--font-mono);
+    font-size: var(--type-body);
+    line-height: var(--leading-relaxed);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Readability: enforce measure for prose blocks */
+.prose {
+    max-width: var(--measure-normal);
+    line-height: var(--leading-relaxed);
+}
+
+/* Tabular-nums for numeric columns */
+.tabular-nums {
+    font-variant-numeric: tabular-nums;
+}
+
 /* ── Reset ─────────────────────────────────────────────────── */
 *,
 *::before,
@@ -298,6 +427,7 @@ body {
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     font-size: calc(16px * var(--vanta-text-scale, 1));
+    line-height: var(--leading-normal);
 }
 
 button:focus-visible,
@@ -328,12 +458,12 @@ textarea {
     padding: 6px 10px;
     border-radius: 6px;
     width: 100%;
-    font-size: 12px;
-    font-family: 'SN Pro', 'Inter', system-ui, sans-serif;
+    font-size: var(--type-body);
+    font-family: var(--font-ui);
     outline: none;
     resize: vertical;
     transition: border-color var(--t-fast);
-    line-height: 1.5;
+    line-height: var(--leading-relaxed);
 }
 
 textarea:focus {
@@ -541,8 +671,9 @@ a:hover {
     box-shadow: none !important;
     font-family: var(--font-ui);
     font-size: var(--type-display) !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.3px;
+    font-weight: var(--weight-bold) !important;
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--leading-tight);
     color: var(--text-primary);
     caret-color: var(--purple-bright);
     text-align: left !important;
@@ -744,9 +875,10 @@ a:hover {
 
 .icon-number {
     font-size: 15px;
-    font-weight: 700;
+    font-weight: var(--weight-bold);
     color: var(--text-secondary);
     font-variant-numeric: tabular-nums;
+    line-height: var(--leading-tight);
 }
 
 .icon-fallback {
@@ -806,8 +938,9 @@ a:hover {
 
 .item-title {
     font-size: var(--type-title);
-    font-weight: 500;
-    letter-spacing: -0.1px;
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--tracking-snug);
+    line-height: var(--leading-snug);
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
@@ -816,12 +949,13 @@ a:hover {
 
 .item-title .match-highlight {
     color: var(--purple-bright);
-    font-weight: 700;
+    font-weight: var(--weight-bold);
 }
 
 .item-subtitle {
     font-size: var(--type-body);
-    font-weight: 400;
+    font-weight: var(--weight-normal);
+    line-height: var(--leading-normal);
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -905,9 +1039,9 @@ a:hover {
 }
 
 .script-badge {
-    font-size: 8.5px;
-    font-weight: 700;
-    letter-spacing: 0.6px;
+    font-size: var(--type-micro);
+    font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
     padding: 1px 5px;
     border-radius: 3px;
@@ -915,7 +1049,7 @@ a:hover {
     color: var(--purple-bright);
     border: 1px solid rgba(123, 53, 240, 0.25);
     flex-shrink: 0;
-    line-height: 1.6;
+    line-height: var(--leading-relaxed);
 }
 
 .item-meta {
@@ -932,13 +1066,14 @@ a:hover {
 }
 
 .item-badge {
-    font-size: 10px;
-    font-weight: 600;
+    font-size: var(--type-caption);
+    font-weight: var(--weight-semibold);
     padding: 1px 7px;
     border-radius: 5px;
     background: rgba(255, 255, 255, 0.05);
     color: var(--text-secondary);
     border: 1px solid rgba(255, 255, 255, 0.07);
+    line-height: var(--leading-snug);
 }
 
 .action-hint {
@@ -951,10 +1086,11 @@ a:hover {
     border: 1px solid var(--purple-dim);
     border-bottom-width: 2px;
     border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
+    font-size: var(--type-caption);
+    font-weight: var(--weight-semibold);
     color: var(--purple-bright);
     font-family: inherit;
+    line-height: var(--leading-tight);
 }
 
 /* ── Empty State ────────────────────────────────────────────── */
@@ -966,7 +1102,8 @@ a:hover {
     gap: 8px;
     padding: 36px 20px;
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: var(--type-body);
+    line-height: var(--leading-normal);
 }
 
 .empty-icon {
@@ -976,7 +1113,8 @@ a:hover {
 
 .empty-text {
     color: var(--text-secondary);
-    font-size: 12.5px;
+    font-size: var(--type-body);
+    line-height: var(--leading-normal);
     opacity: 0.45;
 }
 
@@ -1033,10 +1171,11 @@ a:hover {
 
 .status-version {
     color: var(--text-secondary);
-    font-size: 9px;
-    font-weight: 500;
+    font-size: var(--type-micro);
+    font-weight: var(--weight-medium);
     opacity: 0.5;
-    letter-spacing: 0.3px;
+    letter-spacing: var(--tracking-wide);
+    line-height: var(--leading-snug);
 }
 
 .status-badge {
@@ -1048,10 +1187,11 @@ a:hover {
     color: var(--purple-bright);
     padding: 0px 6px;
     border-radius: 100px;
-    font-weight: 700;
-    font-size: 9.5px;
+    font-weight: var(--weight-bold);
+    font-size: var(--type-micro);
     text-transform: uppercase;
-    letter-spacing: 0.8px;
+    letter-spacing: var(--tracking-wider);
+    line-height: var(--leading-snug);
 }
 
 .status-badge-logo {
@@ -1065,17 +1205,19 @@ a:hover {
 .status-info {
     color: var(--ds-text-secondary);
     opacity: 0.5;
-    font-size: 11px;
-    font-weight: 400;
-    letter-spacing: 0.1px;
+    font-size: var(--type-caption);
+    font-weight: var(--weight-normal);
+    letter-spacing: var(--tracking-normal);
+    line-height: var(--leading-snug);
 }
 
 .status-download {
     display: flex;
     align-items: center;
     gap: 5px;
-    font-weight: 500;
-    font-size: 11px;
+    font-weight: var(--weight-medium);
+    font-size: var(--type-caption);
+    line-height: var(--leading-snug);
     margin-right: 6px;
 }
 
@@ -1140,17 +1282,19 @@ a:hover {
 }
 
 h2 {
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: -0.2px;
+    font-size: var(--type-heading);
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--tracking-snug);
+    line-height: var(--leading-snug);
     margin: 0;
 }
 
 h3 {
-    font-size: 10.5px;
-    font-weight: 700;
+    font-size: var(--type-caption);
+    font-weight: var(--weight-bold);
     text-transform: uppercase;
-    letter-spacing: 0.8px;
+    letter-spacing: var(--tracking-wider);
+    line-height: var(--leading-snug);
     color: var(--text-secondary);
     margin: 20px 0 10px 0;
     border-bottom: 1px solid var(--border-separator);
@@ -1212,7 +1356,8 @@ label {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 13px;
+    font-size: var(--type-body);
+    line-height: var(--leading-normal);
     color: var(--text-primary);
 }
 
@@ -1225,8 +1370,9 @@ input[type="number"] {
     border-radius: 6px;
     width: 150px;
     text-align: right;
-    font-size: 13px;
+    font-size: var(--type-body);
     font-family: inherit;
+    line-height: var(--leading-normal);
     outline: none;
     transition: border-color var(--t-fast);
 }
@@ -1244,7 +1390,8 @@ input[type="number"]:focus {
     border-radius: 6px;
     width: 150px;
     font-family: inherit;
-    font-size: 13px;
+    font-size: var(--type-body);
+    line-height: var(--leading-normal);
     color-scheme: dark;
     outline: none;
 }
@@ -1301,8 +1448,9 @@ input[type="range"] {
     padding: 5px 12px;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 12.5px;
+    font-size: var(--type-body);
     font-family: inherit;
+    line-height: var(--leading-normal);
     transition: all var(--t-fast) var(--ease-std);
 }
 
@@ -1319,9 +1467,10 @@ input[type="range"] {
     padding: 6px 14px;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: var(--type-body);
+    font-weight: var(--weight-medium);
     font-family: inherit;
+    line-height: var(--leading-normal);
     transition: all var(--t-fast) var(--ease-std);
 }
 
@@ -1360,9 +1509,10 @@ input[type="range"] {
     border: none;
     color: var(--text-primary);
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: var(--type-title);
+    font-weight: var(--weight-semibold);
     font-family: inherit;
+    line-height: var(--leading-snug);
     transition: color 0.2s ease;
 }
 
@@ -1370,8 +1520,9 @@ input[type="range"] {
     margin: 0;
     border: none;
     padding: 0;
-    font-size: 13px;
-    letter-spacing: 0.5px;
+    font-size: var(--type-body);
+    letter-spacing: var(--tracking-wide);
+    line-height: var(--leading-snug);
     color: var(--text-secondary);
     text-transform: uppercase;
     transition: color 0.3s ease;
@@ -1550,7 +1701,7 @@ input[type="range"] {
     margin: 0;
     color: var(--ds-text-secondary);
     font-size: var(--type-body);
-    line-height: 1.35;
+    line-height: var(--leading-normal);
 }
 
 .window-shell .hub-window-subtitle {
@@ -1620,8 +1771,9 @@ input[type="range"] {
 
 .store-header h1 {
     flex: 1;
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: var(--type-heading);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
     margin: 0;
 }
 
@@ -1633,7 +1785,8 @@ input[type="range"] {
     margin: 10px 18px 0;
     padding: 9px 12px;
     border-radius: 8px;
-    font-size: 0.82rem;
+    font-size: var(--type-body);
+    line-height: var(--leading-normal);
     border: 1px solid var(--vanta-border, rgba(255,255,255,0.12));
     background: rgba(255, 255, 255, 0.04);
     color: var(--vanta-text, #f5f5f5);
@@ -1803,8 +1956,9 @@ input[type="range"] {
 }
 
 .ext-info h3 {
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: var(--type-title);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
     margin: 0 0 4px 0;
     color: var(--vanta-text, #f5f5f5);
     border: none;
@@ -1822,9 +1976,10 @@ input[type="range"] {
 }
 
 .trust-badge {
-    font-size: 0.64rem;
+    font-size: var(--type-micro);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--tracking-wide);
+    line-height: var(--leading-snug);
     border-radius: 999px;
     padding: 2px 8px;
     border: 1px solid var(--vanta-border, rgba(255,255,255,0.12));
@@ -1838,10 +1993,10 @@ input[type="range"] {
 }
 
 .ext-desc {
-    font-size: 0.82rem;
+    font-size: var(--type-body);
     color: var(--vanta-text-dim, #888);
     margin: 0 0 6px 0;
-    line-height: 1.3;
+    line-height: var(--leading-normal);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -1902,12 +2057,13 @@ input[type="range"] {
 }
 
 .perm-badge {
-    font-size: 0.68rem;
+    font-size: var(--type-caption);
     padding: 1px 6px;
     border-radius: 4px;
     background: color-mix(in srgb, var(--vanta-accent, #7b35f0) 15%, transparent);
     color: var(--vanta-accent, #7b35f0);
-    font-weight: 500;
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-snug);
 }
 
 .ext-actions {
@@ -1965,8 +2121,9 @@ input[type="range"] {
     border: none;
     background: var(--vanta-accent, #7b35f0);
     color: #fff;
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: var(--type-body);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-normal);
     cursor: pointer;
     transition: all 0.15s;
     white-space: nowrap;
@@ -2028,7 +2185,8 @@ input[type="range"] {
     gap: 12px;
     height: 100%;
     color: var(--vanta-text-dim, #888);
-    font-size: 13px;
+    font-size: var(--type-body);
+    line-height: var(--leading-normal);
 }
 
 .ext-spinner {
@@ -2126,7 +2284,8 @@ input[type="range"] {
     gap: 12px;
     height: 100%;
     color: var(--vanta-text-dim, #888);
-    font-size: 13px;
+    font-size: var(--type-body);
+    line-height: var(--leading-normal);
     padding: 24px;
     text-align: center;
 }
@@ -2245,8 +2404,9 @@ input[type="range"] {
     border: none;
     outline: none;
     color: var(--vanta-text, #f5f5f5);
-    font-size: 14px;
+    font-size: var(--type-title);
     font-family: inherit;
+    line-height: var(--leading-snug);
 }
 
 .cv-search-input::placeholder {
@@ -2410,8 +2570,9 @@ input[type="range"] {
 }
 
 .cv-color-label {
-    font-family: monospace;
-    font-size: 13px;
+    font-family: var(--font-mono);
+    font-size: var(--type-body);
+    line-height: var(--leading-normal);
 }
 
 .cv-detail-content {
@@ -2427,9 +2588,9 @@ input[type="range"] {
     margin: 0;
     white-space: pre-wrap;
     word-break: break-all;
-    font-size: 12px;
-    line-height: 1.5;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: var(--type-body);
+    line-height: var(--leading-relaxed);
+    font-family: var(--font-mono);
     color: var(--vanta-text, #f5f5f5);
 }
 
@@ -2520,8 +2681,9 @@ input[type="range"] {
 }
 
 .npb-track {
-    font-size: 12px;
-    font-weight: 600;
+    font-size: var(--type-body);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
     color: var(--vanta-text, #f5f5f5);
     white-space: nowrap;
     overflow: hidden;
@@ -2646,10 +2808,11 @@ input[type="range"] {
 }
 
 .mini-player-title {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: var(--type-caption);
+    font-weight: var(--weight-semibold);
     color: var(--vanta-text-dim, #888);
-    letter-spacing: 0.3px;
+    letter-spacing: var(--tracking-wide);
+    line-height: var(--leading-snug);
 }
 
 .mini-player-close {
@@ -2711,15 +2874,15 @@ input[type="range"] {
 }
 
 .mini-player-lyric-line {
-    font-size: 12px;
-    line-height: 1.35;
+    font-size: var(--type-body);
+    line-height: var(--leading-normal);
     color: var(--vanta-text, #f5f5f5);
 }
 
 .mini-player-lyrics-empty {
-    font-size: 11px;
+    font-size: var(--type-caption);
     color: var(--vanta-text-dim, #9a9a9a);
-    line-height: 1.4;
+    line-height: var(--leading-normal);
 }
 
 .mini-player-controls-pane {
@@ -2768,8 +2931,9 @@ input[type="range"] {
 }
 
 .mini-player-track {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--type-body);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-snug);
     color: var(--vanta-text, #f5f5f5);
     white-space: nowrap;
     overflow: hidden;
