@@ -1,4 +1,4 @@
-name: Release Vanta v4.3.0
+name: Release Vanta v4.4.0
 
 on:
   push:
@@ -86,15 +86,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v4.3.0 -- Phase 23 Launcher Layout Recomposition
+            ## Vanta v4.4.0 -- Phase 24 Settings IA And Visual Refresh
 
-            Minor release focused on launcher spatial balance, adaptive density behavior, and clearer item affordances.
+            Minor release focused on settings discoverability, sticky context navigation, and standardized settings control styling.
 
             ### Highlights
-            - Added launcher layout recomposition for balanced search, results, and status regions.
-            - Added density-aware spacing consistency across launcher surfaces using shared spacing tokens.
-            - Improved row affordances with stronger selected states and cleaner hover behavior.
-            - Improved grouped navigation feedback with selected-state section headers.
+            - Added sticky settings header with in-settings section search jump.
+            - Added canonical settings section alias handling to preserve deep-link compatibility.
+            - Improved settings visual consistency with reusable control-group utility classes.
+            - Added shared hint-list and hub-window styling primitives for settings-adjacent surfaces.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.

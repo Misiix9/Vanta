@@ -80,11 +80,40 @@
 
     let activeSection = $state("Feature Hub");
     let lastInitialSection = $state<string | null>(null);
+    let sectionQuery = $state("");
+    let sectionSearchStatus = $state<string | null>(null);
+
+    const sectionAliases: Record<string, string> = {
+        "theme": "Theme Profile",
+        "appearance": "Theme Profile",
+        "extensions": "Extensions",
+        "window": "Window",
+        "general": "General",
+        "community": "Community",
+        "feature-hub": "Feature Hub",
+        "feature hub": "Feature Hub",
+        "accessibility": "Accessibility",
+        "file-search": "File Search",
+        "file search": "File Search",
+        "diagnostics": "Diagnostics",
+    };
+
+    const sectionSearchIndex: Array<{ section: string; terms: string[] }> = [
+        { section: "Feature Hub", terms: ["start", "discover", "template", "shortcuts"] },
+        { section: "Theme Profile", terms: ["appearance", "theme", "colors", "studio"] },
+        { section: "General", terms: ["hotkey", "results", "community feed"] },
+        { section: "File Search", terms: ["files", "globs", "index", "extensions"] },
+        { section: "Accessibility", terms: ["motion", "text", "spacing", "compact", "relaxed"] },
+        { section: "Community", terms: ["feedback", "snippets", "workflows", "vote"] },
+        { section: "Extensions", terms: ["directory", "dev mode"] },
+        { section: "Window", terms: ["width", "height", "size"] },
+        { section: "Diagnostics", terms: ["metrics", "health", "recovery", "support bundle"] },
+    ];
     const roadmapTopics = [
         { id: "shareable-snippets", label: "Shareable snippets" },
         { id: "popular-workflows-feed", label: "Popular workflows feed" },
         { id: "in-app-feedback-channel", label: "In-app feedback channel" },
-        { id: "adaptive-intent-engine", label: "Adaptive intent engine (Phase 20)" },
+        { id: "settings-ia-refresh", label: "Settings IA refresh (Phase 24)" },
     ];
 
     function toggleSection(name: string) {
@@ -93,6 +122,34 @@
 
     function jumpToSection(name: string) {
         activeSection = name;
+    }
+
+    function normalizeSection(section: string | null | undefined): string | null {
+        if (!section) return null;
+        const trimmed = section.trim();
+        if (!trimmed) return null;
+        const lowered = trimmed.toLowerCase();
+        return sectionAliases[lowered] ?? trimmed;
+    }
+
+    function runSectionSearch() {
+        const query = sectionQuery.trim().toLowerCase();
+        if (!query) {
+            sectionSearchStatus = null;
+            return;
+        }
+
+        const hit = sectionSearchIndex.find((entry) => {
+            if (entry.section.toLowerCase().includes(query)) return true;
+            return entry.terms.some((term) => term.includes(query));
+        });
+
+        if (hit) {
+            activeSection = hit.section;
+            sectionSearchStatus = `Jumped to ${hit.section}`;
+        } else {
+            sectionSearchStatus = "No matching section";
+        }
     }
 
 
@@ -370,9 +427,10 @@
     });
 
     $effect(() => {
-        if (initialSection && initialSection !== lastInitialSection) {
-            activeSection = initialSection;
-            lastInitialSection = initialSection;
+        const normalizedInitial = normalizeSection(initialSection);
+        if (normalizedInitial && normalizedInitial !== lastInitialSection) {
+            activeSection = normalizedInitial;
+            lastInitialSection = normalizedInitial;
         }
     });
 
@@ -591,12 +649,26 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="settings-panel v2-panel v2-stack">
-    <header>
-        <h2>Settings</h2>
+    <header class="settings-header sticky">
+        <div class="settings-header-main">
+            <h2>Settings</h2>
+            <input
+                type="text"
+                class="settings-section-search"
+                bind:value={sectionQuery}
+                oninput={runSectionSearch}
+                placeholder="Jump to section (theme, files, diagnostics...)"
+                aria-label="Search settings sections"
+            />
+        </div>
         <div class="actions">
             <button class="close-btn" onclick={flushAndClose}>Done</button>
         </div>
     </header>
+
+    {#if sectionSearchStatus}
+        <div class="status-info settings-search-status">{sectionSearchStatus}</div>
+    {/if}
 
     <div class="sections v2-stack density-comfortable">
         <!-- Theme Section -->
@@ -627,7 +699,7 @@
                 </label>
             </div>
 
-            <h3 style="margin-top: 1rem;">Colors (Overrides)</h3>
+            <h3 class="settings-subheading">Colors (Overrides)</h3>
 
             <div class="control-group">
                 <label
@@ -706,7 +778,7 @@
                 </label>
             </div>
 
-            <h3 style="margin-top: 1rem;">Theme Studio</h3>
+            <h3 class="settings-subheading">Theme Studio</h3>
 
             <div class="preset-row">
                 <button class="preset-btn" onclick={() => applyThemePreset("minimal")}>Minimal</button>
@@ -932,7 +1004,7 @@
                         {/each}
                     </div>
 
-                    <div class="control-group" style="display: block;">
+                    <div class="control-group control-group-block">
                         <h4>Popular Workflows Feed (Opt-in)</h4>
                         {#if !config.general.community_feed_opt_in}
                             <p>Enable opt-in under General to fetch curated popular workflows.</p>
@@ -955,7 +1027,7 @@
                         {/if}
                     </div>
 
-                    <div class="control-group" style="display: block;">
+                    <div class="control-group control-group-block">
                         <h4>Shareable Snippets</h4>
                         <div class="preset-row">
                             <button class="preset-btn" onclick={() => onSnippetKindChange("workflow")}>Workflow</button>
@@ -996,7 +1068,7 @@
                     </div>
 
                     {#if communitySummary}
-                        <div class="control-group" style="display: block;">
+                        <div class="control-group control-group-block">
                             <h4>Community Snapshot</h4>
                             <p>Total feedback: {communitySummary.total_feedback}</p>
                             <ul class="hint-list">
@@ -1027,7 +1099,7 @@
             </button>
             {#if activeSection === "Feature Hub"}
                 <div class="accordion-content">
-                    <div class="control-group" style="display: block;">
+                    <div class="control-group control-group-block">
                         <h4>Start Here</h4>
                         <p>Use these shortcuts to access major Vanta features quickly.</p>
                         <div class="preset-row">
@@ -1038,7 +1110,7 @@
                         </div>
                     </div>
 
-                    <div class="control-group" style="display: block;">
+                    <div class="control-group control-group-block">
                         <h4>Extension Template Starter</h4>
                         <label>
                             Extension Name
@@ -1252,7 +1324,7 @@
                 </label>
             </div>
 
-            <div class="control-group" style="gap: 12px; align-items: center;">
+            <div class="control-group control-group-inline">
                 <div>{formatIndexedAt()}</div>
                 <button class="link-btn" onclick={rebuildIndex} disabled={rebuilding}>
                     {rebuilding ? "Rebuilding..." : "Rebuild Index"}
@@ -1343,7 +1415,7 @@
                         <input type="text" value={`${healthDashboard.macro_jobs_total}`} readonly />
                     </label>
                 </div>
-                <div class="control-group" style="display: block;">
+                <div class="control-group control-group-block">
                     <h4>Health Checks</h4>
                     <ul class="hint-list">
                         {#each healthDashboard.checks as check}
@@ -1355,7 +1427,7 @@
                 </div>
             {/if}
 
-            <div class="control-group" style="display: block;">
+            <div class="control-group control-group-block">
                 <h4>Recovery Hints</h4>
                 <ul class="hint-list">
                     {#each recoveryHints as hint}
@@ -1367,7 +1439,7 @@
             </div>
 
             {#if supportBundle}
-                <div class="control-group" style="display: block;">
+                <div class="control-group control-group-block">
                     <label>
                         Latest Support Bundle
                         <input type="text" value={supportBundle.path} readonly />

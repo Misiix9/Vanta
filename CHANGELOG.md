@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.4.0
+- Added Phase 24 settings information architecture refresh with a sticky context header and in-settings section search jump.
+- Added canonical settings section alias handling so deep-links resolve reliably across legacy and normalized section names.
+- Improved settings visual consistency by replacing inline layout styles with reusable utility classes.
+- Added missing shared styling primitives for hint lists and hub-window shell regions.
+
 ## 4.3.0
 - Added Phase 23 launcher layout recomposition with balanced search, results, and status regions.
 - Added adaptive density-aware spacing behavior across launcher surfaces using shared spacing tokens.

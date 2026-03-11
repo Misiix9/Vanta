@@ -1049,11 +1049,31 @@ a:hover {
     color: var(--text-primary);
 }
 
-header {
+.settings-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+    margin-bottom: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
+.settings-header.sticky {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: color-mix(in srgb, var(--ds-surface-1) 84%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid color-mix(in srgb, var(--ds-border) 56%, transparent);
+    padding-bottom: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
+.settings-header-main {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+    min-width: 0;
+    flex: 1;
 }
 
 h2 {
@@ -1086,11 +1106,43 @@ h3 {
     display: none;
 }
 
+.settings-search-status {
+    margin-bottom: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
+.settings-section-search {
+    background: color-mix(in srgb, var(--ds-surface-2) 74%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ds-border) 68%, transparent);
+    color: var(--ds-text-primary);
+    padding: calc(var(--space-1) * var(--vanta-space-scale, 1)) calc(var(--space-2) * var(--vanta-space-scale, 1));
+    border-radius: var(--radius-item);
+    width: min(420px, 100%);
+    font-size: var(--type-body);
+}
+
+.settings-section-search:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--ds-accent) 56%, transparent);
+}
+
 .control-group {
     display: flex;
     flex-direction: column;
     gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
     margin-bottom: calc(14px * var(--vanta-space-scale, 1));
+}
+
+.control-group-block {
+    display: block;
+}
+
+.control-group-inline {
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+    align-items: center;
+}
+
+.settings-subheading {
+    margin-top: calc(var(--space-3) * var(--vanta-space-scale, 1));
 }
 
 label {
@@ -1291,6 +1343,43 @@ input[type="range"] {
     display: flex;
     flex-direction: column;
     gap: calc(var(--space-3) * var(--vanta-space-scale, 1));
+}
+
+.hint-list {
+    list-style: none;
+    margin: calc(var(--space-2) * var(--vanta-space-scale, 1)) 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-1) * var(--vanta-space-scale, 1));
+}
+
+.hint-list li {
+    font-size: var(--type-body);
+    color: var(--ds-text-primary);
+    line-height: 1.4;
+}
+
+.hub-window-root {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.hub-window-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+    padding: calc(var(--space-3) * var(--vanta-space-scale, 1)) calc(var(--space-3) * var(--vanta-space-scale, 1));
+    border-bottom: 1px solid color-mix(in srgb, var(--ds-border) 62%, transparent);
+}
+
+.hub-window-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
 }
 /* FontAwesome Icon Styling */
 .item-icon i.fa-solid, 

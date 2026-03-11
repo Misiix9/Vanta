@@ -109,6 +109,28 @@
   let fadeDuration = $derived(vantaConfig?.accessibility?.reduced_motion ? 0 : 150);
   let groupBySection = $derived(query.trim() === "");
 
+  function normalizeSettingsSection(section: string | null | undefined): string | null {
+    if (!section) return null;
+    const trimmed = section.trim();
+    if (!trimmed) return null;
+    const lowered = trimmed.toLowerCase();
+    const aliases: Record<string, string> = {
+      "theme": "Theme Profile",
+      "appearance": "Theme Profile",
+      "extensions": "Extensions",
+      "window": "Window",
+      "general": "General",
+      "community": "Community",
+      "feature-hub": "Feature Hub",
+      "feature hub": "Feature Hub",
+      "accessibility": "Accessibility",
+      "file-search": "File Search",
+      "file search": "File Search",
+      "diagnostics": "Diagnostics",
+    };
+    return aliases[lowered] ?? trimmed;
+  }
+
   function scheduleScrollToSelected() {
     if (pendingScrollFrame !== null) return;
     pendingScrollFrame = requestAnimationFrame(() => {
@@ -1076,7 +1098,7 @@
         continue;
       }
       if (command.kind === "open_settings_section") {
-        settingsStartSection = command.section;
+        settingsStartSection = normalizeSettingsSection(command.section);
         view = "settings";
         continue;
       }
@@ -1194,7 +1216,7 @@
         view = "settings";
         return;
       } else if (command.kind === "open_settings_section") {
-        settingsStartSection = command.section;
+        settingsStartSection = normalizeSettingsSection(command.section);
         view = "settings";
         return;
       } else if (command.kind === "open_feature_window") {
