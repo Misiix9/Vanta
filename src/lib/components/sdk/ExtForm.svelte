@@ -178,7 +178,7 @@
 
 	.ext-form-input.error,
 	.ext-form-select.error {
-		border-color: #e74c3c;
+		border-color: var(--ds-danger);
 	}
 
 	.ext-form-checkbox-wrap {
@@ -203,7 +203,7 @@
 
 	.ext-form-error {
 		font-size: 12px;
-		color: #e74c3c;
+		color: var(--ds-danger);
 	}
 
 	.ext-form-submit {

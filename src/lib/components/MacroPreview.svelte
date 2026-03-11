@@ -190,9 +190,9 @@
   button.secondary { background: transparent; color: #fff; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; }
   button.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
   button:disabled { opacity: 0.6; cursor: not-allowed; }
-  .status-good { color: #6de28a; font-weight: var(--weight-semibold); }
-  .status-warn { color: #f1c40f; font-weight: var(--weight-semibold); }
-  .status-err { color: #ff6b6b; font-weight: var(--weight-semibold); }
+  .status-good { color: var(--ds-success); font-weight: var(--weight-semibold); }
+  .status-warn { color: var(--ds-warning); font-weight: var(--weight-semibold); }
+  .status-err { color: var(--ds-danger); font-weight: var(--weight-semibold); }
   .macro-steps { display: flex; flex-direction: column; gap: 12px; }
   .steps-header { display: flex; justify-content: space-between; align-items: center; }
   .steps-list { display: flex; flex-direction: column; gap: 10px; }
@@ -204,10 +204,10 @@
   .cap-chip { padding: 4px 6px; border-radius: 8px; background: rgba(255,255,255,0.06); font-size: var(--type-body); }
   .step-status { text-align: right; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; font-weight: var(--weight-semibold); }
   .step-status small { opacity: 0.8; font-weight: var(--weight-normal); }
-  .decision-allow { color: #6de28a; }
-  .decision-ask { color: #f1c40f; }
-  .decision-deny { color: #ff6b6b; }
+  .decision-allow { color: var(--ds-success); }
+  .decision-ask { color: var(--ds-warning); }
+  .decision-deny { color: var(--ds-danger); }
   .muted { opacity: 0.7; font-size: var(--type-body); line-height: var(--leading-normal); }
-  .error-box { border: 1px solid rgba(255,0,0,0.3); background: rgba(255,0,0,0.05); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
-  .error-row { color: #ff6b6b; font-size: var(--type-body); line-height: var(--leading-normal); }
+  .error-box { border: 1px solid color-mix(in srgb, var(--ds-danger) 30%, transparent); background: var(--ds-danger-muted); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .error-row { color: var(--ds-danger); font-size: var(--type-body); line-height: var(--leading-normal); }
 </style>

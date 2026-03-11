@@ -208,8 +208,8 @@
 	}
 
 	.ext-list-icon {
-		width: 32px;
-		height: 32px;
+		width: var(--icon-2xl);
+		height: var(--icon-2xl);
 		display: grid;
 		place-items: center;
 		background: var(--vanta-accent, #7b35f0);

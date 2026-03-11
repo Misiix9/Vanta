@@ -149,8 +149,8 @@
 	}
 
 	.ext-action-icon {
-		width: 28px;
-		height: 28px;
+		width: var(--icon-xl);
+		height: var(--icon-xl);
 		display: grid;
 		place-items: center;
 		background: var(--vanta-accent, #7b35f0);

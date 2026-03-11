@@ -8,6 +8,16 @@
     --icon-neutral: #d0d0d0;
     --icon-control: #b8b8b8;
     --icon-extension: #ffffff;
+
+    /* Icon size scale — Phase 29 */
+    --icon-xs:  12px;
+    --icon-sm:  16px;
+    --icon-md:  20px;
+    --icon-lg:  24px;
+    --icon-xl:  28px;
+    --icon-2xl: 32px;
+    --icon-3xl: 36px;
+    --icon-4xl: 56px;
 }
 
 /* ================================================================
@@ -125,6 +135,13 @@
     --ds-warning: #f59e0b;
     --ds-danger: #ef4444;
     --ds-info: #7b35f0;
+    --ds-neutral: #9a9cb3;
+
+    /* Status muted tints — Phase 29 */
+    --ds-success-muted: rgba(45, 212, 191, 0.15);
+    --ds-warning-muted: rgba(245, 158, 11, 0.15);
+    --ds-danger-muted: rgba(239, 68, 68, 0.15);
+    --ds-info-muted: rgba(123, 53, 240, 0.15);
 
     /* Typography — Phase 28 Readability Program */
     --font-ui: 'SN Pro', 'Inter', system-ui, -apple-system, 'Segoe UI', 'Noto Sans', sans-serif;
@@ -406,6 +423,31 @@
 .tabular-nums {
     font-variant-numeric: tabular-nums;
 }
+
+/* ── Phase 29: Iconography & Visual Semantics v2 ──────────── */
+
+/* Icon size utilities */
+.icon-xs  { width: var(--icon-xs);  height: var(--icon-xs);  }
+.icon-sm  { width: var(--icon-sm);  height: var(--icon-sm);  }
+.icon-md  { width: var(--icon-md);  height: var(--icon-md);  }
+.icon-lg  { width: var(--icon-lg);  height: var(--icon-lg);  }
+.icon-xl  { width: var(--icon-xl);  height: var(--icon-xl);  }
+.icon-2xl { width: var(--icon-2xl); height: var(--icon-2xl); }
+.icon-3xl { width: var(--icon-3xl); height: var(--icon-3xl); }
+.icon-4xl { width: var(--icon-4xl); height: var(--icon-4xl); }
+
+/* Semantic status colors */
+.status-success { color: var(--ds-success); }
+.status-warning { color: var(--ds-warning); }
+.status-danger  { color: var(--ds-danger);  }
+.status-info    { color: var(--ds-info);    }
+.status-neutral { color: var(--ds-neutral); }
+
+/* Status background tints */
+.status-bg-success { background: var(--ds-success-muted); }
+.status-bg-warning { background: var(--ds-warning-muted); }
+.status-bg-danger  { background: var(--ds-danger-muted);  }
+.status-bg-info    { background: var(--ds-info-muted);    }
 
 /* ── Reset ─────────────────────────────────────────────────── */
 *,
@@ -728,8 +770,8 @@ a:hover {
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    width: 28px;
-    height: 28px;
+    width: var(--icon-xl);
+    height: var(--icon-xl);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -853,8 +895,8 @@ a:hover {
 
 /* ── Item Icon ──────────────────────────────────────────────── */
 .item-icon {
-    width: 36px;
-    height: 36px;
+    width: var(--icon-3xl);
+    height: var(--icon-3xl);
     border-radius: var(--radius-icon);
     display: flex;
     align-items: center;
@@ -869,7 +911,7 @@ a:hover {
 }
 
 .icon-emoji {
-    font-size: 20px;
+    font-size: var(--icon-md);
     line-height: 1;
 }
 
@@ -882,7 +924,7 @@ a:hover {
 }
 
 .icon-fallback {
-    opacity: 0.35;
+    opacity: 0.5;
 }
 
 .icon-img {
@@ -922,8 +964,8 @@ a:hover {
 }
 
 .file-icon svg {
-    width: 20px;
-    height: 20px;
+    width: var(--icon-md);
+    height: var(--icon-md);
 }
 
 /* ── Item Content ───────────────────────────────────────────── */
@@ -1011,7 +1053,7 @@ a:hover {
 }
 
 .script-item.urgency-critical {
-    border-left: 2px solid rgba(255, 71, 87, 0.7) !important;
+    border-left: 2px solid color-mix(in srgb, var(--ds-danger) 70%, transparent) !important;
 }
 
 .script-item.urgency-low {
@@ -1020,8 +1062,8 @@ a:hover {
 
 /* Script icon — uses colorful inline bg from JS hash */
 .script-icon {
-    width: 36px;
-    height: 36px;
+    width: var(--icon-3xl);
+    height: var(--icon-3xl);
     border-radius: var(--radius-icon);
     display: flex;
     align-items: center;
@@ -1222,11 +1264,11 @@ a:hover {
 }
 
 .status-download.success {
-    color: #22c55e;
+    color: var(--ds-success);
 }
 
 .status-download.failed {
-    color: #ef4444;
+    color: var(--ds-danger);
 }
 
 .spinner {
@@ -1529,10 +1571,10 @@ input[type="range"] {
 }
 
 .accordion-icon {
-    width: 16px;
-    height: 16px;
-    min-width: 16px;
-    min-height: 16px;
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+    min-width: var(--icon-sm);
+    min-height: var(--icon-sm);
     flex-shrink: 0;
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.3s ease;
     color: var(--text-secondary);
@@ -1936,8 +1978,8 @@ input[type="range"] {
 }
 
 .ext-icon img {
-    width: 28px;
-    height: 28px;
+    width: var(--icon-xl);
+    height: var(--icon-xl);
     object-fit: contain;
 }
 
@@ -2562,8 +2604,8 @@ input[type="range"] {
 }
 
 .cv-color-swatch {
-    width: 36px;
-    height: 36px;
+    width: var(--icon-3xl);
+    height: var(--icon-3xl);
     border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.15);
     flex-shrink: 0;
@@ -2653,16 +2695,16 @@ input[type="range"] {
 }
 
 .npb-art {
-    width: 32px;
-    height: 32px;
+    width: var(--icon-2xl);
+    height: var(--icon-2xl);
     border-radius: 4px;
     object-fit: cover;
     flex-shrink: 0;
 }
 
 .npb-art-placeholder {
-    width: 32px;
-    height: 32px;
+    width: var(--icon-2xl);
+    height: var(--icon-2xl);
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.04);
     display: flex;
@@ -2746,8 +2788,8 @@ input[type="range"] {
 }
 
 .npb-ctrl-play {
-    width: 28px;
-    height: 28px;
+    width: var(--icon-xl);
+    height: var(--icon-xl);
     border-radius: 50%;
     background: var(--vanta-accent, #7b35f0);
     color: #fff;
@@ -2832,8 +2874,8 @@ input[type="range"] {
 }
 
 .mini-player-close:hover {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
+    background: var(--ds-danger-muted);
+    color: var(--ds-danger);
 }
 
 .mini-player-content {

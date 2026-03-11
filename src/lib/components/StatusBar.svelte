@@ -60,8 +60,8 @@
   }
 
   .status-badge-logo {
-    width: 12px;
-    height: 12px;
+    width: var(--icon-xs);
+    height: var(--icon-xs);
     opacity: 0.6;
   }
 

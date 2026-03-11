@@ -82,8 +82,8 @@
 	}
 
 	.ext-grid-media {
-		width: 56px;
-		height: 56px;
+		width: var(--icon-4xl);
+		height: var(--icon-4xl);
 		border-radius: var(--vanta-radius, 8px);
 		overflow: hidden;
 		flex-shrink: 0;
