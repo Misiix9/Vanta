@@ -26,13 +26,12 @@
   const NOW_PLAYING_RELAY_EVENT = "spotify-now-playing-relay";
   const COMMAND_RELAY_EVENT = "spotify-command-relay";
   const REQUEST_STATE_EVENT = "spotify-request-state";
-  const NOW_PLAYING_STORAGE_KEY = "vanta.spotify.nowPlaying";
 
   let nowPlaying = $state<NowPlayingState | null>(null);
   let unlistenRelay: (() => void) | null = null;
+  let lyricsContainer = $state<HTMLDivElement | null>(null);
   let albumArtKey = $state(0);
   let prevAlbumArt = $state<string | null>(null);
-  let lyricsContainer = $state<HTMLDivElement | null>(null);
 
   function fmtTime(ms: number): string {
     const s = Math.floor(ms / 1000);
@@ -41,22 +40,10 @@
     return m + ":" + (sec < 10 ? "0" : "") + sec;
   }
 
-  function safeLoadSnapshot(): NowPlayingState | null {
-    try {
-      const raw = localStorage.getItem(NOW_PLAYING_STORAGE_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw) as NowPlayingState;
-    } catch {
-      return null;
-    }
-  }
-
   function sendCommand(cmd: SpotifyCommand, value?: number) {
     const detail = cmd === "set-volume" ? { cmd, value } : cmd;
     window.dispatchEvent(new CustomEvent("vanta-spotify-command", { detail }));
-    void emit(COMMAND_RELAY_EVENT, detail).catch(() => {
-      // best-effort relay to main launcher window
-    });
+    void emit(COMMAND_RELAY_EVENT, detail).catch(() => {});
   }
 
   function handleNowPlaying(e: CustomEvent<NowPlayingState | null>) {
@@ -82,12 +69,6 @@
   }
 
   const hasTrack = $derived(Boolean(nowPlaying?.track || nowPlaying?.isPlaying));
-  const hasLyrics = $derived(
-    Boolean(
-      (nowPlaying?.syncedLines && nowPlaying.syncedLines.length > 0) ||
-        ((nowPlaying?.lyrics || "").trim().length > 0),
-    ),
-  );
   const hasSyncedLines = $derived(
     Boolean(nowPlaying?.syncedLines && nowPlaying.syncedLines.length > 0),
   );
@@ -108,22 +89,24 @@
       .filter((line: string) => line.length > 0)
       .slice(0, 10),
   );
+  const hasLyrics = $derived(hasSyncedLines || lyricLines.length > 0);
 
   onMount(async () => {
     window.addEventListener("vanta-now-playing", handleNowPlaying as EventListener);
 
     unlistenRelay = await listen<NowPlayingState | null>(NOW_PLAYING_RELAY_EVENT, (event) => {
-      const prev = nowPlaying;
-      nowPlaying = event.payload;
-      if (event.payload?.albumArt && event.payload.albumArt !== prev?.albumArt) {
-        prevAlbumArt = prev?.albumArt ?? null;
-        albumArtKey++;
+      const incoming = event.payload;
+      const newArt = incoming?.albumArt ?? null;
+      if (newArt !== (nowPlaying?.albumArt ?? null)) {
+        prevAlbumArt = nowPlaying?.albumArt ?? null;
+        albumArtKey += 1;
       }
+      nowPlaying = incoming;
     });
 
-    // Request current state from the extension immediately
+    // Request current state immediately, then once more after 800ms in case
+    // the extension finishes loading after us
     void emit(REQUEST_STATE_EVENT, {}).catch(() => {});
-    // Re-request after a short delay in case extension wasn't ready yet
     setTimeout(() => void emit(REQUEST_STATE_EVENT, {}).catch(() => {}), 800);
   });
 
@@ -144,11 +127,11 @@
   {#if prevAlbumArt}
     <div class="mini-player-backdrop mini-player-backdrop-prev" style={`background-image:url('${prevAlbumArt}')`}></div>
   {/if}
-  {#key albumArtKey}
-    {#if nowPlaying?.albumArt}
+  {#if nowPlaying?.albumArt}
+    {#key albumArtKey}
       <div class="mini-player-backdrop" style={`background-image:url('${nowPlaying.albumArt}')`}></div>
-    {/if}
-  {/key}
+    {/key}
+  {/if}
   <div class="mini-player-overlay"></div>
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -204,7 +187,7 @@
         </div>
       </div>
 
-      <!-- Lyrics section: collapses smoothly when no lyrics available -->
+      <!-- Lyrics section: collapses when no lyrics, expands with class -->
       <div class="mini-player-lyrics-pane" class:mini-player-lyrics-visible={hasLyrics}>
         {#if hasSyncedLines}
           <div class="mini-player-lyrics-lines" bind:this={lyricsContainer}>

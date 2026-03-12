@@ -2852,22 +2852,28 @@ input[type="range"] {
     filter: blur(32px) brightness(0.3) saturate(1.5);
     pointer-events: none;
     z-index: 0;
-    animation: mini-backdrop-fade-in 0.6s ease;
+    animation: mini-backdrop-fade-in 0.6s ease forwards;
 }
 
 .mini-player-backdrop-prev {
-    animation: mini-backdrop-fade-out 0.6s ease forwards;
+    position: absolute;
+    inset: -24px;
+    background-size: cover;
+    background-position: center;
+    filter: blur(32px) brightness(0.3) saturate(1.5);
+    pointer-events: none;
     z-index: 0;
+    animation: mini-backdrop-fade-out 0.6s ease forwards;
 }
 
 @keyframes mini-backdrop-fade-in {
     from { opacity: 0; }
-    to { opacity: 1; }
+    to   { opacity: 1; }
 }
 
 @keyframes mini-backdrop-fade-out {
     from { opacity: 1; }
-    to { opacity: 0; }
+    to   { opacity: 0; }
 }
 
 .mini-player-overlay {
@@ -3063,6 +3069,8 @@ input[type="range"] {
 }
 
 .mini-player-lyrics-pane {
+    min-height: 0;
+    max-height: 0;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -3070,13 +3078,14 @@ input[type="range"] {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    max-height: 0;
-    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: max-height 0.4s ease, padding 0.4s ease, opacity 0.4s ease;
+    opacity: 0;
 }
 
 .mini-player-lyrics-pane.mini-player-lyrics-visible {
-    max-height: 200px;
+    max-height: 300px;
     padding: 8px 10px;
+    opacity: 1;
     flex: 1;
 }
 
@@ -3100,6 +3109,11 @@ input[type="range"] {
     color: #fff !important;
     font-weight: 600;
     font-size: 12px;
+}
+
+.mini-player-lyrics-empty {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.3);
 }
 
 .mini-player-empty {
