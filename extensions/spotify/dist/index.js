@@ -157,7 +157,8 @@
       '.spot-browse-card-sub{font-size:11px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       '.spot-browse-empty{font-size:12px;color:rgba(255,255,255,0.35);padding:0 16px}',
       '.spot-section-group{margin-bottom:8px}',
-      '.spot-section-group-title{font-size:12px;font-weight:600;color:rgba(255,255,255,0.5);padding:6px 16px 4px;text-transform:uppercase;letter-spacing:.5px}'
+      '.spot-section-group-title{font-size:12px;font-weight:600;color:rgba(255,255,255,0.5);padding:6px 16px 4px;text-transform:uppercase;letter-spacing:.5px}',
+      '@keyframes spot-fade-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}'
     ].join('\n');
 
     var root = document.createElement('div');
@@ -640,25 +641,6 @@
       var overlayEl = document.createElement('div'); overlayEl.className = 'spot-player-overlay';
       root.appendChild(overlayEl);
 
-      var header = document.createElement('div'); header.className = 'spot-header';
-      var headerLeft = document.createElement('div'); headerLeft.className = 'spot-header-left';
-      var dot = document.createElement('div'); dot.className = 'spot-header-dot';
-      headerLeft.appendChild(dot);
-      header.appendChild(headerLeft);
-
-      var headerActions = document.createElement('div'); headerActions.className = 'spot-header-actions';
-      var miniBtn = document.createElement('button'); miniBtn.className = 'spot-icon-btn accent';
-      miniBtn.innerHTML = svgMiniPlayer; miniBtn.title = 'Open Mini Player';
-      miniBtn.onclick = function() {
-        api.window.openMiniPlayer().catch(function() {
-          api.toast({ title: 'Mini player not available', type: 'info' });
-        });
-      };
-      headerActions.appendChild(miniBtn);
-
-      header.appendChild(headerActions);
-      root.appendChild(header);
-
       var tabs = document.createElement('div'); tabs.className = 'spot-tabs';
       var tabNow = document.createElement('button'); tabNow.className = 'spot-tab active'; tabNow.textContent = 'Now Playing';
       var tabSearch = document.createElement('button'); tabSearch.className = 'spot-tab'; tabSearch.textContent = 'Browse';
@@ -690,7 +672,7 @@
       footer.appendChild(reconnectBtn); footer.appendChild(disconnectBtn);
       root.appendChild(footer);
 
-      tabNow.onclick = function() { tabNow.className = 'spot-tab active'; tabSearch.className = 'spot-tab'; content.style.overflowY = ''; renderNowPlaying(content); };
+      tabNow.onclick = function() { tabNow.className = 'spot-tab active'; tabSearch.className = 'spot-tab'; renderNowPlaying(content); };
       tabSearch.onclick = function() { tabSearch.className = 'spot-tab active'; tabNow.className = 'spot-tab'; renderBrowse(content); };
 
       renderNowPlaying(content);
@@ -705,29 +687,22 @@
     }
 
     function immediateRefresh() {
-      clearInterval(refreshTimer);
       fetchNowPlaying();
-      refreshTimer = setInterval(function() { fetchNowPlaying(); }, 1000);
-      window.__vanta_spotify_poll = refreshTimer;
     }
 
     function updateLyricsInPlace() {
-      if (!lyricsWrapEl) {
-        if (nowPlayingContainer && (syncedLines || lyricsText)) {
-          renderNowPlaying(nowPlayingContainer);
-        }
-        return;
-      }
-      lyricsWrapEl.innerHTML = '';
-      var title = document.createElement('div'); title.className = 'spot-lyrics-title'; title.textContent = 'Lyrics';
-      lyricsWrapEl.appendChild(title);
+      if (!lyricsWrapEl) return;
       lyricsLineEls = [];
-      var hasLyrics = false;
+      // remove existing lyric rows (keep the title row)
+      var titleEl = lyricsWrapEl.querySelector('.spot-lyrics-title');
+      lyricsWrapEl.innerHTML = '';
+      if (titleEl) lyricsWrapEl.appendChild(titleEl);
+      var hasL = false;
       if (syncedLines && syncedLines.length > 0) {
-        hasLyrics = true;
+        hasL = true;
         var activeIdx = 0;
-        for (var i = 0; i < syncedLines.length; i++) {
-          if (syncedLines[i].time <= progressMs) activeIdx = i;
+        for (var si = 0; si < syncedLines.length; si++) {
+          if (syncedLines[si].time <= progressMs) activeIdx = si;
         }
         syncedLines.forEach(function(line, idx) {
           var row = document.createElement('div');
@@ -737,28 +712,28 @@
           lyricsWrapEl.appendChild(row);
         });
       } else if (lyricsText && lyricsText.trim()) {
-        hasLyrics = true;
-        lyricsText.split('\n').map(function(l) { return l.trim(); })
-          .filter(function(l) { return l.length > 0 && !l.match(/^\[\d{2}:\d{2}/); })
-          .slice(0, 30).forEach(function(line) {
-            var row = document.createElement('div'); row.className = 'spot-lyrics-line'; row.textContent = line;
-            lyricsWrapEl.appendChild(row);
-          });
+        hasL = true;
+        lyricsText.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0 && !l.match(/^\[\d{2}:\d{2}\.\d{2,3}\]/); }).slice(0, 30).forEach(function(l) {
+          var row = document.createElement('div'); row.className = 'spot-lyrics-line'; row.textContent = l;
+          lyricsLineEls.push(row);
+          lyricsWrapEl.appendChild(row);
+        });
       }
-      if (hasLyrics && !lyricsWrapEl.parentElement && nowPlayingContainer) {
-        nowPlayingContainer.appendChild(lyricsWrapEl);
-      } else if (!hasLyrics && lyricsWrapEl.parentElement) {
-        lyricsWrapEl.parentElement.removeChild(lyricsWrapEl);
+      if (nowPlayingContainer) {
+        var existing = nowPlayingContainer.querySelector('.spot-lyrics');
+        if (hasL && !existing) {
+          nowPlayingContainer.appendChild(lyricsWrapEl);
+        } else if (!hasL && existing) {
+          existing.remove();
+          lyricsWrapEl = null;
+        }
       }
+      emitNowPlaying();
     }
 
     function renderNowPlaying(container) {
       nowPlayingContainer = container; container.innerHTML = '';
-      lyricsWrapEl = null;
-
-      // Re-trigger fade-in animation on container
-      container.style.animation = 'none';
-      requestAnimationFrame(function() { container.style.animation = ''; });
+      lyricsWrapEl = null; lyricsLineEls = [];;
 
       var bgEl = root.querySelector('.spot-player-bg');
       if (bgEl) bgEl.style.backgroundImage = albumArtUrl ? 'url(' + albumArtUrl + ')' : 'none';
@@ -784,18 +759,20 @@
       }
 
       var trackInfo = document.createElement('div'); trackInfo.className = 'spot-track-info';
-      var trackNameRow = document.createElement('div');
-      trackNameRow.style.cssText = 'display:flex;align-items:center;gap:6px;min-width:0';
-      var trackName = document.createElement('div'); trackName.className = 'spot-track-name';
+      var nameRow = document.createElement('div'); nameRow.style.cssText = 'display:flex;align-items:center;gap:6px;min-width:0';
+      var trackName = document.createElement('div'); trackName.className = 'spot-track-name'; trackName.textContent = currentTrack.name;
       trackName.style.cssText = 'flex:1;min-width:0';
-      trackName.textContent = currentTrack.name;
-      var miniIconBtn = document.createElement('button');
-      miniIconBtn.className = 'spot-icon-btn accent'; miniIconBtn.style.cssText = 'width:22px;height:22px;flex-shrink:0;padding:0';
-      miniIconBtn.innerHTML = svgMiniPlayer; miniIconBtn.title = 'Open Mini Player';
-      miniIconBtn.onclick = function() { api.window.openMiniPlayer().catch(function() { api.toast({ title: 'Mini player not available', type: 'info' }); }); };
-      trackNameRow.appendChild(trackName); trackNameRow.appendChild(miniIconBtn);
+      var inlineMiniBtn = document.createElement('button'); inlineMiniBtn.className = 'spot-icon-btn accent';
+      inlineMiniBtn.innerHTML = svgMiniPlayer; inlineMiniBtn.title = 'Open Mini Player';
+      inlineMiniBtn.style.cssText = 'flex-shrink:0';
+      inlineMiniBtn.onclick = function() {
+        api.window.openMiniPlayer().catch(function() {
+          api.toast({ title: 'Mini player not available', type: 'info' });
+        });
+      };
+      nameRow.appendChild(trackName); nameRow.appendChild(inlineMiniBtn);
       var trackArtist = document.createElement('div'); trackArtist.className = 'spot-track-artist'; trackArtist.textContent = currentTrack.artist;
-      trackInfo.appendChild(trackNameRow); trackInfo.appendChild(trackArtist);
+      trackInfo.appendChild(nameRow); trackInfo.appendChild(trackArtist);
       if (currentTrack.album) {
         var trackAlbum = document.createElement('div'); trackAlbum.className = 'spot-track-album'; trackAlbum.textContent = currentTrack.album;
         trackInfo.appendChild(trackAlbum);
@@ -819,13 +796,13 @@
         var seekMs = Math.floor(ratio * durationMs);
         progressMs = seekMs; updateProgressUI();
         spotApi('PUT', '/me/player/seek?position_ms=' + seekMs);
-        setTimeout(immediateRefresh, 150);
+        setTimeout(immediateRefresh, 300);
       };
       container.appendChild(progSection);
 
       var controls = document.createElement('div'); controls.className = 'spot-controls';
-      shuffleBtnRef = makeCtrl(svgShuffle, shuffleState, function() { spotApi('PUT', '/me/player/shuffle?state=' + (!shuffleState)); shuffleState = !shuffleState; shuffleBtnRef.className = 'spot-ctrl' + (shuffleState ? ' active' : ''); immediateRefresh(); });
-      var btnPrev = makeCtrl(svgPrev, false, function() { spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300); });
+      shuffleBtnRef = makeCtrl(svgShuffle, shuffleState, function() { spotApi('PUT', '/me/player/shuffle?state=' + (!shuffleState)); shuffleState = !shuffleState; shuffleBtnRef.className = 'spot-ctrl' + (shuffleState ? ' active' : ''); setTimeout(immediateRefresh, 300); });
+      var btnPrev = makeCtrl(svgPrev, false, function() { spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200); });
 
       playPauseBtnRef = document.createElement('button'); playPauseBtnRef.className = 'spot-ctrl-main';
       playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
@@ -834,15 +811,15 @@
         else { spotApi('PUT', '/me/player/play'); isPlaying = true; }
         playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
         emitNowPlaying();
-        setTimeout(immediateRefresh, 150);
+        setTimeout(immediateRefresh, 300);
       };
 
-      var btnNext = makeCtrl(svgNext, false, function() { spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300); });
+      var btnNext = makeCtrl(svgNext, false, function() { spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200); });
       repeatBtnRef = makeCtrl(svgRepeat, repeatState !== 'off', function() {
         var next = repeatState === 'off' ? 'context' : repeatState === 'context' ? 'track' : 'off';
         spotApi('PUT', '/me/player/repeat?state=' + next); repeatState = next;
         repeatBtnRef.className = 'spot-ctrl' + (repeatState !== 'off' ? ' active' : '');
-        immediateRefresh();
+        setTimeout(immediateRefresh, 300);
       });
 
       controls.appendChild(shuffleBtnRef); controls.appendChild(btnPrev); controls.appendChild(playPauseBtnRef);
@@ -860,7 +837,7 @@
         volumePercent = Math.round(ratio * 100);
         volFill.style.width = volumePercent + '%';
         spotApi('PUT', '/me/player/volume?volume_percent=' + volumePercent);
-        setTimeout(immediateRefresh, 150);
+        setTimeout(immediateRefresh, 300);
       };
       volWrap.appendChild(volIcon); volWrap.appendChild(volBar);
       container.appendChild(volWrap);
@@ -969,7 +946,7 @@
       wrap.appendChild(input);
       container.appendChild(wrap);
       var browseArea = document.createElement('div');
-      browseArea.style.cssText = 'padding-bottom:40px;flex:1';
+      browseArea.style.cssText = 'padding-bottom:12px';
       container.appendChild(browseArea);
 
       loadBrowseSections(browseArea);
@@ -1251,20 +1228,18 @@
         if (isPlaying) { spotApi('PUT', '/me/player/pause'); isPlaying = false; }
         else { spotApi('PUT', '/me/player/play'); isPlaying = true; }
         if (playPauseBtnRef) playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
-        emitNowPlaying();
-        setTimeout(immediateRefresh, 150);
+        emitNowPlaying(); setTimeout(immediateRefresh, 300);
       } else if (cmd === 'next') {
-        spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300);
+        spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200);
       } else if (cmd === 'prev') {
-        spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300);
+        spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200);
       } else if (cmd === 'set-volume') {
         var val = typeof payload === 'object' && payload ? Number(payload.value) : NaN;
         if (!isNaN(val)) {
           volumePercent = Math.max(0, Math.min(100, Math.round(val)));
           spotApi('PUT', '/me/player/volume?volume_percent=' + volumePercent);
           if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer);
-          emitNowPlaying();
-          setTimeout(immediateRefresh, 150);
+          emitNowPlaying(); setTimeout(immediateRefresh, 300);
         }
       }
     });
@@ -1286,19 +1261,17 @@
             if (isPlaying) { spotApi('PUT', '/me/player/pause'); isPlaying = false; }
             else { spotApi('PUT', '/me/player/play'); isPlaying = true; }
             if (playPauseBtnRef) playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
-            emitNowPlaying();
-            setTimeout(immediateRefresh, 150);
+            emitNowPlaying(); setTimeout(immediateRefresh, 300);
           } else if (cmd === 'next') {
-            spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300);
+            spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200);
           } else if (cmd === 'prev') {
-            spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300);
+            spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200);
           } else if (cmd === 'set-volume') {
             var val = typeof payload === 'object' && payload ? Number(payload.value) : NaN;
             if (!isNaN(val)) {
               volumePercent = Math.max(0, Math.min(100, Math.round(val)));
               spotApi('PUT', '/me/player/volume?volume_percent=' + volumePercent);
-              emitNowPlaying();
-              setTimeout(immediateRefresh, 150);
+              emitNowPlaying(); setTimeout(immediateRefresh, 300);
             }
           }
         });
