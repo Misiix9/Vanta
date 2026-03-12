@@ -26,6 +26,8 @@
     var lyricsText = null;
     var lyricsFetchKey = null;
     var lyricsCache = {};
+    var syncedLines = null;
+    var lyricsLineEls = [];
 
     var style = document.createElement('style');
     style.textContent = [
@@ -108,6 +110,7 @@
       '.spot-lyrics-title{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,0.4);margin-bottom:8px;font-weight:500}',
       '.spot-lyrics-line{font-size:12px;line-height:1.6;color:rgba(255,255,255,0.8);margin:0 0 2px}',
       '.spot-lyrics-empty{font-size:12px;color:rgba(255,255,255,0.35)}',
+      '.spot-lyrics-active{color:#fff!important;font-weight:600;font-size:13px;transition:all .3s ease}',
 
       '.spot-empty{text-align:center;padding:32px 16px;color:rgba(255,255,255,0.45);font-size:13px}',
       '.spot-empty-icon{margin-bottom:12px;opacity:.3}',
@@ -159,6 +162,24 @@
 
     function esc(s) { var d = document.createElement('span'); d.textContent = s; return d.innerHTML; }
 
+    function parseSyncedLyrics(raw) {
+      if (!raw) return null;
+      var lines = raw.split('\n');
+      var result = [];
+      for (var i = 0; i < lines.length; i++) {
+        var m = lines[i].match(/^\[(\d{2}):(\d{2})\.(\d{2,3})\]\s*(.*)/);
+        if (m) {
+          var mins = parseInt(m[1]);
+          var secs = parseInt(m[2]);
+          var ms = m[3].length === 3 ? parseInt(m[3]) : parseInt(m[3]) * 10;
+          var t = (mins * 60 + secs) * 1000 + ms;
+          var text = m[4].trim();
+          if (text) result.push({time: t, text: text});
+        }
+      }
+      return result.length > 0 ? result : null;
+    }
+
     function generateCodeVerifier() {
       var arr = new Uint8Array(64);
       crypto.getRandomValues(arr);
@@ -200,6 +221,8 @@
       if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
       if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
       if (searchTimeout) { clearTimeout(searchTimeout); searchTimeout = null; }
+      window.__vanta_spotify_poll = null;
+      window.__vanta_spotify_tick = null;
     }
 
     function emitNowPlaying() {
@@ -212,7 +235,8 @@
         progressMs: progressMs,
         durationMs: durationMs,
         volumePercent: volumePercent,
-        lyrics: lyricsText
+        lyrics: lyricsText,
+        syncedLines: syncedLines
       };
       window.__vanta_now_playing = detail;
       window.dispatchEvent(new CustomEvent('vanta-now-playing', { detail: detail }));
@@ -227,12 +251,14 @@
       var key = (trackName || '') + '::' + (artistName || '');
       if (!trackName || !artistName) {
         lyricsText = null;
+        syncedLines = null;
         lyricsFetchKey = null;
         emitNowPlaying();
         return;
       }
       if (lyricsCache[key] !== undefined) {
-        lyricsText = lyricsCache[key];
+        lyricsText = lyricsCache[key].text;
+        syncedLines = lyricsCache[key].synced;
         lyricsFetchKey = key;
         emitNowPlaying();
         return;
@@ -251,20 +277,26 @@
         }
 
         var out = null;
+        var synced = null;
         if (parsed) {
-          out = parsed.plainLyrics || parsed.syncedLyrics || null;
-          if (out && typeof out === 'string' && out.length > 2400) out = out.slice(0, 2400);
+          var syncedRaw = parsed.syncedLyrics || null;
+          var plainRaw = parsed.plainLyrics || null;
+          out = syncedRaw || plainRaw || null;
+          if (out && typeof out === 'string' && out.length > 8000) out = out.slice(0, 8000);
+          synced = syncedRaw ? parseSyncedLyrics(syncedRaw) : null;
         }
 
-        lyricsCache[key] = out;
+        lyricsCache[key] = {text: out, synced: synced};
         if (lyricsFetchKey === key) {
           lyricsText = out;
+          syncedLines = synced;
           emitNowPlaying();
         }
       } catch (e) {
-        lyricsCache[key] = null;
+        lyricsCache[key] = {text: null, synced: null};
         if (lyricsFetchKey === key) {
           lyricsText = null;
+          syncedLines = null;
           emitNowPlaying();
         }
       }
@@ -504,7 +536,7 @@
     }
 
     function showExpired() {
-      clearTimers(); token = null; currentTrack = null; lyricsText = null; clearNowPlaying();
+      clearTimers(); token = null; currentTrack = null; lyricsText = null; syncedLines = null; clearNowPlaying();
 
       if (refreshToken && clientId) {
         root.innerHTML = '<div class="spot-loading">Refreshing token\u2026</div>';
@@ -601,12 +633,20 @@
     }
 
     function startRefresh() {
+      if (window.__vanta_spotify_poll) clearInterval(window.__vanta_spotify_poll);
+      if (window.__vanta_spotify_tick) clearInterval(window.__vanta_spotify_tick);
       fetchNowPlaying();
-      refreshTimer = setInterval(function() { if (!root.isConnected) { clearTimers(); return; } fetchNowPlaying(); }, 5000);
+      refreshTimer = setInterval(function() { fetchNowPlaying(); }, 2000);
+      window.__vanta_spotify_poll = refreshTimer;
       progressTimer = setInterval(function() {
-        if (!root.isConnected) { clearTimers(); return; }
-        if (isPlaying && durationMs > 0) { progressMs = Math.min(progressMs + 1000, durationMs); updateProgressUI(); emitNowPlaying(); }
+        if (isPlaying && durationMs > 0) {
+          progressMs = Math.min(progressMs + 1000, durationMs);
+          updateProgressUI();
+          updateLyricsHighlight();
+          emitNowPlaying();
+        }
       }, 1000);
+      window.__vanta_spotify_tick = progressTimer;
     }
 
     function renderNowPlaying(container) {
@@ -667,7 +707,7 @@
 
       var controls = document.createElement('div'); controls.className = 'spot-controls';
       shuffleBtnRef = makeCtrl(svgShuffle, shuffleState, function() { spotApi('PUT', '/me/player/shuffle?state=' + (!shuffleState)); shuffleState = !shuffleState; shuffleBtnRef.className = 'spot-ctrl' + (shuffleState ? ' active' : ''); });
-      var btnPrev = makeCtrl(svgPrev, false, function() { spotApi('POST', '/me/player/previous'); setTimeout(fetchNowPlaying, 300); });
+      var btnPrev = makeCtrl(svgPrev, false, function() { spotApi('POST', '/me/player/previous'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200); });
 
       playPauseBtnRef = document.createElement('button'); playPauseBtnRef.className = 'spot-ctrl-main';
       playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
@@ -678,7 +718,7 @@
         emitNowPlaying();
       };
 
-      var btnNext = makeCtrl(svgNext, false, function() { spotApi('POST', '/me/player/next'); setTimeout(fetchNowPlaying, 300); });
+      var btnNext = makeCtrl(svgNext, false, function() { spotApi('POST', '/me/player/next'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200); });
       repeatBtnRef = makeCtrl(svgRepeat, repeatState !== 'off', function() {
         var next = repeatState === 'off' ? 'context' : repeatState === 'context' ? 'track' : 'off';
         spotApi('PUT', '/me/player/repeat?state=' + next); repeatState = next;
@@ -707,8 +747,21 @@
       var lyricsWrap = document.createElement('div'); lyricsWrap.className = 'spot-lyrics';
       var lyricsTitle = document.createElement('div'); lyricsTitle.className = 'spot-lyrics-title'; lyricsTitle.textContent = 'Lyrics';
       lyricsWrap.appendChild(lyricsTitle);
-      if (lyricsText && lyricsText.trim()) {
-        lyricsText.split('\n').map(function(line) { return line.trim(); }).filter(function(line) { return line.length > 0; }).slice(0, 30).forEach(function(line) {
+      lyricsLineEls = [];
+      if (syncedLines && syncedLines.length > 0) {
+        var activeIdx = 0;
+        for (var si = 0; si < syncedLines.length; si++) {
+          if (syncedLines[si].time <= progressMs) activeIdx = si;
+        }
+        syncedLines.forEach(function(line, idx) {
+          var row = document.createElement('div');
+          row.className = 'spot-lyrics-line' + (idx === activeIdx ? ' spot-lyrics-active' : '');
+          row.textContent = line.text;
+          lyricsLineEls.push(row);
+          lyricsWrap.appendChild(row);
+        });
+      } else if (lyricsText && lyricsText.trim()) {
+        lyricsText.split('\n').map(function(line) { return line.trim(); }).filter(function(line) { return line.length > 0 && !line.match(/^\[\d{2}:\d{2}\.\d{2,3}\]/); }).slice(0, 30).forEach(function(line) {
           var row = document.createElement('div'); row.className = 'spot-lyrics-line'; row.textContent = line;
           lyricsWrap.appendChild(row);
         });
@@ -730,13 +783,26 @@
       if (progressCurEl) progressCurEl.textContent = fmtTime(progressMs);
     }
 
+    function updateLyricsHighlight() {
+      if (!syncedLines || syncedLines.length === 0 || lyricsLineEls.length === 0) return;
+      var activeIdx = 0;
+      for (var i = 0; i < syncedLines.length; i++) {
+        if (syncedLines[i].time <= progressMs) activeIdx = i;
+      }
+      for (var j = 0; j < lyricsLineEls.length; j++) {
+        lyricsLineEls[j].className = j === activeIdx ? 'spot-lyrics-line spot-lyrics-active' : 'spot-lyrics-line';
+      }
+      var el = lyricsLineEls[activeIdx];
+      if (el && el.parentElement) el.scrollIntoView({block: 'center', behavior: 'smooth'});
+    }
+
     async function fetchNowPlaying() {
       try {
         var raw = await spotApi('GET', '/me/player');
         var resp = parseResponse(raw);
         if (resp.code === 401) { showExpired(); return; }
         if (resp.code === 204 || !resp.body) {
-          if (currentTrack !== null) { currentTrack = null; albumArtUrl = null; lyricsText = null; isPlaying = false; emitNowPlaying(); if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer); }
+          if (currentTrack !== null) { currentTrack = null; albumArtUrl = null; lyricsText = null; syncedLines = null; isPlaying = false; emitNowPlaying(); if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer); }
           return;
         }
         var data = JSON.parse(resp.body);
@@ -753,6 +819,8 @@
           if (!currentTrack || currentTrack.id !== newId) {
             currentTrack = { id: newId, name: data.item.name, artist: artists, album: data.item.album ? data.item.album.name : '', uri: data.item.uri };
             lyricsText = null;
+            syncedLines = null;
+            lyricsLineEls = [];
             fetchLyrics(data.item.name, primaryArtist);
             var bgEl = root.querySelector('.spot-player-bg');
             if (bgEl) bgEl.style.backgroundImage = albumArtUrl ? 'url(' + albumArtUrl + ')' : 'none';
@@ -851,9 +919,9 @@
         if (playPauseBtnRef) playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
         emitNowPlaying();
       } else if (cmd === 'next') {
-        spotApi('POST', '/me/player/next'); setTimeout(fetchNowPlaying, 300);
+        spotApi('POST', '/me/player/next'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200);
       } else if (cmd === 'prev') {
-        spotApi('POST', '/me/player/previous'); setTimeout(fetchNowPlaying, 300);
+        spotApi('POST', '/me/player/previous'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200);
       } else if (cmd === 'set-volume') {
         var val = typeof payload === 'object' && payload ? Number(payload.value) : NaN;
         if (!isNaN(val)) {
