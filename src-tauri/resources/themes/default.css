@@ -551,6 +551,7 @@ a:hover {
 .vanta-root {
     width: 100vw;
     height: 100vh;
+    padding: 0;
     display: grid;
     grid-template-rows: auto 1fr auto;
     overflow: hidden;
@@ -2337,8 +2338,7 @@ input[type="range"] {
 
 .ext-container {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
 }
 
 /* ── Clipboard View ─────────────────────────────────────────── */
@@ -2727,16 +2727,17 @@ input[type="range"] {
 }
 
 .npb-volume {
-    width: 36px;
+    width: 64px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
+    margin-right: 1rem;
 }
 
 .npb-volume-slider {
     -webkit-appearance: none;
     appearance: none;
-    width: 100%;
+    width: 100% !important;
     height: 3px;
     background: rgba(255, 255, 255, 0.15);
     border-radius: 2px;
@@ -3046,7 +3047,6 @@ input[type="range"] {
 }
 
 .mini-player-lyrics-pane {
-    flex: 1;
     min-height: 0;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.06);
@@ -3055,6 +3055,14 @@ input[type="range"] {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+
+.mini-player-lyrics-pane:has(.mini-player-lyrics-empty) {
+    display: none;
+}
+
+.mini-player-lyrics-pane:has(.mini-player-lyrics-lines) {
+    flex: 1;
 }
 
 .mini-player-lyrics-lines {
