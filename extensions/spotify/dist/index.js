@@ -31,7 +31,7 @@
 
     var style = document.createElement('style');
     style.textContent = [
-      '.spot-root{padding:0;font-family:-apple-system,system-ui,sans-serif;color:var(--vanta-text,#e8e8e8);min-height:200px;overflow-y:auto;max-height:520px}',
+      '.spot-root{padding:0;font-family:-apple-system,system-ui,sans-serif;color:var(--vanta-text,#e8e8e8);overflow-y:auto;max-height:520px}',
       '.spot-setup{display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 16px;text-align:center}',
       '.spot-setup-icon{opacity:.35}',
       '.spot-setup-title{font-size:18px;font-weight:600;margin-top:2px}',
@@ -74,19 +74,20 @@
       '.spot-icon-btn:hover{background:rgba(255,255,255,0.1);color:#fff}',
       '.spot-icon-btn.accent:hover{background:rgba(255,255,255,0.15);color:#fff}',
 
-      '.spot-tabs{display:flex;gap:2px;background:rgba(255,255,255,0.06);border-radius:8px;padding:3px;margin:12px 16px 0}',
+      '.spot-tabs{display:flex;gap:2px;background:rgba(255,255,255,0.06);border-radius:8px;padding:3px;margin:8px 16px 0}',
       '.spot-tab{flex:1;padding:7px 0;text-align:center;font-size:12px;font-weight:500;border:none;border-radius:6px;cursor:pointer;background:transparent;color:rgba(255,255,255,0.5);transition:all .15s}',
       '.spot-tab.active{background:rgba(255,255,255,0.15);color:#fff;backdrop-filter:blur(4px)}',
 
-      '.spot-art-section{display:flex;align-items:flex-start;gap:16px;padding:16px}',
-      '.spot-art-img{width:120px;height:120px;border-radius:12px;object-fit:cover;flex-shrink:0;box-shadow:0 4px 24px rgba(0,0,0,.5)}',
-      '.spot-art-placeholder{width:120px;height:120px;border-radius:12px;flex-shrink:0;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3)}',
+      '.spot-art-section{display:flex;align-items:flex-start;gap:14px;padding:12px 16px 8px}',
+      '.spot-art-img{width:90px;height:90px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 4px 24px rgba(0,0,0,.5);transition:opacity .4s ease}',
+      '.spot-art-placeholder{width:90px;height:90px;border-radius:10px;flex-shrink:0;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3)}',
       '.spot-track-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding-top:4px}',
       '.spot-track-name{font-size:16px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}',
       '.spot-track-artist{font-size:13px;color:rgba(255,255,255,0.7);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       '.spot-track-album{font-size:12px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}',
 
       '.spot-progress-section{padding:0 16px}',
+      '.spot-player>div{animation:spot-fade-in .35s ease}',
       '.spot-progress-bar{width:100%;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;overflow:visible;cursor:pointer;transition:height .1s;position:relative}',
       '.spot-progress-bar:hover{height:6px}',
       '.spot-progress-fill{height:100%;background:rgba(255,255,255,0.8);border-radius:2px;transition:width .3s linear;position:relative}',
@@ -94,7 +95,7 @@
       '.spot-progress-bar:hover .spot-progress-thumb{opacity:1}',
       '.spot-progress-times{display:flex;justify-content:space-between;font-size:11px;color:rgba(255,255,255,0.45);margin-top:6px}',
 
-      '.spot-controls{display:flex;align-items:center;justify-content:center;gap:16px;padding:8px 16px 4px}',
+      '.spot-controls{display:flex;align-items:center;justify-content:center;gap:16px;padding:4px 16px 2px}',
       '.spot-ctrl{background:none;border:none;color:rgba(255,255,255,0.5);cursor:pointer;padding:6px;border-radius:50%;transition:all .15s;display:flex;align-items:center;justify-content:center}',
       '.spot-ctrl:hover{color:#fff;background:rgba(255,255,255,0.08)}',
       '.spot-ctrl.active{color:#fff}',
@@ -102,17 +103,18 @@
       '.spot-ctrl-main:hover{transform:scale(1.06);background:rgba(255,255,255,0.3)}',
       '.spot-ctrl-main:active{transform:scale(.94)}',
 
-      '.spot-volume{display:flex;align-items:center;gap:8px;padding:4px 16px 12px}',
+      '.spot-volume{display:flex;align-items:center;gap:8px;padding:2px 16px 8px}',
       '.spot-vol-icon{color:rgba(255,255,255,0.45);flex-shrink:0;display:flex;align-items:center}',
       '.spot-vol-bar{flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;cursor:pointer;position:relative}',
       '.spot-vol-fill{height:100%;background:rgba(255,255,255,0.7);border-radius:2px;transition:width .1s}',
-      '.spot-lyrics{margin:0 16px 12px;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:10px;max-height:150px;overflow:auto;backdrop-filter:blur(4px)}',
+      '.spot-lyrics{margin:0 16px 8px;padding:10px 12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:10px;max-height:130px;overflow:auto;backdrop-filter:blur(4px);animation:spot-fade-in .3s ease}',
+      '@keyframes spot-fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}',
       '.spot-lyrics-title{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,0.4);margin-bottom:8px;font-weight:500}',
       '.spot-lyrics-line{font-size:12px;line-height:1.6;color:rgba(255,255,255,0.8);margin:0 0 2px}',
       '.spot-lyrics-empty{font-size:12px;color:rgba(255,255,255,0.35)}',
       '.spot-lyrics-active{color:#fff!important;font-weight:600;font-size:13px;transition:all .3s ease}',
 
-      '.spot-empty{text-align:center;padding:32px 16px;color:rgba(255,255,255,0.45);font-size:13px}',
+      '.spot-empty{text-align:center;padding:20px 16px;color:rgba(255,255,255,0.45);font-size:13px}',
       '.spot-empty-icon{margin-bottom:12px;opacity:.3}',
       '.spot-search-input{width:100%;padding:10px 12px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;margin:0 0 12px}',
       '.spot-search-input:focus{border-color:rgba(255,255,255,0.25)}',
@@ -130,7 +132,7 @@
       '.spot-result-play{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}',
       '.spot-result:hover .spot-result-play{opacity:1}',
 
-      '.spot-footer{display:flex;justify-content:center;gap:8px;padding:12px 16px;border-top:1px solid rgba(255,255,255,0.06)}',
+      '.spot-footer{display:flex;justify-content:center;gap:8px;padding:8px 16px;border-top:1px solid rgba(255,255,255,0.06)}',
       '.spot-loading{display:flex;justify-content:center;padding:24px;color:rgba(255,255,255,0.5);font-size:13px}',
       '.spot-err{color:#ef4444;font-size:12px;text-align:center;padding:8px 16px}',
       '.spot-hint{font-size:11px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;max-width:420px;line-height:1.6;text-align:left}',
@@ -247,6 +249,24 @@
       window.dispatchEvent(new CustomEvent('vanta-now-playing', { detail: null }));
     }
 
+    function cleanTrackName(name) {
+      if (!name) return name;
+      return name
+        .replace(/\s*[\(\[](?:feat\.?|ft\.?|featuring|with|prod\.?|remix|remaster(?:ed)?|deluxe|bonus|live|acoustic|radio edit|explicit|clean|version|edit|mix|instrumental|extended|original)[^\)\]]*[\)\]]/gi, '')
+        .replace(/\s*-\s*(?:remaster(?:ed)?|deluxe|bonus|live|acoustic|radio edit|single version|album version|mono|stereo|explicit|clean).*$/i, '')
+        .trim();
+    }
+
+    function extractLyricsFromResult(parsed) {
+      if (!parsed) return { text: null, synced: null };
+      var syncedRaw = parsed.syncedLyrics || null;
+      var plainRaw = parsed.plainLyrics || null;
+      var out = syncedRaw || plainRaw || null;
+      if (out && typeof out === 'string' && out.length > 8000) out = out.slice(0, 8000);
+      var synced = syncedRaw ? parseSyncedLyrics(syncedRaw) : null;
+      return { text: out, synced: synced };
+    }
+
     async function fetchLyrics(trackName, artistName) {
       var key = (trackName || '') + '::' + (artistName || '');
       if (!trackName || !artistName) {
@@ -265,31 +285,51 @@
       }
       lyricsFetchKey = key;
       try {
+        // Try exact match first
         var raw = await api.shell.execute('curl', [
           '-s',
           'https://lrclib.net/api/get?track_name=' + encodeURIComponent(trackName) + '&artist_name=' + encodeURIComponent(artistName)
         ]);
         var parsed = null;
-        try {
-          parsed = JSON.parse((raw || '').trim() || '{}');
-        } catch (e) {
-          parsed = null;
+        try { parsed = JSON.parse((raw || '').trim() || '{}'); } catch (e) { parsed = null; }
+
+        var result = extractLyricsFromResult(parsed);
+
+        // Fallback: try with cleaned track name
+        if (!result.text) {
+          var cleanName = cleanTrackName(trackName);
+          if (cleanName && cleanName !== trackName) {
+            raw = await api.shell.execute('curl', [
+              '-s',
+              'https://lrclib.net/api/get?track_name=' + encodeURIComponent(cleanName) + '&artist_name=' + encodeURIComponent(artistName)
+            ]);
+            try { parsed = JSON.parse((raw || '').trim() || '{}'); } catch (e) { parsed = null; }
+            result = extractLyricsFromResult(parsed);
+          }
         }
 
-        var out = null;
-        var synced = null;
-        if (parsed) {
-          var syncedRaw = parsed.syncedLyrics || null;
-          var plainRaw = parsed.plainLyrics || null;
-          out = syncedRaw || plainRaw || null;
-          if (out && typeof out === 'string' && out.length > 8000) out = out.slice(0, 8000);
-          synced = syncedRaw ? parseSyncedLyrics(syncedRaw) : null;
+        // Fallback: search API (fuzzy matching, returns array)
+        if (!result.text) {
+          var searchName = cleanTrackName(trackName) || trackName;
+          raw = await api.shell.execute('curl', [
+            '-s',
+            'https://lrclib.net/api/search?track_name=' + encodeURIComponent(searchName) + '&artist_name=' + encodeURIComponent(artistName)
+          ]);
+          try {
+            var searchResults = JSON.parse((raw || '').trim() || '[]');
+            if (Array.isArray(searchResults)) {
+              for (var si = 0; si < searchResults.length; si++) {
+                var candidate = extractLyricsFromResult(searchResults[si]);
+                if (candidate.text) { result = candidate; break; }
+              }
+            }
+          } catch (e) { /* ignore */ }
         }
 
-        lyricsCache[key] = {text: out, synced: synced};
+        lyricsCache[key] = result;
         if (lyricsFetchKey === key) {
-          lyricsText = out;
-          syncedLines = synced;
+          lyricsText = result.text;
+          syncedLines = result.synced;
           emitNowPlaying();
         }
       } catch (e) {
@@ -748,7 +788,9 @@
       var lyricsTitle = document.createElement('div'); lyricsTitle.className = 'spot-lyrics-title'; lyricsTitle.textContent = 'Lyrics';
       lyricsWrap.appendChild(lyricsTitle);
       lyricsLineEls = [];
+      var hasLyrics = false;
       if (syncedLines && syncedLines.length > 0) {
+        hasLyrics = true;
         var activeIdx = 0;
         for (var si = 0; si < syncedLines.length; si++) {
           if (syncedLines[si].time <= progressMs) activeIdx = si;
@@ -761,16 +803,15 @@
           lyricsWrap.appendChild(row);
         });
       } else if (lyricsText && lyricsText.trim()) {
+        hasLyrics = true;
         lyricsText.split('\n').map(function(line) { return line.trim(); }).filter(function(line) { return line.length > 0 && !line.match(/^\[\d{2}:\d{2}\.\d{2,3}\]/); }).slice(0, 30).forEach(function(line) {
           var row = document.createElement('div'); row.className = 'spot-lyrics-line'; row.textContent = line;
           lyricsWrap.appendChild(row);
         });
-      } else {
-        var empty = document.createElement('div'); empty.className = 'spot-lyrics-empty';
-        empty.textContent = 'Lyrics unavailable for this track.';
-        lyricsWrap.appendChild(empty);
       }
-      container.appendChild(lyricsWrap);
+      if (hasLyrics) {
+        container.appendChild(lyricsWrap);
+      }
     }
 
     function makeCtrl(svg, active, handler) {
