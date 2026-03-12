@@ -30,7 +30,8 @@
 
   let nowPlaying = $state<NowPlayingState | null>(null);
   let unlistenRelay: (() => void) | null = null;
-  let tickTimer: number | null = null;
+  let albumArtKey = $state(0);
+  let prevAlbumArt = $state<string | null>(null);
   let lyricsContainer = $state<HTMLDivElement | null>(null);
 
   function fmtTime(ms: number): string {
@@ -81,6 +82,12 @@
   }
 
   const hasTrack = $derived(Boolean(nowPlaying?.track || nowPlaying?.isPlaying));
+  const hasLyrics = $derived(
+    Boolean(
+      (nowPlaying?.syncedLines && nowPlaying.syncedLines.length > 0) ||
+        ((nowPlaying?.lyrics || "").trim().length > 0),
+    ),
+  );
   const hasSyncedLines = $derived(
     Boolean(nowPlaying?.syncedLines && nowPlaying.syncedLines.length > 0),
   );
@@ -105,29 +112,19 @@
   onMount(async () => {
     window.addEventListener("vanta-now-playing", handleNowPlaying as EventListener);
 
-    const existing = (window as any).__vanta_now_playing;
-    if (existing && (existing.track || existing.isPlaying)) {
-      nowPlaying = existing;
-    } else {
-      const stored = safeLoadSnapshot();
-      if (stored) nowPlaying = stored;
-    }
-
     unlistenRelay = await listen<NowPlayingState | null>(NOW_PLAYING_RELAY_EVENT, (event) => {
+      const prev = nowPlaying;
       nowPlaying = event.payload;
-      (window as any).__vanta_now_playing = event.payload;
+      if (event.payload?.albumArt && event.payload.albumArt !== prev?.albumArt) {
+        prevAlbumArt = prev?.albumArt ?? null;
+        albumArtKey++;
+      }
     });
 
-    // Request current state from NowPlayingBar immediately
+    // Request current state from the extension immediately
     void emit(REQUEST_STATE_EVENT, {}).catch(() => {});
-
-    tickTimer = window.setInterval(() => {
-      if (!nowPlaying || !nowPlaying.isPlaying || nowPlaying.durationMs <= 0) return;
-      nowPlaying = {
-        ...nowPlaying,
-        progressMs: Math.min(nowPlaying.progressMs + 1000, nowPlaying.durationMs),
-      };
-    }, 1000);
+    // Re-request after a short delay in case extension wasn't ready yet
+    setTimeout(() => void emit(REQUEST_STATE_EVENT, {}).catch(() => {}), 800);
   });
 
   $effect(() => {
@@ -140,17 +137,18 @@
   onDestroy(() => {
     window.removeEventListener("vanta-now-playing", handleNowPlaying as EventListener);
     unlistenRelay?.();
-    if (tickTimer !== null) {
-      window.clearInterval(tickTimer);
-      tickTimer = null;
-    }
   });
 </script>
 
 <div class="mini-player-root">
-  {#if nowPlaying?.albumArt}
-    <div class="mini-player-backdrop" style={`background-image:url('${nowPlaying.albumArt}')`}></div>
+  {#if prevAlbumArt}
+    <div class="mini-player-backdrop mini-player-backdrop-prev" style={`background-image:url('${prevAlbumArt}')`}></div>
   {/if}
+  {#key albumArtKey}
+    {#if nowPlaying?.albumArt}
+      <div class="mini-player-backdrop" style={`background-image:url('${nowPlaying.albumArt}')`}></div>
+    {/if}
+  {/key}
   <div class="mini-player-overlay"></div>
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -166,7 +164,9 @@
       <!-- Top section: art + info + controls -->
       <div class="mini-player-top">
         {#if nowPlaying?.albumArt}
-          <img class="mini-player-art" src={nowPlaying.albumArt} alt="" />
+          {#key albumArtKey}
+            <img class="mini-player-art" src={nowPlaying.albumArt} alt="" />
+          {/key}
         {:else}
           <div class="mini-player-art-placeholder">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
@@ -204,8 +204,8 @@
         </div>
       </div>
 
-      <!-- Lyrics section -->
-      <div class="mini-player-lyrics-pane">
+      <!-- Lyrics section: collapses smoothly when no lyrics available -->
+      <div class="mini-player-lyrics-pane" class:mini-player-lyrics-visible={hasLyrics}>
         {#if hasSyncedLines}
           <div class="mini-player-lyrics-lines" bind:this={lyricsContainer}>
             {#each nowPlaying!.syncedLines! as line, i}
@@ -220,8 +220,6 @@
               <div class="mini-player-lyric-line">{line}</div>
             {/each}
           </div>
-        {:else}
-          <div class="mini-player-lyrics-empty">Lyrics unavailable</div>
         {/if}
       </div>
     </div>
