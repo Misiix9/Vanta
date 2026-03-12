@@ -19,10 +19,14 @@
 
   const NOW_PLAYING_RELAY_EVENT = "spotify-now-playing-relay";
   const COMMAND_RELAY_EVENT = "spotify-command-relay";
+  const REQUEST_STATE_EVENT = "spotify-request-state";
   const NOW_PLAYING_STORAGE_KEY = "vanta.spotify.nowPlaying";
+
+  let { onOpenExtension }: { onOpenExtension?: () => void } = $props();
 
   let nowPlaying = $state<NowPlayingState | null>(null);
   let unlistenCommandRelay: (() => void) | null = null;
+  let unlistenRequestState: (() => void) | null = null;
   let tickTimer: number | null = null;
 
   function safeStoreNowPlaying(snapshot: NowPlayingState | null) {
@@ -89,6 +93,12 @@
       );
     });
 
+    unlistenRequestState = await listen(REQUEST_STATE_EVENT, () => {
+      if (nowPlaying) {
+        void emit(NOW_PLAYING_RELAY_EVENT, nowPlaying).catch(() => {});
+      }
+    });
+
     tickTimer = window.setInterval(() => {
       if (!nowPlaying || !nowPlaying.isPlaying || nowPlaying.durationMs <= 0) return;
       nowPlaying = {
@@ -96,12 +106,14 @@
         progressMs: Math.min(nowPlaying.progressMs + 1000, nowPlaying.durationMs),
       };
       safeStoreNowPlaying(nowPlaying);
+      void emit(NOW_PLAYING_RELAY_EVENT, nowPlaying).catch(() => {});
     }, 1000);
   });
 
   onDestroy(() => {
     window.removeEventListener("vanta-now-playing", handleNowPlaying as EventListener);
     unlistenCommandRelay?.();
+    unlistenRequestState?.();
     if (tickTimer !== null) {
       window.clearInterval(tickTimer);
       tickTimer = null;
@@ -110,7 +122,13 @@
 </script>
 
 {#if hasTrack}
-  <div class="now-playing-bar">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div class="now-playing-bar" onclick={(e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('.npb-ctrl, .npb-ctrl-play, .npb-volume, .npb-volume-slider')) return;
+    onOpenExtension?.();
+  }} style="cursor:pointer">
     <!-- Blurred album art background -->
     {#if nowPlaying?.albumArt}
       <div class="npb-bg" style="background-image: url({nowPlaying.albumArt})"></div>

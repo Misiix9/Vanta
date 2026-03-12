@@ -25,6 +25,7 @@
 
   const NOW_PLAYING_RELAY_EVENT = "spotify-now-playing-relay";
   const COMMAND_RELAY_EVENT = "spotify-command-relay";
+  const REQUEST_STATE_EVENT = "spotify-request-state";
   const NOW_PLAYING_STORAGE_KEY = "vanta.spotify.nowPlaying";
 
   let nowPlaying = $state<NowPlayingState | null>(null);
@@ -116,6 +117,9 @@
       nowPlaying = event.payload;
       (window as any).__vanta_now_playing = event.payload;
     });
+
+    // Request current state from NowPlayingBar immediately
+    void emit(REQUEST_STATE_EVENT, {}).catch(() => {});
 
     tickTimer = window.setInterval(() => {
       if (!nowPlaying || !nowPlaying.isPlaying || nowPlaying.durationMs <= 0) return;

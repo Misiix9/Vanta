@@ -492,7 +492,10 @@
     {/if}
   {/if}
 
-  <NowPlayingBar />
+  <NowPlayingBar onOpenExtension={() => {
+    const ext = availableExtensions.find((e) => e.manifest.name === 'spotify');
+    if (ext) extensionView = { extId: 'spotify', command: 'player', extPath: ext.path ?? '' };
+  }} />
   <StatusBar resultCount={activeMacroId ? macroDryRun?.steps.length ?? 0 : visibleRowCount} {searchTime} {isSearching} />
 
   {#if pendingConfirmResult}
