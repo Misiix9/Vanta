@@ -177,7 +177,7 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<div class="extension-host window-shell ext-surface-root">
+<div class="extension-host">
   {#if loading}
     <div class="ext-loading">
       <div class="ext-spinner"></div>
@@ -193,23 +193,7 @@
       </div>
     </div>
   {:else}
-    <div class="ext-header hub-window-header window-header ext-surface-header">
-      <div class="window-header-main">
-        <span class="window-breadcrumb">Extension Runtime</span>
-        <span class="ext-title">{extId}</span>
-      </div>
-      <div class="window-actions">
-        {#if navStack.length > 1}
-          <button class="ext-back btn-ghost icon-btn" onclick={handlePop} aria-label="Back">
-            <i class="fa-solid fa-arrow-left"></i>
-          </button>
-        {/if}
-        <button class="ext-close btn-ghost icon-btn" onclick={() => onClose?.()} aria-label="Close">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-    </div>
-    <div class="ext-container hub-window-scroll window-scroll" bind:this={container}></div>
+    <div class="ext-container" bind:this={container}></div>
   {/if}
 </div>
 

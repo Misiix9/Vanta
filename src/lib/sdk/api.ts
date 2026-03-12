@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { emit, listen } from '@tauri-apps/api/event';
 import type { VantaAPI, ToastOptions, ExtensionEnvironment } from './types';
 
 type NavigationCallback = (component: any, props?: Record<string, any>) => void;
@@ -62,6 +63,14 @@ export function createVantaAPI(options: {
     window: {
       openMiniPlayer: async () => {
         await invoke('open_spotify_mini_player');
+      },
+    },
+    events: {
+      emit: async (event: string, payload?: any) => {
+        await emit(event, payload);
+      },
+      listen: async (event: string, handler: (payload: any) => void) => {
+        return await listen(event, (ev) => handler(ev.payload));
       },
     },
     toast: options.onToast,

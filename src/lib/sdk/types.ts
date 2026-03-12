@@ -33,6 +33,10 @@ export interface VantaAPI {
   window: {
     openMiniPlayer: () => Promise<void>;
   };
+  events: {
+    emit: (event: string, payload?: any) => Promise<void>;
+    listen: (event: string, handler: (payload: any) => void) => Promise<() => void>;
+  };
   toast: (options: ToastOptions) => void;
   closeMainWindow: () => Promise<void>;
   getPreference: <T>(key: string) => T | undefined;
