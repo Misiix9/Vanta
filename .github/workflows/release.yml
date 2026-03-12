@@ -1,4 +1,4 @@
-name: Release Vanta v5.5.0
+name: Release Vanta v5.6.0
 
 on:
   push:
@@ -86,18 +86,17 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v5.3.0 -- Phase 34 Accessibility Compliance
+            ## Vanta v5.6.0 -- Phase 37 Result Preview And Context Actions
 
-            Minor release achieving WCAG AA compliance across all primary surfaces.
+            Minor release adding result inspection and action flexibility.
 
             ### Highlights
-            - `:focus-visible` rings on all interactive elements with proper override precedence.
-            - Dialog roles, `aria-modal`, and focus trapping on all modal surfaces.
-            - `aria-live` regions for result count changes and view transitions.
-            - Accessible thin scrollbar replacing the hidden scrollbar kill.
-            - Keyboard shortcut help modal (Ctrl+?) with full navigation shortcut listing.
-            - WCAG AA contrast fixes: `--text-tertiary` and `.icon-fallback` now pass 4.5:1 ratio.
-            - Skip-navigation link from search input to results region.
+            - Quick Look preview panel (Space) — file metadata, image preview, text content, non-file result info.
+            - Right-click context menu on results with all available actions.
+            - Image file thumbnails displayed inline in result rows.
+            - Contextual empty states with filter hint chips.
+            - Fuzzy score debug overlay (Ctrl+D) showing match scores.
+            - Drag-and-drop from result items (text/plain data transfer).
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.

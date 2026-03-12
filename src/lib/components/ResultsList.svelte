@@ -27,14 +27,20 @@
     results = [],
     selectedIndex = $bindable(0),
     groupBySection = true,
+    query = "",
+    showScore = false,
     onActivate,
     onActionClick,
+    onContextMenu,
   }: {
     results: SearchResult[];
     selectedIndex: number;
     groupBySection?: boolean;
+    query?: string;
+    showScore?: boolean;
     onActivate: (result: SearchResult) => void;
     onActionClick?: (result: SearchResult, action: ResultAction) => void;
+    onContextMenu?: (e: MouseEvent, result: SearchResult) => void;
   } = $props();
 
   let container: HTMLDivElement | null = $state(null);
@@ -287,9 +293,11 @@
               index={i}
               displayIndex={row.itemIndex}
               isSelected={i === selectedIndex}
+              {showScore}
               onSelect={handleSelect}
               {onActivate}
               {onActionClick}
+              {onContextMenu}
             />
           </div>
         {/if}
@@ -330,7 +338,20 @@
         <path d="m21 21-4.3-4.3" />
       </svg>
     </div>
-    <p class="empty-text">Type to search applications...</p>
+    {#if query.trim()}
+      {#if query.startsWith("type:")}
+        <p class="empty-text">No results for this source filter. Try a different filter or broader query.</p>
+      {:else}
+        <p class="empty-text">No results for "{query}". Try a different spelling or use <kbd>type:app</kbd> to filter.</p>
+      {/if}
+    {:else}
+      <p class="empty-text">Start typing to search apps, files, and more.</p>
+      <div class="empty-hints">
+        <span class="empty-hint-chip">type:app</span>
+        <span class="empty-hint-chip">type:file</span>
+        <span class="empty-hint-chip">in:clipboard</span>
+      </div>
+    {/if}
   </div>
 {/if}
 

@@ -38,7 +38,15 @@ Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/rele
 sudo rpm -i vanta-5.5.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.5.0)
+### Latest Minor (v5.6.0)
+- Quick Look preview panel (Space key) — shows file metadata, image preview, text content (up to 4 KB), directory listing; non-file results show source info and exec details.
+- Right-click context menu on any result row — lists primary action plus all available actions (reveal, copy path, open-with, etc.).
+- Image file thumbnails displayed inline in result rows for common image formats (png, jpg, gif, webp, svg, etc.).
+- Contextual empty states — filter-specific hints, "no results" messaging, and filter hint chips (`type:app`, `type:file`, `in:clipboard`) on the default empty screen.
+- Fuzzy score debug overlay (Ctrl+D) — shows numeric match scores as inline badges on each result for ranking inspection.
+- Drag-and-drop from result items — file paths, clipboard text, or exec strings transferred as `text/plain`.
+
+### Previous Minor (v5.5.0)
 - Added search source filters: `type:app`, `type:file`, `type:window`, `in:clipboard`, `ext:<id>` narrow results to a specific source; non-matching parallel tasks are skipped entirely for efficiency.
 - Added query history with up-arrow recall in empty search input; recent queries (up to 50) persisted in history file with deduplication.
 - Added typo tolerance / "Did you mean?" — when results are sparse, Levenshtein edit-distance suggestions from app names surface as clickable fill-query results.

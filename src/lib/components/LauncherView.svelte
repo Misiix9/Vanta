@@ -36,6 +36,8 @@
   import SearchExplainPanel from "$lib/components/SearchExplainPanel.svelte";
   import ActionConfirmModal from "$lib/components/ActionConfirmModal.svelte";
   import KeyboardShortcutsModal from "$lib/components/KeyboardShortcutsModal.svelte";
+  import PreviewPanel from "$lib/components/PreviewPanel.svelte";
+  import ContextMenu from "$lib/components/ContextMenu.svelte";
 
   type ViewId = "launcher" | "settings" | "store" | "featureHub" | "communityHub" | "themeHub" | "extensionsHub";
 
@@ -106,6 +108,9 @@
   let quickTipsVisible = $state(false);
   let pendingConfirmResult = $state<SearchResult | null>(null);
   let shortcutsOpen = $state(false);
+  let previewResult = $state<SearchResult | null>(null);
+  let contextMenu = $state<{ result: SearchResult; x: number; y: number } | null>(null);
+  let showScoreOverlay = $state(false);
   let groupBySection = $derived(query.trim() === "");
   let totalItems = $derived(visibleRowCount);
 
@@ -341,6 +346,8 @@
 
   function handleEscape() {
     if (permissionPrompt) return;
+    if (contextMenu) { contextMenu = null; return; }
+    if (previewResult) { previewResult = null; return; }
     if (extensionView) { extensionView = null; return; }
     if (activeMacroId) { resetMacroState(); return; }
     onResetAndHide();
@@ -349,6 +356,14 @@
   function handleActionClick(result: SearchResult, action: ResultAction) {
     const exec = execForAction(result, action);
     handleActivate({ ...result, exec, command: action.command }, false);
+  }
+
+  function handleContextMenuAction(result: SearchResult, exec: string, command?: ResultAction["command"]) {
+    handleActivate({ ...result, exec, command }, false);
+  }
+
+  function handleResultContextMenu(e: MouseEvent, result: SearchResult) {
+    contextMenu = { result, x: e.clientX, y: e.clientY };
   }
 
   function handleHistoryRecall(q: string) {
@@ -379,6 +394,7 @@
     }
     if (onboardingOpen || permissionPrompt) return;
     if (e.key === "?" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); shortcutsOpen = true; return; }
+    if (e.key === "d" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); showScoreOverlay = !showScoreOverlay; return; }
     if (activeMacroId && e.key === "Escape") { resetMacroState(); return; }
     if (e.key === "," && e.ctrlKey) { e.preventDefault(); view = view === "launcher" ? "settings" : "launcher"; return; }
     if (view === "settings" || view === "store") {
@@ -430,6 +446,12 @@
       case "ArrowDown": e.preventDefault(); selectedIndex = skipHeaders((selectedIndex + 1) % totalItems, 1); scheduleScrollToSelected(); break;
       case "ArrowUp": e.preventDefault(); selectedIndex = skipHeaders(selectedIndex <= 0 ? totalItems - 1 : selectedIndex - 1, -1); scheduleScrollToSelected(); break;
       case "Enter": e.preventDefault(); if (activeResult) handleActivate(activeResult); break;
+      case " ":
+        if (document.activeElement?.tagName !== "INPUT") {
+          e.preventDefault();
+          if (activeResult) previewResult = previewResult?.exec === activeResult.exec ? null : activeResult;
+        }
+        break;
       case "Tab":
         e.preventDefault();
         if (results[selectedIndex]?.exec.startsWith("fill:")) { handleActivate(results[selectedIndex]); break; }
@@ -469,8 +491,11 @@
   {:else}
     <ResultsList
       bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
+      query={query}
+      showScore={showScoreOverlay}
       onActivate={handleActivate}
       onActionClick={handleActionClick}
+      onContextMenu={handleResultContextMenu}
       on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
     />
     {#if query.trim() !== "" && config && config.search.show_explain_panel !== false}
@@ -494,6 +519,20 @@
 
   {#if shortcutsOpen}
     <KeyboardShortcutsModal onClose={() => (shortcutsOpen = false)} />
+  {/if}
+
+  {#if previewResult}
+    <PreviewPanel result={previewResult} onClose={() => (previewResult = null)} />
+  {/if}
+
+  {#if contextMenu}
+    <ContextMenu
+      result={contextMenu.result}
+      x={contextMenu.x}
+      y={contextMenu.y}
+      onAction={handleContextMenuAction}
+      onClose={() => (contextMenu = null)}
+    />
   {/if}
 
   {#if onboardingOpen && config}

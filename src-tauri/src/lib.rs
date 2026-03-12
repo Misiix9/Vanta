@@ -2919,6 +2919,91 @@ async fn open_with_editor(
     Ok(())
 }
 
+#[derive(serde::Serialize)]
+struct FilePreview {
+    path: String,
+    name: String,
+    size_bytes: u64,
+    modified: Option<u64>,
+    mime_hint: String,
+    content: Option<String>,
+    is_image: bool,
+    is_directory: bool,
+}
+
+#[tauri::command]
+async fn preview_file(path: String) -> Result<FilePreview, VantaError> {
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        return Err("Path does not exist".into());
+    }
+
+    let meta = std::fs::metadata(&path)
+        .map_err(|e| format!("Cannot read metadata: {}", e))?;
+    let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let size_bytes = meta.len();
+    let modified = meta.modified().ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs());
+    let is_directory = meta.is_dir();
+
+    let ext = p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let image_exts = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "svg", "ico"];
+    let is_image = image_exts.contains(&ext.as_str());
+
+    let mime_hint = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "bmp" => "image/bmp",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "ico" => "image/x-icon",
+        "pdf" => "application/pdf",
+        "rs" => "text/x-rust",
+        "py" => "text/x-python",
+        "js" | "mjs" => "text/javascript",
+        "ts" => "text/typescript",
+        "json" => "application/json",
+        "toml" => "text/x-toml",
+        "yaml" | "yml" => "text/x-yaml",
+        "md" => "text/markdown",
+        "html" | "htm" => "text/html",
+        "css" => "text/css",
+        "sh" | "bash" | "zsh" => "text/x-shellscript",
+        "txt" | "log" => "text/plain",
+        "xml" => "text/xml",
+        "csv" => "text/csv",
+        _ => if is_directory { "inode/directory" } else { "application/octet-stream" },
+    }.to_string();
+
+    // Read text content for non-images, cap at 4KB
+    let content = if !is_image && !is_directory && size_bytes < 512_000 {
+        let text_types = ["text/", "application/json", "text/x-"];
+        let is_text = text_types.iter().any(|t| mime_hint.starts_with(t))
+            || mime_hint == "application/json";
+        if is_text {
+            std::fs::read_to_string(&path).ok().map(|s| {
+                if s.len() > 4096 { format!("{}…", &s[..4096]) } else { s }
+            })
+        } else { None }
+    } else if is_directory {
+        // List directory entries (up to 50)
+        let mut entries: Vec<String> = Vec::new();
+        if let Ok(dir) = std::fs::read_dir(&path) {
+            for entry in dir.take(50).flatten() {
+                let n = entry.file_name().to_string_lossy().to_string();
+                let suffix = if entry.path().is_dir() { "/" } else { "" };
+                entries.push(format!("{}{}", n, suffix));
+            }
+        }
+        entries.sort();
+        Some(entries.join("\n"))
+    } else { None };
+
+    Ok(FilePreview { path, name, size_bytes, modified, mime_hint, content, is_image, is_directory })
+}
+
 #[tauri::command]
 async fn open_spotify_mini_player(app_handle: tauri::AppHandle) -> Result<(), VantaError> {
     use tauri::WebviewUrl;
@@ -3125,6 +3210,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             open_path,
             reveal_in_file_manager,
             open_with_editor,
+            preview_file,
             open_spotify_mini_player,
             permissions::get_permission_decision,
             permissions::set_permission_decision,

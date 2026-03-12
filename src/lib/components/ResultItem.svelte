@@ -8,22 +8,48 @@
         index,
         displayIndex = undefined,
         isSelected = false,
+        showScore = false,
         onSelect,
         onActivate,
         onActionClick,
+        onContextMenu,
     }: {
         result: SearchResult;
         index: number;
         displayIndex?: number;
         isSelected: boolean;
+        showScore?: boolean;
         onSelect: (index: number) => void;
         onActivate: (result: SearchResult) => void;
         onActionClick?: (result: SearchResult, action: import("$lib/types").ResultAction) => void;
+        onContextMenu?: (e: MouseEvent, result: SearchResult) => void;
     } = $props();
 
     let loadFailed = $state(false);
     let iconUrl = $derived(result.icon ? convertFileSrc(result.icon) : "");
     let safeInlineSvgMarkup = $derived(sanitizeInlineSvg(result.icon));
+
+    // Detect image file results for thumbnail display
+    const imageExts = new Set(["png", "jpg", "jpeg", "gif", "bmp", "webp", "svg", "ico"]);
+    let filePath = $derived.by(() => {
+        if (result.source !== "File") return null;
+        const exec = result.exec;
+        if (exec.startsWith("open:")) return exec.slice(5);
+        if (exec.startsWith("xdg-open ")) return exec.slice(9).replace(/^"|"$/g, "");
+        if (exec.startsWith("/")) return exec;
+        if (result.subtitle?.startsWith("/")) return result.subtitle;
+        return null;
+    });
+    let fileExt = $derived(filePath ? (filePath.split(".").pop() ?? "").toLowerCase() : "");
+    let isImageFile = $derived(imageExts.has(fileExt));
+    let thumbnailUrl = $derived(isImageFile && filePath ? convertFileSrc(filePath) : null);
+    let thumbFailed = $state(false);
+
+    function getDragData(): string {
+        if (filePath) return filePath;
+        if (result.source === "Clipboard") return result.subtitle || result.title;
+        return result.exec;
+    }
 
     /**
      * Highlight matching characters in the title based on match_indices.
@@ -130,6 +156,9 @@
     class:selected={isSelected}
     onmouseenter={() => onSelect(index)}
     onclick={() => onActivate(result)}
+    oncontextmenu={(e) => { if (onContextMenu) { e.preventDefault(); onContextMenu(e, result); } }}
+    draggable="true"
+    ondragstart={(e) => { e.dataTransfer?.setData("text/plain", getDragData()); }}
     role="option"
     aria-selected={isSelected}
 >
@@ -173,11 +202,23 @@
     <div class="item-content">
         <div class="item-title">
             {@html highlightTitle(result.title, result.match_indices)}
+            {#if showScore}
+                <span class="score-badge" title="Fuzzy match score">{Math.round(result.score)}</span>
+            {/if}
         </div>
         {#if result.subtitle}
             <div class="item-subtitle">{result.subtitle}</div>
         {/if}
     </div>
+
+    {#if thumbnailUrl && !thumbFailed}
+        <img
+            src={thumbnailUrl}
+            alt={result.title}
+            class="result-thumbnail"
+            onerror={() => { thumbFailed = true; }}
+        />
+    {/if}
 
     {#if isSelected}
         <div class="action-hints">
