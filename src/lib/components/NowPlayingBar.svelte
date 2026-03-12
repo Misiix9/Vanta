@@ -110,47 +110,63 @@
 
 {#if hasTrack}
   <div class="now-playing-bar">
+    <!-- Blurred album art background -->
     {#if nowPlaying?.albumArt}
-      <img class="npb-art" src={nowPlaying.albumArt} alt="" />
-    {:else}
-      <div class="npb-art-placeholder">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      <div class="npb-bg" style="background-image: url({nowPlaying.albumArt})"></div>
+    {/if}
+    <div class="npb-bg-overlay"></div>
+
+    <!-- Content -->
+    <div class="npb-content">
+      {#if nowPlaying?.albumArt}
+        <img class="npb-art" src={nowPlaying.albumArt} alt="" />
+      {:else}
+        <div class="npb-art-placeholder">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        </div>
+      {/if}
+
+      <div class="npb-info">
+        <span class="npb-track">{nowPlaying?.track || "Spotify"}</span>
+        <span class="npb-artist">{nowPlaying?.artist || "Playback active"}</span>
+      </div>
+
+      <div class="npb-time">{fmtTime(nowPlaying?.progressMs || 0)} / {fmtTime(nowPlaying?.durationMs || 0)}</div>
+
+      <div class="npb-controls">
+        <button class="npb-ctrl" onclick={() => sendCommand("prev")} aria-label="Previous">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        </button>
+        <button class="npb-ctrl npb-ctrl-play" onclick={() => sendCommand("play-pause")} aria-label="Play/Pause">
+          {#if nowPlaying?.isPlaying}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          {:else}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          {/if}
+        </button>
+        <button class="npb-ctrl" onclick={() => sendCommand("next")} aria-label="Next">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zm-10 6l8.5 6V6z" transform="rotate(180 12 12)"/></svg>
+        </button>
+      </div>
+
+      <div class="npb-volume" title="Volume">
+        <input
+          class="npb-volume-slider"
+          type="range"
+          min="0"
+          max="100"
+          value={Math.max(0, Math.min(100, Math.round(nowPlaying?.volumePercent ?? 100)))}
+          oninput={(event) => sendCommand("set-volume", Number((event.currentTarget as HTMLInputElement).value))}
+          aria-label="Spotify volume"
+        />
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    {#if nowPlaying?.durationMs && nowPlaying.durationMs > 0}
+      <div class="npb-progress">
+        <div class="npb-progress-fill" style="width: {(nowPlaying.progressMs / nowPlaying.durationMs) * 100}%"></div>
       </div>
     {/if}
-
-    <div class="npb-info">
-      <span class="npb-track">{nowPlaying?.track || "Spotify"}</span>
-      <span class="npb-artist">{nowPlaying?.artist || "Playback active"}</span>
-    </div>
-
-    <div class="npb-time">{fmtTime(nowPlaying?.progressMs || 0)} / {fmtTime(nowPlaying?.durationMs || 0)}</div>
-
-    <div class="npb-controls">
-      <button class="npb-ctrl" onclick={() => sendCommand("prev")} aria-label="Previous">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-      </button>
-      <button class="npb-ctrl npb-ctrl-play" onclick={() => sendCommand("play-pause")} aria-label="Play/Pause">
-        {#if nowPlaying?.isPlaying}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-        {:else}
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        {/if}
-      </button>
-      <button class="npb-ctrl" onclick={() => sendCommand("next")} aria-label="Next">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zm-10 6l8.5 6V6z" transform="rotate(180 12 12)"/></svg>
-      </button>
-    </div>
-
-    <div class="npb-volume" title="Volume">
-      <input
-        class="npb-volume-slider"
-        type="range"
-        min="0"
-        max="100"
-        value={Math.max(0, Math.min(100, Math.round(nowPlaying?.volumePercent ?? 100)))}
-        oninput={(event) => sendCommand("set-volume", Number((event.currentTarget as HTMLInputElement).value))}
-        aria-label="Spotify volume"
-      />
-    </div>
   </div>
 {/if}

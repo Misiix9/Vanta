@@ -22,7 +22,6 @@
   const NOW_PLAYING_STORAGE_KEY = "vanta.spotify.nowPlaying";
 
   let nowPlaying = $state<NowPlayingState | null>(null);
-  let showControls = $state(false);
   let unlistenRelay: (() => void) | null = null;
   let tickTimer: number | null = null;
 
@@ -122,85 +121,71 @@
   {#if nowPlaying?.albumArt}
     <div class="mini-player-backdrop" style={`background-image:url('${nowPlaying.albumArt}')`}></div>
   {/if}
+  <div class="mini-player-overlay"></div>
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="mini-player-drag" onmousedown={startDrag}>
-    <span class="mini-player-title">Spotify Mini Player</span>
+    <span class="mini-player-title">Mini Player</span>
     <button class="mini-player-close" onclick={closeWindow} aria-label="Close">
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
   </div>
 
   {#if hasTrack}
-    <div
-      class="mini-player-content"
-      role="presentation"
-      onmouseenter={() => (showControls = true)}
-      onmouseleave={() => (showControls = false)}
-    >
-      {#if !showControls}
-        <div class="mini-player-lyrics-pane">
-          <div class="mini-player-trackline">{nowPlaying?.track || "Now Playing"} · {nowPlaying?.artist || "Spotify"}</div>
-          {#if lyricLines.length > 0}
-            <div class="mini-player-lyrics-lines">
-              {#each lyricLines as line}
-                <div class="mini-player-lyric-line">{line}</div>
-              {/each}
-            </div>
-          {:else}
-            <div class="mini-player-lyrics-empty">Lyrics unavailable for this track.</div>
-          {/if}
-        </div>
-      {:else}
-        <div class="mini-player-controls-pane">
-          {#if nowPlaying?.albumArt}
-            <img class="mini-player-art" src={nowPlaying.albumArt} alt="" />
-          {:else}
-            <div class="mini-player-art-placeholder">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-            </div>
-          {/if}
-          <div class="mini-player-info">
-            <span class="mini-player-track">{nowPlaying?.track || "Spotify"}</span>
-            <span class="mini-player-artist">{nowPlaying?.artist || "Playback"}</span>
-            <div class="mini-player-progress">
-              <div class="mini-player-progress-bar">
-                <div class="mini-player-progress-fill" style="width: {nowPlaying && nowPlaying.durationMs > 0 ? nowPlaying.progressMs / nowPlaying.durationMs * 100 : 0}%"></div>
-              </div>
-              <div class="mini-player-times">
-                <span>{fmtTime(nowPlaying?.progressMs || 0)}</span>
-                <span>{fmtTime(nowPlaying?.durationMs || 0)}</span>
-              </div>
-            </div>
-            <div class="mini-player-controls">
-              <button class="mini-player-ctrl" onclick={() => sendCommand("prev")} aria-label="Previous">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
-              </button>
-              <button class="mini-player-ctrl-main" onclick={() => sendCommand("play-pause")} aria-label="Play/Pause">
-                {#if nowPlaying?.isPlaying}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                {:else}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                {/if}
-              </button>
-              <button class="mini-player-ctrl" onclick={() => sendCommand("next")} aria-label="Next">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zm-10 6l8.5 6V6z" transform="rotate(180 12 12)"/></svg>
-              </button>
-            </div>
-            <div class="mini-player-volume">
-              <input
-                class="mini-player-volume-slider"
-                type="range"
-                min="0"
-                max="100"
-                value={Math.max(0, Math.min(100, Math.round(nowPlaying?.volumePercent ?? 100)))}
-                oninput={(event) => sendCommand("set-volume", Number((event.currentTarget as HTMLInputElement).value))}
-                aria-label="Spotify volume"
-              />
-            </div>
+    <div class="mini-player-content">
+      <!-- Top section: art + info + controls -->
+      <div class="mini-player-top">
+        {#if nowPlaying?.albumArt}
+          <img class="mini-player-art" src={nowPlaying.albumArt} alt="" />
+        {:else}
+          <div class="mini-player-art-placeholder">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          </div>
+        {/if}
+        <div class="mini-player-info">
+          <span class="mini-player-track">{nowPlaying?.track || "Spotify"}</span>
+          <span class="mini-player-artist">{nowPlaying?.artist || "Playback"}</span>
+          <div class="mini-player-controls">
+            <button class="mini-player-ctrl" onclick={() => sendCommand("prev")} aria-label="Previous">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+            </button>
+            <button class="mini-player-ctrl-main" onclick={() => sendCommand("play-pause")} aria-label="Play/Pause">
+              {#if nowPlaying?.isPlaying}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+              {:else}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              {/if}
+            </button>
+            <button class="mini-player-ctrl" onclick={() => sendCommand("next")} aria-label="Next">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zm-10 6l8.5 6V6z" transform="rotate(180 12 12)"/></svg>
+            </button>
           </div>
         </div>
-      {/if}
+      </div>
+
+      <!-- Progress bar -->
+      <div class="mini-player-progress">
+        <div class="mini-player-progress-bar">
+          <div class="mini-player-progress-fill" style="width: {nowPlaying && nowPlaying.durationMs > 0 ? nowPlaying.progressMs / nowPlaying.durationMs * 100 : 0}%"></div>
+        </div>
+        <div class="mini-player-times">
+          <span>{fmtTime(nowPlaying?.progressMs || 0)}</span>
+          <span>{fmtTime(nowPlaying?.durationMs || 0)}</span>
+        </div>
+      </div>
+
+      <!-- Lyrics section -->
+      <div class="mini-player-lyrics-pane">
+        {#if lyricLines.length > 0}
+          <div class="mini-player-lyrics-lines">
+            {#each lyricLines as line}
+              <div class="mini-player-lyric-line">{line}</div>
+            {/each}
+          </div>
+        {:else}
+          <div class="mini-player-lyrics-empty">Lyrics unavailable</div>
+        {/if}
+      </div>
     </div>
   {:else}
     <div class="mini-player-empty">

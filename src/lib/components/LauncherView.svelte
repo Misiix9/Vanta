@@ -9,7 +9,6 @@
     ThemeMeta,
     WorkflowMacro,
     MacroDryRunResult,
-    MacroJobRecord,
     ExtensionEntry,
     Capability,
     PermissionNeededPayload,
@@ -29,7 +28,6 @@
   import ResultsList from "$lib/components/ResultsList.svelte";
   import StatusBar from "$lib/components/StatusBar.svelte";
   import MacroPreview from "$lib/components/MacroPreview.svelte";
-  import JobsPanel from "$lib/components/JobsPanel.svelte";
   import NowPlayingBar from "$lib/components/NowPlayingBar.svelte";
   import FirstRunWizard from "$lib/components/FirstRunWizard.svelte";
   import QuickTipsPanel from "$lib/components/QuickTipsPanel.svelte";
@@ -45,7 +43,6 @@
     config = $bindable<VantaConfig | undefined>(),
     availableExtensions = [],
     availableMacros = [],
-    macroJobs = $bindable<MacroJobRecord[]>(),
     availableThemes = [],
     blurMode = "fallback",
     permissionPrompt = $bindable<{
@@ -65,7 +62,6 @@
     config: VantaConfig | undefined;
     availableExtensions: ExtensionEntry[];
     availableMacros: WorkflowMacro[];
-    macroJobs: MacroJobRecord[];
     availableThemes: ThemeMeta[];
     blurMode: string;
     permissionPrompt: { scriptId: string; missingCaps: Capability[]; requestedCaps: Capability[] } | null;
@@ -204,14 +200,7 @@
     } finally { macroBusy = false; }
   }
 
-  async function retryMacroJob(jobId: string) {
-    try { await invoke("retry_macro_job", { jobId }); } catch (e) { console.error("Retry job failed", e); }
-  }
-  async function cancelMacroJob(jobId: string) {
-    try { await invoke("cancel_macro_job", { jobId }); } catch (e) { console.error("Cancel job failed", e); }
-  }
-
-  export async function loadSuggestions() {
+  async function loadSuggestions() {
     const requestId = ++searchRequestId;
     try {
       const suggestions = await invoke<SearchResult[]>("get_suggestions_v3");
@@ -546,9 +535,5 @@
       on:opensettings={() => { completeOnboarding(); view = "settings"; }}
       on:skip={completeOnboarding} on:complete={completeOnboarding}
     />
-  {/if}
-
-  {#if query.trim() === ""}
-    <JobsPanel jobs={macroJobs} onRetry={retryMacroJob} onCancel={cancelMacroJob} />
   {/if}
 </div>

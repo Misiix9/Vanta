@@ -3020,8 +3020,8 @@ async fn open_spotify_mini_player(app_handle: tauri::AppHandle) -> Result<(), Va
         url,
     )
     .title("Spotify Mini Player")
-    .inner_size(340.0, 160.0)
-    .min_inner_size(280.0, 120.0)
+    .inner_size(420.0, 340.0)
+    .min_inner_size(340.0, 260.0)
     .resizable(true)
     .decorations(false)
     .transparent(true)
@@ -3029,6 +3029,14 @@ async fn open_spotify_mini_player(app_handle: tauri::AppHandle) -> Result<(), Va
     .skip_taskbar(false);
 
     builder.build().map_err(|e| format!("Failed to create mini player window: {}", e))?;
+
+    // Hint tiling WMs (Hyprland) to float this window
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let _ = std::process::Command::new("hyprctl")
+            .args(["dispatch", "togglefloating", "title:Spotify Mini Player"])
+            .output();
+    });
     Ok(())
 }
 

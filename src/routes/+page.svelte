@@ -10,7 +10,6 @@
     ThemeMeta,
     Capability,
     WorkflowMacro,
-    MacroJobRecord,
     ExtensionEntry,
   } from "$lib/types";
   import { applyTheme, validateThemeTokens } from "$lib/theme";
@@ -37,7 +36,6 @@
   let availableExtensions: ExtensionEntry[] = $state([]);
   let extensionView: { extId: string; command: string; extPath: string } | null = $state(null);
   let availableMacros: WorkflowMacro[] = $state([]);
-  let macroJobs = $state<MacroJobRecord[]>([]);
   let isVisible = $state(true);
   let permissionPrompt = $state<{
     scriptId: string;
@@ -197,8 +195,7 @@
     catch (e) { console.error("Failed to load extensions:", e); }
     try { availableMacros = await invoke<WorkflowMacro[]>("get_workflows"); }
     catch (e) { console.error("Failed to load macros:", e); }
-    try { macroJobs = await invoke<MacroJobRecord[]>("list_macro_jobs"); }
-    catch (e) { console.error("Failed to load macro jobs:", e); }
+
 
     unlisteners.push(
       await listen<VantaConfig>("config-updated", (event) => {
@@ -226,7 +223,7 @@
     );
 
     unlisteners.push(await listen<WorkflowMacro[]>("macros-changed", (event) => { availableMacros = event.payload; }));
-    unlisteners.push(await listen<MacroJobRecord[]>("macro-jobs-updated", (event) => { macroJobs = event.payload; }));
+
 
     const appWindow = getCurrentWebviewWindow();
     unlisteners.push(await appWindow.onFocusChanged(({ payload: focused }) => {}));
@@ -326,7 +323,6 @@
           bind:config={vantaConfig}
           {availableExtensions}
           {availableMacros}
-          bind:macroJobs
           {availableThemes}
           {blurMode}
           bind:permissionPrompt
