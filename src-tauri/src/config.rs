@@ -1192,6 +1192,6 @@ mod tests {
         let mut cfg = VantaConfig::default();
         let err = import_profile_from_path(&mut cfg, path.to_str().unwrap(), false)
             .expect_err("should reject future schema");
-        assert!(err.contains("newer than supported"));
+        assert!(err.to_string().contains("newer than supported"));
     }
 }

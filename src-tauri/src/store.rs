@@ -868,7 +868,7 @@ mod tests {
         }"#;
 
         let err = validate_downloaded_manifest("weather", manifest).unwrap_err();
-        assert!(err.contains("does not match requested extension"));
+        assert!(err.to_string().contains("does not match requested extension"));
     }
 
     #[test]
@@ -881,6 +881,6 @@ mod tests {
         }"#;
 
         let err = validate_downloaded_manifest("weather", manifest).unwrap_err();
-        assert!(err.contains("at least one command"));
+        assert!(err.to_string().contains("at least one command"));
     }
 }

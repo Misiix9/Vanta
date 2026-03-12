@@ -984,7 +984,7 @@ where
     }
 
     fn supports_minimize(backend: &str) -> bool {
-        matches!(backend, "sway" | "x11")
+        backend == "sway" || backend == "x11"
     }
 
     fn supports_workspace_move(backend: &str) -> bool {

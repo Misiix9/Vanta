@@ -241,7 +241,7 @@
       }),
     );
 
-    launcherRef?.loadSuggestions();
+    launcherRef?.refreshSuggestions();
     maybeRescanApps(true);
   });
 </script>
@@ -263,7 +263,7 @@
     {:else if view === "featureHub"}
       <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
         <FeatureHubWindow
-          onClose={() => { view = "launcher"; launcherRef?.loadSuggestions(); }}
+          onClose={() => { view = "launcher"; launcherRef?.refreshSuggestions(); }}
           onOpenCommunity={() => (view = "communityHub")}
           onOpenTheme={() => (view = "themeHub")}
           onOpenExtensions={() => (view = "extensionsHub")}
@@ -299,7 +299,7 @@
           {availableThemes}
           initialSection={settingsStartSection}
           onOpenStore={() => { settingsStartSection = null; view = "store"; }}
-          onClose={() => { settingsStartSection = null; view = "launcher"; launcherRef?.loadSuggestions(); }}
+          onClose={() => { settingsStartSection = null; view = "launcher"; launcherRef?.refreshSuggestions(); }}
         />
       </div>
     {:else if currentMode === "clipboard"}

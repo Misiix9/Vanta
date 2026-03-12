@@ -393,6 +393,6 @@ mod tests {
     #[test]
     fn blocking_launch_invalid_command_errors() {
         let err = launch_blocking("definitely-not-a-real-command", &[], None).unwrap_err();
-        assert!(err.contains("Failed to run"));
+        assert!(err.to_string().contains("Failed to run"));
     }
 }

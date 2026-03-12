@@ -70,8 +70,10 @@
   <div
     class="context-menu"
     role="menu"
+    tabindex="-1"
     style="left: {adjustedX}px; top: {adjustedY}px;"
     onclick={(e) => e.stopPropagation()}
+    onkeydown={(e) => e.stopPropagation()}
   >
     {#each menuItems as item, i}
       {#if item.divider}

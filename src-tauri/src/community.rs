@@ -573,7 +573,8 @@ mod tests {
     #[test]
     fn sanitize_topic_rejects_invalid_chars() {
         let err = sanitize_topic("phase 20").unwrap_err();
-        assert!(err.contains("can only include"));
+        let msg = format!("{}", err);
+        assert!(msg.contains("can only include"));
     }
 
     #[test]
