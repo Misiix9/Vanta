@@ -7,7 +7,6 @@
     var codeVerifier = null;
     var REDIRECT_URI = 'http://127.0.0.1:8888/callback';
     var refreshTimer = null;
-    var progressTimer = null;
     var currentTrack = null;
     var isPlaying = false;
     var progressMs = 0;
@@ -28,6 +27,7 @@
     var lyricsCache = {};
     var syncedLines = null;
     var lyricsLineEls = [];
+    var lyricsWrapEl = null;
 
     var style = document.createElement('style');
     style.textContent = [
@@ -79,7 +79,7 @@
       '.spot-tab.active{background:rgba(255,255,255,0.15);color:#fff;backdrop-filter:blur(4px)}',
 
       '.spot-art-section{display:flex;align-items:flex-start;gap:14px;padding:12px 16px 8px}',
-      '.spot-art-img{width:90px;height:90px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 4px 24px rgba(0,0,0,.5);transition:opacity .4s ease}',
+      '.spot-art-img{width:90px;height:90px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 4px 24px rgba(0,0,0,.5);animation:spot-fade-in .4s ease}',
       '.spot-art-placeholder{width:90px;height:90px;border-radius:10px;flex-shrink:0;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3)}',
       '.spot-track-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding-top:4px}',
       '.spot-track-name{font-size:16px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}',
@@ -116,10 +116,10 @@
 
       '.spot-empty{text-align:center;padding:20px 16px;color:rgba(255,255,255,0.45);font-size:13px}',
       '.spot-empty-icon{margin-bottom:12px;opacity:.3}',
-      '.spot-search-input{width:100%;padding:10px 12px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;margin:0 0 12px}',
+      '.spot-search-input{width:100%;padding:10px 12px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;margin:0 0 12px;direction:ltr;text-align:left}',
       '.spot-search-input:focus{border-color:rgba(255,255,255,0.25)}',
       '.spot-search-input::placeholder{color:rgba(255,255,255,0.35)}',
-      '.spot-search-wrap{padding:0 16px}',
+      '.spot-search-wrap{padding:0 16px;flex-shrink:0}',
 
       '.spot-result{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:pointer;transition:background .1s}',
       '.spot-result:hover{background:rgba(255,255,255,0.06)}',
@@ -134,7 +134,7 @@
 
       '.spot-footer{display:flex;justify-content:center;gap:8px;padding:8px 16px;border-top:1px solid rgba(255,255,255,0.06)}',
       '.spot-hover-footer{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:10px;padding:10px 16px;z-index:20;opacity:0;transition:opacity .2s ease;pointer-events:none}',
-      '.spot-player:hover .spot-hover-footer,.spot-hover-footer:hover{opacity:1;pointer-events:auto}',
+      '.spot-hover-footer:hover{opacity:1;pointer-events:auto}',
       '.spot-hover-btn{font-size:11px;padding:4px 14px;border-radius:6px;border:none;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);cursor:pointer;transition:all .15s;backdrop-filter:blur(12px)}',
       '.spot-hover-btn:hover{background:rgba(255,255,255,0.14);color:#fff}',
       '.spot-hover-btn-danger{color:rgba(239,68,68,0.7)}',
@@ -144,7 +144,7 @@
       '.spot-hint{font-size:11px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;max-width:420px;line-height:1.6;text-align:left}',
       '.spot-hint strong{color:#fff}',
       '.spot-divider{height:1px;background:rgba(255,255,255,0.06);margin:0}',
-      '.spot-content-scroll{flex:1;overflow:hidden;min-height:0;display:flex;flex-direction:column}',
+      '.spot-content-scroll{flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column}',
       '.spot-browse-section{margin-bottom:16px}',
       '.spot-browse-title{font-size:14px;font-weight:600;color:rgba(255,255,255,0.85);padding:0 16px;margin-bottom:8px}',
       '.spot-browse-scroll{display:flex;gap:10px;padding:0 16px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}',
@@ -241,10 +241,8 @@
 
     function clearTimers() {
       if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
-      if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
       if (searchTimeout) { clearTimeout(searchTimeout); searchTimeout = null; }
       window.__vanta_spotify_poll = null;
-      window.__vanta_spotify_tick = null;
     }
 
     function emitNowPlaying() {
@@ -357,7 +355,7 @@
           lyricsText = result.text;
           syncedLines = result.synced;
           emitNowPlaying();
-          if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer);
+          updateLyricsInPlace();
         }
       } catch (e) {
         lyricsCache[key] = {text: null, synced: null};
@@ -365,7 +363,7 @@
           lyricsText = null;
           syncedLines = null;
           emitNowPlaying();
-          if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer);
+          updateLyricsInPlace();
         }
       }
     }
@@ -645,8 +643,7 @@
       var header = document.createElement('div'); header.className = 'spot-header';
       var headerLeft = document.createElement('div'); headerLeft.className = 'spot-header-left';
       var dot = document.createElement('div'); dot.className = 'spot-header-dot';
-      var headerTitle = document.createElement('span'); headerTitle.className = 'spot-header-title'; headerTitle.textContent = 'Spotify';
-      headerLeft.appendChild(dot); headerLeft.appendChild(headerTitle);
+      headerLeft.appendChild(dot);
       header.appendChild(headerLeft);
 
       var headerActions = document.createElement('div'); headerActions.className = 'spot-header-actions';
@@ -693,7 +690,7 @@
       footer.appendChild(reconnectBtn); footer.appendChild(disconnectBtn);
       root.appendChild(footer);
 
-      tabNow.onclick = function() { tabNow.className = 'spot-tab active'; tabSearch.className = 'spot-tab'; renderNowPlaying(content); };
+      tabNow.onclick = function() { tabNow.className = 'spot-tab active'; tabSearch.className = 'spot-tab'; content.style.overflowY = ''; renderNowPlaying(content); };
       tabSearch.onclick = function() { tabSearch.className = 'spot-tab active'; tabNow.className = 'spot-tab'; renderBrowse(content); };
 
       renderNowPlaying(content);
@@ -702,23 +699,66 @@
 
     function startRefresh() {
       if (window.__vanta_spotify_poll) clearInterval(window.__vanta_spotify_poll);
-      if (window.__vanta_spotify_tick) clearInterval(window.__vanta_spotify_tick);
       fetchNowPlaying();
-      refreshTimer = setInterval(function() { fetchNowPlaying(); }, 2000);
+      refreshTimer = setInterval(function() { fetchNowPlaying(); }, 1000);
       window.__vanta_spotify_poll = refreshTimer;
-      progressTimer = setInterval(function() {
-        if (isPlaying && durationMs > 0) {
-          progressMs = Math.min(progressMs + 1000, durationMs);
-          updateProgressUI();
-          updateLyricsHighlight();
-          emitNowPlaying();
+    }
+
+    function immediateRefresh() {
+      clearInterval(refreshTimer);
+      fetchNowPlaying();
+      refreshTimer = setInterval(function() { fetchNowPlaying(); }, 1000);
+      window.__vanta_spotify_poll = refreshTimer;
+    }
+
+    function updateLyricsInPlace() {
+      if (!lyricsWrapEl) {
+        if (nowPlayingContainer && (syncedLines || lyricsText)) {
+          renderNowPlaying(nowPlayingContainer);
         }
-      }, 1000);
-      window.__vanta_spotify_tick = progressTimer;
+        return;
+      }
+      lyricsWrapEl.innerHTML = '';
+      var title = document.createElement('div'); title.className = 'spot-lyrics-title'; title.textContent = 'Lyrics';
+      lyricsWrapEl.appendChild(title);
+      lyricsLineEls = [];
+      var hasLyrics = false;
+      if (syncedLines && syncedLines.length > 0) {
+        hasLyrics = true;
+        var activeIdx = 0;
+        for (var i = 0; i < syncedLines.length; i++) {
+          if (syncedLines[i].time <= progressMs) activeIdx = i;
+        }
+        syncedLines.forEach(function(line, idx) {
+          var row = document.createElement('div');
+          row.className = 'spot-lyrics-line' + (idx === activeIdx ? ' spot-lyrics-active' : '');
+          row.textContent = line.text;
+          lyricsLineEls.push(row);
+          lyricsWrapEl.appendChild(row);
+        });
+      } else if (lyricsText && lyricsText.trim()) {
+        hasLyrics = true;
+        lyricsText.split('\n').map(function(l) { return l.trim(); })
+          .filter(function(l) { return l.length > 0 && !l.match(/^\[\d{2}:\d{2}/); })
+          .slice(0, 30).forEach(function(line) {
+            var row = document.createElement('div'); row.className = 'spot-lyrics-line'; row.textContent = line;
+            lyricsWrapEl.appendChild(row);
+          });
+      }
+      if (hasLyrics && !lyricsWrapEl.parentElement && nowPlayingContainer) {
+        nowPlayingContainer.appendChild(lyricsWrapEl);
+      } else if (!hasLyrics && lyricsWrapEl.parentElement) {
+        lyricsWrapEl.parentElement.removeChild(lyricsWrapEl);
+      }
     }
 
     function renderNowPlaying(container) {
       nowPlayingContainer = container; container.innerHTML = '';
+      lyricsWrapEl = null;
+
+      // Re-trigger fade-in animation on container
+      container.style.animation = 'none';
+      requestAnimationFrame(function() { container.style.animation = ''; });
 
       var bgEl = root.querySelector('.spot-player-bg');
       if (bgEl) bgEl.style.backgroundImage = albumArtUrl ? 'url(' + albumArtUrl + ')' : 'none';
@@ -744,9 +784,18 @@
       }
 
       var trackInfo = document.createElement('div'); trackInfo.className = 'spot-track-info';
-      var trackName = document.createElement('div'); trackName.className = 'spot-track-name'; trackName.textContent = currentTrack.name;
+      var trackNameRow = document.createElement('div');
+      trackNameRow.style.cssText = 'display:flex;align-items:center;gap:6px;min-width:0';
+      var trackName = document.createElement('div'); trackName.className = 'spot-track-name';
+      trackName.style.cssText = 'flex:1;min-width:0';
+      trackName.textContent = currentTrack.name;
+      var miniIconBtn = document.createElement('button');
+      miniIconBtn.className = 'spot-icon-btn accent'; miniIconBtn.style.cssText = 'width:22px;height:22px;flex-shrink:0;padding:0';
+      miniIconBtn.innerHTML = svgMiniPlayer; miniIconBtn.title = 'Open Mini Player';
+      miniIconBtn.onclick = function() { api.window.openMiniPlayer().catch(function() { api.toast({ title: 'Mini player not available', type: 'info' }); }); };
+      trackNameRow.appendChild(trackName); trackNameRow.appendChild(miniIconBtn);
       var trackArtist = document.createElement('div'); trackArtist.className = 'spot-track-artist'; trackArtist.textContent = currentTrack.artist;
-      trackInfo.appendChild(trackName); trackInfo.appendChild(trackArtist);
+      trackInfo.appendChild(trackNameRow); trackInfo.appendChild(trackArtist);
       if (currentTrack.album) {
         var trackAlbum = document.createElement('div'); trackAlbum.className = 'spot-track-album'; trackAlbum.textContent = currentTrack.album;
         trackInfo.appendChild(trackAlbum);
@@ -770,12 +819,13 @@
         var seekMs = Math.floor(ratio * durationMs);
         progressMs = seekMs; updateProgressUI();
         spotApi('PUT', '/me/player/seek?position_ms=' + seekMs);
+        setTimeout(immediateRefresh, 150);
       };
       container.appendChild(progSection);
 
       var controls = document.createElement('div'); controls.className = 'spot-controls';
-      shuffleBtnRef = makeCtrl(svgShuffle, shuffleState, function() { spotApi('PUT', '/me/player/shuffle?state=' + (!shuffleState)); shuffleState = !shuffleState; shuffleBtnRef.className = 'spot-ctrl' + (shuffleState ? ' active' : ''); });
-      var btnPrev = makeCtrl(svgPrev, false, function() { spotApi('POST', '/me/player/previous'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200); });
+      shuffleBtnRef = makeCtrl(svgShuffle, shuffleState, function() { spotApi('PUT', '/me/player/shuffle?state=' + (!shuffleState)); shuffleState = !shuffleState; shuffleBtnRef.className = 'spot-ctrl' + (shuffleState ? ' active' : ''); immediateRefresh(); });
+      var btnPrev = makeCtrl(svgPrev, false, function() { spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300); });
 
       playPauseBtnRef = document.createElement('button'); playPauseBtnRef.className = 'spot-ctrl-main';
       playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
@@ -784,13 +834,15 @@
         else { spotApi('PUT', '/me/player/play'); isPlaying = true; }
         playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
         emitNowPlaying();
+        setTimeout(immediateRefresh, 150);
       };
 
-      var btnNext = makeCtrl(svgNext, false, function() { spotApi('POST', '/me/player/next'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200); });
+      var btnNext = makeCtrl(svgNext, false, function() { spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300); });
       repeatBtnRef = makeCtrl(svgRepeat, repeatState !== 'off', function() {
         var next = repeatState === 'off' ? 'context' : repeatState === 'context' ? 'track' : 'off';
         spotApi('PUT', '/me/player/repeat?state=' + next); repeatState = next;
         repeatBtnRef.className = 'spot-ctrl' + (repeatState !== 'off' ? ' active' : '');
+        immediateRefresh();
       });
 
       controls.appendChild(shuffleBtnRef); controls.appendChild(btnPrev); controls.appendChild(playPauseBtnRef);
@@ -808,11 +860,13 @@
         volumePercent = Math.round(ratio * 100);
         volFill.style.width = volumePercent + '%';
         spotApi('PUT', '/me/player/volume?volume_percent=' + volumePercent);
+        setTimeout(immediateRefresh, 150);
       };
       volWrap.appendChild(volIcon); volWrap.appendChild(volBar);
       container.appendChild(volWrap);
 
       var lyricsWrap = document.createElement('div'); lyricsWrap.className = 'spot-lyrics';
+      lyricsWrapEl = lyricsWrap;
       var lyricsTitle = document.createElement('div'); lyricsTitle.className = 'spot-lyrics-title'; lyricsTitle.textContent = 'Lyrics';
       lyricsWrap.appendChild(lyricsTitle);
       lyricsLineEls = [];
@@ -907,6 +961,7 @@
 
     function renderBrowse(container) {
       nowPlayingContainer = null; container.innerHTML = '';
+      container.style.overflowY = 'auto';
       var wrap = document.createElement('div'); wrap.className = 'spot-search-wrap';
       wrap.style.cssText = 'padding-top:12px';
       var input = document.createElement('input'); input.className = 'spot-search-input'; input.type = 'text';
@@ -914,7 +969,7 @@
       wrap.appendChild(input);
       container.appendChild(wrap);
       var browseArea = document.createElement('div');
-      browseArea.style.cssText = 'padding-bottom:12px';
+      browseArea.style.cssText = 'padding-bottom:40px;flex:1';
       container.appendChild(browseArea);
 
       loadBrowseSections(browseArea);
@@ -1086,7 +1141,7 @@
         var raw = await spotApiBody('PUT', '/me/player/play', { context_uri: contextUri });
         var resp = parseResponse(raw);
         if (resp.code === 401) { showExpired(); return; }
-        isPlaying = true; setTimeout(fetchNowPlaying, 500);
+        isPlaying = true; setTimeout(immediateRefresh, 300);
         api.toast({ title: 'Playing', type: 'success' });
       } catch (e) { api.toast({ title: 'Playback failed', message: String(e), type: 'error' }); }
     }
@@ -1183,7 +1238,7 @@
         var raw = await spotApiBody('PUT', '/me/player/play', { uris: [uri] });
         var resp = parseResponse(raw);
         if (resp.code === 401) { showExpired(); return; }
-        isPlaying = true; setTimeout(fetchNowPlaying, 500);
+        isPlaying = true; setTimeout(immediateRefresh, 300);
         api.toast({ title: 'Playing', type: 'success' });
       } catch (e) { api.toast({ title: 'Playback failed', message: String(e), type: 'error' }); }
     }
@@ -1197,10 +1252,11 @@
         else { spotApi('PUT', '/me/player/play'); isPlaying = true; }
         if (playPauseBtnRef) playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
         emitNowPlaying();
+        setTimeout(immediateRefresh, 150);
       } else if (cmd === 'next') {
-        spotApi('POST', '/me/player/next'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200);
+        spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300);
       } else if (cmd === 'prev') {
-        spotApi('POST', '/me/player/previous'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200);
+        spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300);
       } else if (cmd === 'set-volume') {
         var val = typeof payload === 'object' && payload ? Number(payload.value) : NaN;
         if (!isNaN(val)) {
@@ -1208,6 +1264,7 @@
           spotApi('PUT', '/me/player/volume?volume_percent=' + volumePercent);
           if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer);
           emitNowPlaying();
+          setTimeout(immediateRefresh, 150);
         }
       }
     });
@@ -1230,16 +1287,18 @@
             else { spotApi('PUT', '/me/player/play'); isPlaying = true; }
             if (playPauseBtnRef) playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
             emitNowPlaying();
+            setTimeout(immediateRefresh, 150);
           } else if (cmd === 'next') {
-            spotApi('POST', '/me/player/next'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200);
+            spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300);
           } else if (cmd === 'prev') {
-            spotApi('POST', '/me/player/previous'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200);
+            spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300);
           } else if (cmd === 'set-volume') {
             var val = typeof payload === 'object' && payload ? Number(payload.value) : NaN;
             if (!isNaN(val)) {
               volumePercent = Math.max(0, Math.min(100, Math.round(val)));
               spotApi('PUT', '/me/player/volume?volume_percent=' + volumePercent);
               emitNowPlaying();
+              setTimeout(immediateRefresh, 150);
             }
           }
         });
