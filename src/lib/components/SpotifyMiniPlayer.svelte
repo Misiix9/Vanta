@@ -3,6 +3,11 @@
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { onDestroy, onMount } from "svelte";
 
+  interface SyncedLine {
+    time: number;
+    text: string;
+  }
+
   interface NowPlayingState {
     track: string | null;
     artist: string | null;
@@ -13,6 +18,7 @@
     durationMs: number;
     volumePercent?: number;
     lyrics?: string | null;
+    syncedLines?: SyncedLine[] | null;
   }
 
   type SpotifyCommand = "prev" | "next" | "play-pause" | "set-volume";
@@ -24,6 +30,7 @@
   let nowPlaying = $state<NowPlayingState | null>(null);
   let unlistenRelay: (() => void) | null = null;
   let tickTimer: number | null = null;
+  let lyricsContainer = $state<HTMLDivElement | null>(null);
 
   function fmtTime(ms: number): string {
     const s = Math.floor(ms / 1000);
@@ -73,11 +80,23 @@
   }
 
   const hasTrack = $derived(Boolean(nowPlaying?.track || nowPlaying?.isPlaying));
+  const hasSyncedLines = $derived(
+    Boolean(nowPlaying?.syncedLines && nowPlaying.syncedLines.length > 0),
+  );
+  const activeLyricIndex = $derived(
+    !nowPlaying?.syncedLines || nowPlaying.syncedLines.length === 0
+      ? -1
+      : nowPlaying.syncedLines.reduce(
+          (acc: number, line: SyncedLine, i: number) =>
+            line.time <= (nowPlaying?.progressMs || 0) ? i : acc,
+          0,
+        ),
+  );
   const lyricsText = $derived((nowPlaying?.lyrics || "").trim());
   const lyricLines = $derived(
     lyricsText
       .split("\n")
-      .map((line: string) => line.trim())
+      .map((line: string) => line.replace(/^\[\d{2}:\d{2}\.\d{2,3}\]\s*/, "").trim())
       .filter((line: string) => line.length > 0)
       .slice(0, 10),
   );
@@ -105,6 +124,13 @@
         progressMs: Math.min(nowPlaying.progressMs + 1000, nowPlaying.durationMs),
       };
     }, 1000);
+  });
+
+  $effect(() => {
+    if (lyricsContainer && activeLyricIndex >= 0) {
+      const el = lyricsContainer.children[activeLyricIndex] as HTMLElement | undefined;
+      if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
   });
 
   onDestroy(() => {
@@ -176,7 +202,15 @@
 
       <!-- Lyrics section -->
       <div class="mini-player-lyrics-pane">
-        {#if lyricLines.length > 0}
+        {#if hasSyncedLines}
+          <div class="mini-player-lyrics-lines" bind:this={lyricsContainer}>
+            {#each nowPlaying!.syncedLines! as line, i}
+              <div class="mini-player-lyric-line" class:mini-player-lyric-active={i === activeLyricIndex}>
+                {line.text}
+              </div>
+            {/each}
+          </div>
+        {:else if lyricLines.length > 0}
           <div class="mini-player-lyrics-lines">
             {#each lyricLines as line}
               <div class="mini-player-lyric-line">{line}</div>

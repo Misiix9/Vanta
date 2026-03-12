@@ -12,6 +12,7 @@
     durationMs: number;
     volumePercent?: number;
     lyrics?: string | null;
+    syncedLines?: { time: number; text: string }[] | null;
   }
 
   type SpotifyCommand = "prev" | "next" | "play-pause" | "set-volume";
