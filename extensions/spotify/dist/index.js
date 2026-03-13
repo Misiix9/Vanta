@@ -32,7 +32,7 @@
 
     var style = document.createElement('style');
     style.textContent = [
-      '.spot-root{padding:0;font-family:-apple-system,system-ui,sans-serif;color:var(--vanta-text,#e8e8e8);overflow:hidden;height:100%;display:flex;flex-direction:column}',
+      '.spot-root{padding:0;font-family:"Inter","Noto Sans","Noto Sans CJK JP","Noto Sans CJK SC","Noto Sans CJK KR","Hiragino Sans","Yu Gothic UI","Segoe UI",system-ui,sans-serif;color:var(--vanta-text,#e8e8e8);overflow:hidden;height:100%;display:flex;flex-direction:column}',
       '.spot-setup{display:flex;flex-direction:column;align-items:center;gap:14px;padding:20px 16px;text-align:center}',
       '.spot-setup-icon{opacity:.35}',
       '.spot-setup-title{font-size:18px;font-weight:600;margin-top:2px}',
@@ -83,7 +83,10 @@
       '.spot-art-img{width:90px;height:90px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 4px 24px rgba(0,0,0,.5);transition:opacity .4s ease}',
       '.spot-art-placeholder{width:90px;height:90px;border-radius:10px;flex-shrink:0;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3)}',
       '.spot-track-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding-top:4px}',
+      '.spot-track-title-row{display:flex;align-items:center;gap:8px;min-width:0}',
       '.spot-track-name{font-size:16px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}',
+      '.spot-track-mini-btn{width:24px;height:24px;border-radius:6px;border:none;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.86);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}',
+      '.spot-track-mini-btn:hover{background:rgba(255,255,255,0.18);color:#fff;transform:translateY(-1px)}',
       '.spot-track-artist{font-size:13px;color:rgba(255,255,255,0.7);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       '.spot-track-album{font-size:12px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}',
 
@@ -695,26 +698,6 @@
       var overlayEl = document.createElement('div'); overlayEl.className = 'spot-player-overlay';
       root.appendChild(overlayEl);
 
-      var header = document.createElement('div'); header.className = 'spot-header';
-      var headerLeft = document.createElement('div'); headerLeft.className = 'spot-header-left';
-      var dot = document.createElement('div'); dot.className = 'spot-header-dot';
-      var headerTitle = document.createElement('span'); headerTitle.className = 'spot-header-title'; headerTitle.textContent = 'Spotify';
-      headerLeft.appendChild(dot); headerLeft.appendChild(headerTitle);
-      header.appendChild(headerLeft);
-
-      var headerActions = document.createElement('div'); headerActions.className = 'spot-header-actions';
-      var miniBtn = document.createElement('button'); miniBtn.className = 'spot-icon-btn accent';
-      miniBtn.innerHTML = svgMiniPlayer; miniBtn.title = 'Open Mini Player';
-      miniBtn.onclick = function() {
-        api.window.openMiniPlayer().catch(function() {
-          api.toast({ title: 'Mini player not available', type: 'info' });
-        });
-      };
-      headerActions.appendChild(miniBtn);
-
-      header.appendChild(headerActions);
-      root.appendChild(header);
-
       var tabs = document.createElement('div'); tabs.className = 'spot-tabs';
       var tabNow = document.createElement('button'); tabNow.className = 'spot-tab active'; tabNow.textContent = 'Now Playing';
       var tabSearch = document.createElement('button'); tabSearch.className = 'spot-tab'; tabSearch.textContent = 'Browse';
@@ -756,7 +739,7 @@
     function startRefresh() {
       if (window.__vanta_spotify_poll) clearInterval(window.__vanta_spotify_poll);
       fetchNowPlaying();
-      refreshTimer = setInterval(function() { fetchNowPlaying(); }, 1000);
+      refreshTimer = setInterval(function() { fetchNowPlaying(); }, 500);
       window.__vanta_spotify_poll = refreshTimer;
     }
 
@@ -787,9 +770,21 @@
       }
 
       var trackInfo = document.createElement('div'); trackInfo.className = 'spot-track-info';
+      var trackTitleRow = document.createElement('div'); trackTitleRow.className = 'spot-track-title-row';
       var trackName = document.createElement('div'); trackName.className = 'spot-track-name'; trackName.textContent = currentTrack.name;
+      trackName.style.flex = '1';
+      trackName.style.minWidth = '0';
+      var inlineMiniBtn = document.createElement('button'); inlineMiniBtn.className = 'spot-track-mini-btn';
+      inlineMiniBtn.innerHTML = svgMiniPlayer; inlineMiniBtn.title = 'Open Mini Player';
+      inlineMiniBtn.onclick = function() {
+        api.window.openMiniPlayer().catch(function() {
+          api.toast({ title: 'Mini player not available', type: 'info' });
+        });
+      };
+      trackTitleRow.appendChild(trackName);
+      trackTitleRow.appendChild(inlineMiniBtn);
       var trackArtist = document.createElement('div'); trackArtist.className = 'spot-track-artist'; trackArtist.textContent = currentTrack.artist;
-      trackInfo.appendChild(trackName); trackInfo.appendChild(trackArtist);
+      trackInfo.appendChild(trackTitleRow); trackInfo.appendChild(trackArtist);
       if (currentTrack.album) {
         var trackAlbum = document.createElement('div'); trackAlbum.className = 'spot-track-album'; trackAlbum.textContent = currentTrack.album;
         trackInfo.appendChild(trackAlbum);
