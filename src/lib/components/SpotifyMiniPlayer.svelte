@@ -1,6 +1,6 @@
 <script lang="ts">
   import { emit, listen } from "@tauri-apps/api/event";
-  import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onDestroy, onMount } from "svelte";
 
   interface SyncedLine {
@@ -65,7 +65,7 @@
 
   async function startDrag() {
     try {
-      const win = getCurrentWebviewWindow();
+      const win = getCurrentWindow();
       await win.startDragging();
     } catch {
       // ignored
@@ -74,7 +74,7 @@
 
   async function closeWindow() {
     try {
-      const win = getCurrentWebviewWindow();
+      const win = getCurrentWindow();
       await win.close();
     } catch {
       // ignored
@@ -83,7 +83,7 @@
 
   async function toggleFullscreen() {
     try {
-      const win = getCurrentWebviewWindow();
+      const win = getCurrentWindow();
       const maximized = await win.isMaximized();
       if (maximized) {
         await win.unmaximize();
@@ -125,8 +125,13 @@
     window.addEventListener("vanta-now-playing", handleNowPlaying as EventListener);
 
     try {
-      const win = getCurrentWebviewWindow();
+      const win = getCurrentWindow();
       isMaximized = await win.isMaximized();
+      win.onResized(async () => {
+        try {
+          isMaximized = await win.isMaximized();
+        } catch {}
+      });
     } catch {
       isMaximized = false;
     }
@@ -153,7 +158,7 @@
   });
 </script>
 
-<div class="mini-player-root">
+<div class="mini-player-root" class:is-maximized={isMaximized}>
   {#if nowPlaying?.albumArt}
     <div class="mini-player-backdrop" style={`background-image:url('${nowPlaying.albumArt}')`}></div>
   {/if}
@@ -177,8 +182,8 @@
   </div>
 
   {#if hasTrack}
-    <div class="mini-player-content" class:mini-player-content-split={hasLyrics} class:mini-player-content-centered={!hasLyrics}>
-      <div class="mini-player-main-pane" class:mini-player-main-pane-centered={!hasLyrics}>
+    <div class="mini-player-content" class:has-lyrics={hasLyrics}>
+      <div class="mini-player-main-pane">
         <div class="mini-player-volume-rail-wrap">
           <div class="mini-player-volume-rail-hitbox" title="Volume">
             <div class="mini-player-volume-rail-shell">
@@ -196,7 +201,7 @@
         </div>
 
         <div class="mini-player-main-block">
-          <div class="mini-player-top" class:mini-player-top-centered={!hasLyrics}>
+          <div class="mini-player-top">
             {#if nowPlaying?.albumArt}
               <img class="mini-player-art" src={nowPlaying.albumArt} alt="" />
             {:else}
