@@ -148,18 +148,32 @@
       '.spot-hint{font-size:11px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;max-width:420px;line-height:1.6;text-align:left}',
       '.spot-hint strong{color:#fff}',
       '.spot-divider{height:1px;background:rgba(255,255,255,0.06);margin:0}',
-      '.spot-content-scroll{flex:1;overflow:hidden;min-height:0;display:flex;flex-direction:column}',
+      '.spot-content-scroll{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0;display:flex;flex-direction:column;scrollbar-width:none;-ms-overflow-style:none}',
+      '.spot-content-scroll::-webkit-scrollbar{display:none}',
       '.spot-browse-section{margin-bottom:16px}',
       '.spot-browse-title{font-size:14px;font-weight:600;color:rgba(255,255,255,0.85);padding:0 16px;margin-bottom:8px}',
       '.spot-browse-scroll{display:flex;gap:10px;padding:0 16px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}',
       '.spot-browse-scroll::-webkit-scrollbar{display:none}',
-      '.spot-browse-card{width:110px;flex-shrink:0;cursor:pointer;border-radius:8px;padding:6px;transition:background .15s}',
+      '.spot-browse-card{width:clamp(102px,30vw,132px);flex-shrink:0;cursor:pointer;border-radius:8px;padding:6px;transition:background .15s}',
       '.spot-browse-card:hover{background:rgba(255,255,255,0.06)}',
-      '.spot-browse-card-img{width:98px;height:98px;border-radius:6px;object-fit:cover;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;overflow:hidden}',
+      '.spot-browse-card-img{width:100%;aspect-ratio:1/1;border-radius:6px;object-fit:cover;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;overflow:hidden}',
       '.spot-browse-card-img img{width:100%;height:100%;object-fit:cover}',
       '.spot-browse-card-name{font-size:12px;font-weight:500;color:#fff;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       '.spot-browse-card-sub{font-size:11px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       '.spot-browse-empty{font-size:12px;color:rgba(255,255,255,0.35);padding:0 16px}',
+      '.spot-browse-area{padding-bottom:14px;min-height:0}',
+      '.spot-playlist-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 16px 10px}',
+      '.spot-playlist-title{font-size:14px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      '.spot-inline-back{border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.9);border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;flex-shrink:0}',
+      '.spot-inline-back:hover{background:rgba(255,255,255,0.12)}',
+      '.spot-playlist-list{padding:0 12px 12px}',
+      '.spot-playlist-row{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;cursor:pointer;transition:background .12s}',
+      '.spot-playlist-row:hover{background:rgba(255,255,255,0.06)}',
+      '.spot-playlist-row-num{width:22px;text-align:right;font-size:11px;color:rgba(255,255,255,0.45);font-variant-numeric:tabular-nums;flex-shrink:0}',
+      '.spot-playlist-row-info{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}',
+      '.spot-playlist-row-name{font-size:12px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      '.spot-playlist-row-meta{font-size:11px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      '.spot-playlist-row-dur{font-size:11px;color:rgba(255,255,255,0.45);flex-shrink:0;font-variant-numeric:tabular-nums}',
       '.spot-section-group{margin-bottom:8px}',
       '.spot-section-group-title{font-size:12px;font-weight:600;color:rgba(255,255,255,0.5);padding:6px 16px 4px;text-transform:uppercase;letter-spacing:.5px}'
     ].join('\n');
@@ -958,7 +972,7 @@
       wrap.appendChild(input);
       container.appendChild(wrap);
       var browseArea = document.createElement('div');
-      browseArea.style.cssText = 'padding-bottom:12px';
+      browseArea.className = 'spot-browse-area';
       container.appendChild(browseArea);
 
       loadBrowseSections(browseArea);
@@ -1004,6 +1018,76 @@
       return card;
     }
 
+    function spotifyIdFromUri(uri) {
+      if (!uri) return null;
+      var parts = String(uri).split(':');
+      return parts.length >= 3 ? parts[2] : null;
+    }
+
+    async function renderPlaylistTracks(container, playlistId, playlistName, likedSongs) {
+      container.innerHTML = '<div class="spot-loading">Loading tracks…</div>';
+      if (!likedSongs && !playlistId) {
+        container.innerHTML = '<div class="spot-err">Could not open this playlist.</div>';
+        return;
+      }
+      var endpoint = likedSongs ? '/me/tracks?limit=50' : '/playlists/' + encodeURIComponent(playlistId) + '/tracks?limit=50';
+      try {
+        var raw = await spotApi('GET', endpoint);
+        var resp = parseResponse(raw);
+        if (resp.code === 401) { showExpired(); return; }
+        if (resp.code !== 200) {
+          container.innerHTML = '<div class="spot-err">Could not load tracks (HTTP ' + resp.code + ')</div>';
+          return;
+        }
+
+        var data = JSON.parse(resp.body);
+        var items = data.items || [];
+        container.innerHTML = '';
+
+        var header = document.createElement('div'); header.className = 'spot-playlist-header';
+        var title = document.createElement('div'); title.className = 'spot-playlist-title'; title.textContent = playlistName || 'Playlist';
+        var back = document.createElement('button'); back.className = 'spot-inline-back'; back.textContent = 'Back';
+        back.onclick = function() { loadBrowseSections(container); };
+        header.appendChild(title);
+        header.appendChild(back);
+        container.appendChild(header);
+
+        if (!items.length) {
+          var empty = document.createElement('div'); empty.className = 'spot-browse-empty';
+          empty.textContent = 'No songs found in this playlist.';
+          container.appendChild(empty);
+          return;
+        }
+
+        var list = document.createElement('div'); list.className = 'spot-playlist-list';
+        items.forEach(function(item, idx) {
+          var track = item.track;
+          if (!track || !track.uri) return;
+          var artists = (track.artists || []).map(function(a) { return a.name; }).join(', ');
+          var row = document.createElement('div'); row.className = 'spot-playlist-row';
+
+          var n = document.createElement('div'); n.className = 'spot-playlist-row-num'; n.textContent = String(idx + 1);
+          row.appendChild(n);
+
+          var info = document.createElement('div'); info.className = 'spot-playlist-row-info';
+          var name = document.createElement('div'); name.className = 'spot-playlist-row-name'; name.textContent = track.name || 'Unknown';
+          var meta = document.createElement('div'); meta.className = 'spot-playlist-row-meta'; meta.textContent = artists || 'Unknown artist';
+          info.appendChild(name);
+          info.appendChild(meta);
+          row.appendChild(info);
+
+          var dur = document.createElement('div'); dur.className = 'spot-playlist-row-dur'; dur.textContent = fmtTime(track.duration_ms || 0);
+          row.appendChild(dur);
+
+          row.onclick = function() { playTrack(track.uri); };
+          list.appendChild(row);
+        });
+        container.appendChild(list);
+      } catch (e) {
+        container.innerHTML = '<div class="spot-err">Could not load tracks: ' + esc(String(e)) + '</div>';
+      }
+    }
+
     async function loadBrowseSections(container) {
       container.innerHTML = '<div class="spot-loading">Loading your library\u2026</div>';
       var loaded = false;
@@ -1044,12 +1128,12 @@
             var scroll2 = makeBrowseSection('Your Playlists', container);
             // Liked Songs special card
             scroll2.appendChild(makeBrowseCard(null, '\u2764\uFE0F Liked Songs', 'Your saved tracks', function() {
-              playContext('spotify:collection:tracks');
+              renderPlaylistTracks(container, null, 'Liked Songs', true);
             }));
             playlists.forEach(function(pl) {
               var imgUrl2 = pl.images && pl.images.length > 0 ? pl.images[0].url : null;
               scroll2.appendChild(makeBrowseCard(imgUrl2, pl.name, (pl.tracks ? pl.tracks.total : 0) + ' tracks', function() {
-                playContext(pl.uri);
+                renderPlaylistTracks(container, spotifyIdFromUri(pl.uri), pl.name, false);
               }));
             });
           }
@@ -1215,7 +1299,7 @@
           playlists.forEach(function(pl) {
             var imgUrl = pl.images && pl.images.length > 0 ? pl.images[0].url : null;
             scroll4.appendChild(makeBrowseCard(imgUrl, pl.name, (pl.tracks ? pl.tracks.total : 0) + ' tracks', function() {
-              playContext(pl.uri);
+              renderPlaylistTracks(container, spotifyIdFromUri(pl.uri), pl.name, false);
             }));
           });
         }
