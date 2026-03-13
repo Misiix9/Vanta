@@ -27,7 +27,8 @@
     var lyricsCache = {};
     var syncedLines = null;
     var lyricsLineEls = [];
-    var lyricsWrapEl = null;
+    var fetchNowPlayingSeq = 0;
+    var LYRICS_LEAD_MS = 350;
 
     var style = document.createElement('style');
     style.textContent = [
@@ -79,7 +80,7 @@
       '.spot-tab.active{background:rgba(255,255,255,0.15);color:#fff;backdrop-filter:blur(4px)}',
 
       '.spot-art-section{display:flex;align-items:flex-start;gap:14px;padding:12px 16px 8px}',
-      '.spot-art-img{width:90px;height:90px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 4px 24px rgba(0,0,0,.5);animation:spot-fade-in .4s ease}',
+      '.spot-art-img{width:90px;height:90px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 4px 24px rgba(0,0,0,.5);transition:opacity .4s ease}',
       '.spot-art-placeholder{width:90px;height:90px;border-radius:10px;flex-shrink:0;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3)}',
       '.spot-track-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding-top:4px}',
       '.spot-track-name{font-size:16px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}',
@@ -116,10 +117,10 @@
 
       '.spot-empty{text-align:center;padding:20px 16px;color:rgba(255,255,255,0.45);font-size:13px}',
       '.spot-empty-icon{margin-bottom:12px;opacity:.3}',
-      '.spot-search-input{width:100%;padding:10px 12px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;margin:0 0 12px;direction:ltr;text-align:left}',
+      '.spot-search-input{width:100%;padding:10px 12px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.08);border-radius:8px;font-size:13px;outline:none;box-sizing:border-box;margin:0 0 12px}',
       '.spot-search-input:focus{border-color:rgba(255,255,255,0.25)}',
       '.spot-search-input::placeholder{color:rgba(255,255,255,0.35)}',
-      '.spot-search-wrap{padding:0 16px;flex-shrink:0}',
+      '.spot-search-wrap{padding:0 16px}',
 
       '.spot-result{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:pointer;transition:background .1s}',
       '.spot-result:hover{background:rgba(255,255,255,0.06)}',
@@ -134,7 +135,7 @@
 
       '.spot-footer{display:flex;justify-content:center;gap:8px;padding:8px 16px;border-top:1px solid rgba(255,255,255,0.06)}',
       '.spot-hover-footer{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:center;gap:10px;padding:10px 16px;z-index:20;opacity:0;transition:opacity .2s ease;pointer-events:none}',
-      '.spot-hover-footer:hover{opacity:1;pointer-events:auto}',
+      '.spot-player:hover .spot-hover-footer,.spot-hover-footer:hover{opacity:1;pointer-events:auto}',
       '.spot-hover-btn{font-size:11px;padding:4px 14px;border-radius:6px;border:none;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.6);cursor:pointer;transition:all .15s;backdrop-filter:blur(12px)}',
       '.spot-hover-btn:hover{background:rgba(255,255,255,0.14);color:#fff}',
       '.spot-hover-btn-danger{color:rgba(239,68,68,0.7)}',
@@ -144,7 +145,7 @@
       '.spot-hint{font-size:11px;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;max-width:420px;line-height:1.6;text-align:left}',
       '.spot-hint strong{color:#fff}',
       '.spot-divider{height:1px;background:rgba(255,255,255,0.06);margin:0}',
-      '.spot-content-scroll{flex:1;overflow-y:auto;min-height:0;display:flex;flex-direction:column}',
+      '.spot-content-scroll{flex:1;overflow:hidden;min-height:0;display:flex;flex-direction:column}',
       '.spot-browse-section{margin-bottom:16px}',
       '.spot-browse-title{font-size:14px;font-weight:600;color:rgba(255,255,255,0.85);padding:0 16px;margin-bottom:8px}',
       '.spot-browse-scroll{display:flex;gap:10px;padding:0 16px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}',
@@ -157,8 +158,7 @@
       '.spot-browse-card-sub{font-size:11px;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       '.spot-browse-empty{font-size:12px;color:rgba(255,255,255,0.35);padding:0 16px}',
       '.spot-section-group{margin-bottom:8px}',
-      '.spot-section-group-title{font-size:12px;font-weight:600;color:rgba(255,255,255,0.5);padding:6px 16px 4px;text-transform:uppercase;letter-spacing:.5px}',
-      '@keyframes spot-fade-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}'
+      '.spot-section-group-title{font-size:12px;font-weight:600;color:rgba(255,255,255,0.5);padding:6px 16px 4px;text-transform:uppercase;letter-spacing:.5px}'
     ].join('\n');
 
     var root = document.createElement('div');
@@ -255,6 +255,7 @@
         isPlaying: isPlaying,
         progressMs: progressMs,
         durationMs: durationMs,
+        updatedAt: Date.now(),
         volumePercent: volumePercent,
         lyrics: lyricsText,
         syncedLines: syncedLines
@@ -282,6 +283,16 @@
         .trim();
     }
 
+    function cleanArtistName(name) {
+      if (!name) return name;
+      return name
+        .split(',')[0]
+        .split('&')[0]
+        .split(' x ')[0]
+        .replace(/\s*[\(\[](?:feat\.?|ft\.?|featuring|with)[^\)\]]*[\)\]]/gi, '')
+        .trim();
+    }
+
     function extractLyricsFromResult(parsed) {
       if (!parsed) return { text: null, synced: null };
       var syncedRaw = parsed.syncedLyrics || null;
@@ -290,6 +301,51 @@
       if (out && typeof out === 'string' && out.length > 8000) out = out.slice(0, 8000);
       var synced = syncedRaw ? parseSyncedLyrics(syncedRaw) : null;
       return { text: out, synced: synced };
+    }
+
+    function extractLyricsFromOvh(parsed) {
+      if (!parsed || typeof parsed !== 'object') return { text: null, synced: null };
+      var text = parsed.lyrics || null;
+      if (text && typeof text === 'string' && text.length > 8000) text = text.slice(0, 8000);
+      return { text: text, synced: null };
+    }
+
+    async function fetchLrclibGet(trackName, artistName) {
+      var raw = await api.shell.execute('curl', [
+        '-s',
+        'https://lrclib.net/api/get?track_name=' + encodeURIComponent(trackName) + '&artist_name=' + encodeURIComponent(artistName)
+      ]);
+      var parsed = null;
+      try { parsed = JSON.parse((raw || '').trim() || '{}'); } catch (e) { parsed = null; }
+      return extractLyricsFromResult(parsed);
+    }
+
+    async function fetchLrclibSearch(trackName, artistName) {
+      var raw = await api.shell.execute('curl', [
+        '-s',
+        'https://lrclib.net/api/search?track_name=' + encodeURIComponent(trackName) + '&artist_name=' + encodeURIComponent(artistName)
+      ]);
+      var result = { text: null, synced: null };
+      try {
+        var searchResults = JSON.parse((raw || '').trim() || '[]');
+        if (Array.isArray(searchResults)) {
+          for (var si = 0; si < searchResults.length; si++) {
+            var candidate = extractLyricsFromResult(searchResults[si]);
+            if (candidate.text) { result = candidate; break; }
+          }
+        }
+      } catch (e) { /* ignore */ }
+      return result;
+    }
+
+    async function fetchLyricsOvh(trackName, artistName) {
+      var raw = await api.shell.execute('curl', [
+        '-s',
+        'https://api.lyrics.ovh/v1/' + encodeURIComponent(artistName) + '/' + encodeURIComponent(trackName)
+      ]);
+      var parsed = null;
+      try { parsed = JSON.parse((raw || '').trim() || '{}'); } catch (e) { parsed = null; }
+      return extractLyricsFromOvh(parsed);
     }
 
     async function fetchLyrics(trackName, artistName) {
@@ -310,45 +366,43 @@
       }
       lyricsFetchKey = key;
       try {
-        // Try exact match first
-        var raw = await api.shell.execute('curl', [
-          '-s',
-          'https://lrclib.net/api/get?track_name=' + encodeURIComponent(trackName) + '&artist_name=' + encodeURIComponent(artistName)
-        ]);
-        var parsed = null;
-        try { parsed = JSON.parse((raw || '').trim() || '{}'); } catch (e) { parsed = null; }
+        var result = await fetchLrclibGet(trackName, artistName);
 
-        var result = extractLyricsFromResult(parsed);
-
-        // Fallback: try with cleaned track name
+        // Fallback #1: cleaned track name + original artist
         if (!result.text) {
           var cleanName = cleanTrackName(trackName);
           if (cleanName && cleanName !== trackName) {
-            raw = await api.shell.execute('curl', [
-              '-s',
-              'https://lrclib.net/api/get?track_name=' + encodeURIComponent(cleanName) + '&artist_name=' + encodeURIComponent(artistName)
-            ]);
-            try { parsed = JSON.parse((raw || '').trim() || '{}'); } catch (e) { parsed = null; }
-            result = extractLyricsFromResult(parsed);
+            result = await fetchLrclibGet(cleanName, artistName);
           }
         }
 
-        // Fallback: search API (fuzzy matching, returns array)
+        // Fallback #2: search API with cleaned title
         if (!result.text) {
           var searchName = cleanTrackName(trackName) || trackName;
-          raw = await api.shell.execute('curl', [
-            '-s',
-            'https://lrclib.net/api/search?track_name=' + encodeURIComponent(searchName) + '&artist_name=' + encodeURIComponent(artistName)
-          ]);
-          try {
-            var searchResults = JSON.parse((raw || '').trim() || '[]');
-            if (Array.isArray(searchResults)) {
-              for (var si = 0; si < searchResults.length; si++) {
-                var candidate = extractLyricsFromResult(searchResults[si]);
-                if (candidate.text) { result = candidate; break; }
-              }
-            }
-          } catch (e) { /* ignore */ }
+          result = await fetchLrclibSearch(searchName, artistName);
+        }
+
+        // Fallback #3: cleaned title + cleaned primary artist
+        if (!result.text) {
+          var cleanArtist = cleanArtistName(artistName) || artistName;
+          var cleanName2 = cleanTrackName(trackName) || trackName;
+          if (cleanArtist || cleanName2) {
+            result = await fetchLrclibGet(cleanName2, cleanArtist);
+          }
+        }
+
+        // Fallback #4: search with cleaned artist variant
+        if (!result.text) {
+          var cleanArtist2 = cleanArtistName(artistName) || artistName;
+          var cleanName3 = cleanTrackName(trackName) || trackName;
+          result = await fetchLrclibSearch(cleanName3, cleanArtist2);
+        }
+
+        // Fallback #5: lyrics.ovh plain lyrics (non-synced)
+        if (!result.text) {
+          var ovhArtist = cleanArtistName(artistName) || artistName;
+          var ovhTrack = cleanTrackName(trackName) || trackName;
+          result = await fetchLyricsOvh(ovhTrack, ovhArtist);
         }
 
         lyricsCache[key] = result;
@@ -356,7 +410,7 @@
           lyricsText = result.text;
           syncedLines = result.synced;
           emitNowPlaying();
-          updateLyricsInPlace();
+          if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer);
         }
       } catch (e) {
         lyricsCache[key] = {text: null, synced: null};
@@ -364,7 +418,7 @@
           lyricsText = null;
           syncedLines = null;
           emitNowPlaying();
-          updateLyricsInPlace();
+          if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer);
         }
       }
     }
@@ -641,6 +695,26 @@
       var overlayEl = document.createElement('div'); overlayEl.className = 'spot-player-overlay';
       root.appendChild(overlayEl);
 
+      var header = document.createElement('div'); header.className = 'spot-header';
+      var headerLeft = document.createElement('div'); headerLeft.className = 'spot-header-left';
+      var dot = document.createElement('div'); dot.className = 'spot-header-dot';
+      var headerTitle = document.createElement('span'); headerTitle.className = 'spot-header-title'; headerTitle.textContent = 'Spotify';
+      headerLeft.appendChild(dot); headerLeft.appendChild(headerTitle);
+      header.appendChild(headerLeft);
+
+      var headerActions = document.createElement('div'); headerActions.className = 'spot-header-actions';
+      var miniBtn = document.createElement('button'); miniBtn.className = 'spot-icon-btn accent';
+      miniBtn.innerHTML = svgMiniPlayer; miniBtn.title = 'Open Mini Player';
+      miniBtn.onclick = function() {
+        api.window.openMiniPlayer().catch(function() {
+          api.toast({ title: 'Mini player not available', type: 'info' });
+        });
+      };
+      headerActions.appendChild(miniBtn);
+
+      header.appendChild(headerActions);
+      root.appendChild(header);
+
       var tabs = document.createElement('div'); tabs.className = 'spot-tabs';
       var tabNow = document.createElement('button'); tabNow.className = 'spot-tab active'; tabNow.textContent = 'Now Playing';
       var tabSearch = document.createElement('button'); tabSearch.className = 'spot-tab'; tabSearch.textContent = 'Browse';
@@ -686,54 +760,8 @@
       window.__vanta_spotify_poll = refreshTimer;
     }
 
-    function immediateRefresh() {
-      fetchNowPlaying();
-    }
-
-    function updateLyricsInPlace() {
-      if (!lyricsWrapEl) return;
-      lyricsLineEls = [];
-      // remove existing lyric rows (keep the title row)
-      var titleEl = lyricsWrapEl.querySelector('.spot-lyrics-title');
-      lyricsWrapEl.innerHTML = '';
-      if (titleEl) lyricsWrapEl.appendChild(titleEl);
-      var hasL = false;
-      if (syncedLines && syncedLines.length > 0) {
-        hasL = true;
-        var activeIdx = 0;
-        for (var si = 0; si < syncedLines.length; si++) {
-          if (syncedLines[si].time <= progressMs) activeIdx = si;
-        }
-        syncedLines.forEach(function(line, idx) {
-          var row = document.createElement('div');
-          row.className = 'spot-lyrics-line' + (idx === activeIdx ? ' spot-lyrics-active' : '');
-          row.textContent = line.text;
-          lyricsLineEls.push(row);
-          lyricsWrapEl.appendChild(row);
-        });
-      } else if (lyricsText && lyricsText.trim()) {
-        hasL = true;
-        lyricsText.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0 && !l.match(/^\[\d{2}:\d{2}\.\d{2,3}\]/); }).slice(0, 30).forEach(function(l) {
-          var row = document.createElement('div'); row.className = 'spot-lyrics-line'; row.textContent = l;
-          lyricsLineEls.push(row);
-          lyricsWrapEl.appendChild(row);
-        });
-      }
-      if (nowPlayingContainer) {
-        var existing = nowPlayingContainer.querySelector('.spot-lyrics');
-        if (hasL && !existing) {
-          nowPlayingContainer.appendChild(lyricsWrapEl);
-        } else if (!hasL && existing) {
-          existing.remove();
-          lyricsWrapEl = null;
-        }
-      }
-      emitNowPlaying();
-    }
-
     function renderNowPlaying(container) {
       nowPlayingContainer = container; container.innerHTML = '';
-      lyricsWrapEl = null; lyricsLineEls = [];;
 
       var bgEl = root.querySelector('.spot-player-bg');
       if (bgEl) bgEl.style.backgroundImage = albumArtUrl ? 'url(' + albumArtUrl + ')' : 'none';
@@ -759,20 +787,9 @@
       }
 
       var trackInfo = document.createElement('div'); trackInfo.className = 'spot-track-info';
-      var nameRow = document.createElement('div'); nameRow.style.cssText = 'display:flex;align-items:center;gap:6px;min-width:0';
       var trackName = document.createElement('div'); trackName.className = 'spot-track-name'; trackName.textContent = currentTrack.name;
-      trackName.style.cssText = 'flex:1;min-width:0';
-      var inlineMiniBtn = document.createElement('button'); inlineMiniBtn.className = 'spot-icon-btn accent';
-      inlineMiniBtn.innerHTML = svgMiniPlayer; inlineMiniBtn.title = 'Open Mini Player';
-      inlineMiniBtn.style.cssText = 'flex-shrink:0';
-      inlineMiniBtn.onclick = function() {
-        api.window.openMiniPlayer().catch(function() {
-          api.toast({ title: 'Mini player not available', type: 'info' });
-        });
-      };
-      nameRow.appendChild(trackName); nameRow.appendChild(inlineMiniBtn);
       var trackArtist = document.createElement('div'); trackArtist.className = 'spot-track-artist'; trackArtist.textContent = currentTrack.artist;
-      trackInfo.appendChild(nameRow); trackInfo.appendChild(trackArtist);
+      trackInfo.appendChild(trackName); trackInfo.appendChild(trackArtist);
       if (currentTrack.album) {
         var trackAlbum = document.createElement('div'); trackAlbum.className = 'spot-track-album'; trackAlbum.textContent = currentTrack.album;
         trackInfo.appendChild(trackAlbum);
@@ -796,13 +813,12 @@
         var seekMs = Math.floor(ratio * durationMs);
         progressMs = seekMs; updateProgressUI();
         spotApi('PUT', '/me/player/seek?position_ms=' + seekMs);
-        setTimeout(immediateRefresh, 300);
       };
       container.appendChild(progSection);
 
       var controls = document.createElement('div'); controls.className = 'spot-controls';
-      shuffleBtnRef = makeCtrl(svgShuffle, shuffleState, function() { spotApi('PUT', '/me/player/shuffle?state=' + (!shuffleState)); shuffleState = !shuffleState; shuffleBtnRef.className = 'spot-ctrl' + (shuffleState ? ' active' : ''); setTimeout(immediateRefresh, 300); });
-      var btnPrev = makeCtrl(svgPrev, false, function() { spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200); });
+      shuffleBtnRef = makeCtrl(svgShuffle, shuffleState, function() { spotApi('PUT', '/me/player/shuffle?state=' + (!shuffleState)); shuffleState = !shuffleState; shuffleBtnRef.className = 'spot-ctrl' + (shuffleState ? ' active' : ''); });
+      var btnPrev = makeCtrl(svgPrev, false, function() { spotApi('POST', '/me/player/previous'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200); });
 
       playPauseBtnRef = document.createElement('button'); playPauseBtnRef.className = 'spot-ctrl-main';
       playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
@@ -811,15 +827,13 @@
         else { spotApi('PUT', '/me/player/play'); isPlaying = true; }
         playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
         emitNowPlaying();
-        setTimeout(immediateRefresh, 300);
       };
 
-      var btnNext = makeCtrl(svgNext, false, function() { spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200); });
+      var btnNext = makeCtrl(svgNext, false, function() { spotApi('POST', '/me/player/next'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200); });
       repeatBtnRef = makeCtrl(svgRepeat, repeatState !== 'off', function() {
         var next = repeatState === 'off' ? 'context' : repeatState === 'context' ? 'track' : 'off';
         spotApi('PUT', '/me/player/repeat?state=' + next); repeatState = next;
         repeatBtnRef.className = 'spot-ctrl' + (repeatState !== 'off' ? ' active' : '');
-        setTimeout(immediateRefresh, 300);
       });
 
       controls.appendChild(shuffleBtnRef); controls.appendChild(btnPrev); controls.appendChild(playPauseBtnRef);
@@ -837,13 +851,11 @@
         volumePercent = Math.round(ratio * 100);
         volFill.style.width = volumePercent + '%';
         spotApi('PUT', '/me/player/volume?volume_percent=' + volumePercent);
-        setTimeout(immediateRefresh, 300);
       };
       volWrap.appendChild(volIcon); volWrap.appendChild(volBar);
       container.appendChild(volWrap);
 
       var lyricsWrap = document.createElement('div'); lyricsWrap.className = 'spot-lyrics';
-      lyricsWrapEl = lyricsWrap;
       var lyricsTitle = document.createElement('div'); lyricsTitle.className = 'spot-lyrics-title'; lyricsTitle.textContent = 'Lyrics';
       lyricsWrap.appendChild(lyricsTitle);
       lyricsLineEls = [];
@@ -851,8 +863,9 @@
       if (syncedLines && syncedLines.length > 0) {
         hasLyrics = true;
         var activeIdx = 0;
+        var activeProgress = Math.max(0, progressMs + LYRICS_LEAD_MS);
         for (var si = 0; si < syncedLines.length; si++) {
-          if (syncedLines[si].time <= progressMs) activeIdx = si;
+          if (syncedLines[si].time <= activeProgress) activeIdx = si;
         }
         syncedLines.forEach(function(line, idx) {
           var row = document.createElement('div');
@@ -886,8 +899,9 @@
     function updateLyricsHighlight() {
       if (!syncedLines || syncedLines.length === 0 || lyricsLineEls.length === 0) return;
       var activeIdx = 0;
+      var activeProgress = Math.max(0, progressMs + LYRICS_LEAD_MS);
       for (var i = 0; i < syncedLines.length; i++) {
-        if (syncedLines[i].time <= progressMs) activeIdx = i;
+        if (syncedLines[i].time <= activeProgress) activeIdx = i;
       }
       for (var j = 0; j < lyricsLineEls.length; j++) {
         lyricsLineEls[j].className = j === activeIdx ? 'spot-lyrics-line spot-lyrics-active' : 'spot-lyrics-line';
@@ -897,8 +911,10 @@
     }
 
     async function fetchNowPlaying() {
+      var reqSeq = ++fetchNowPlayingSeq;
       try {
         var raw = await spotApi('GET', '/me/player');
+        if (reqSeq !== fetchNowPlayingSeq) return;
         var resp = parseResponse(raw);
         if (resp.code === 401) { showExpired(); return; }
         if (resp.code === 204 || !resp.body) {
@@ -906,6 +922,7 @@
           return;
         }
         var data = JSON.parse(resp.body);
+        if (reqSeq !== fetchNowPlayingSeq) return;
         isPlaying = !!data.is_playing; shuffleState = !!data.shuffle_state; repeatState = data.repeat_state || 'off'; progressMs = data.progress_ms || 0;
         if (data.device) volumePercent = data.device.volume_percent || 100;
         if (data.item) {
@@ -927,6 +944,7 @@
             if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer);
           } else {
             updateProgressUI();
+            updateLyricsHighlight();
             if (playPauseBtnRef) playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
             if (shuffleBtnRef) shuffleBtnRef.className = 'spot-ctrl' + (shuffleState ? ' active' : '');
             if (repeatBtnRef) repeatBtnRef.className = 'spot-ctrl' + (repeatState !== 'off' ? ' active' : '');
@@ -938,7 +956,6 @@
 
     function renderBrowse(container) {
       nowPlayingContainer = null; container.innerHTML = '';
-      container.style.overflowY = 'auto';
       var wrap = document.createElement('div'); wrap.className = 'spot-search-wrap';
       wrap.style.cssText = 'padding-top:12px';
       var input = document.createElement('input'); input.className = 'spot-search-input'; input.type = 'text';
@@ -1118,7 +1135,7 @@
         var raw = await spotApiBody('PUT', '/me/player/play', { context_uri: contextUri });
         var resp = parseResponse(raw);
         if (resp.code === 401) { showExpired(); return; }
-        isPlaying = true; setTimeout(immediateRefresh, 300);
+        isPlaying = true; setTimeout(fetchNowPlaying, 500);
         api.toast({ title: 'Playing', type: 'success' });
       } catch (e) { api.toast({ title: 'Playback failed', message: String(e), type: 'error' }); }
     }
@@ -1215,7 +1232,7 @@
         var raw = await spotApiBody('PUT', '/me/player/play', { uris: [uri] });
         var resp = parseResponse(raw);
         if (resp.code === 401) { showExpired(); return; }
-        isPlaying = true; setTimeout(immediateRefresh, 300);
+        isPlaying = true; setTimeout(fetchNowPlaying, 500);
         api.toast({ title: 'Playing', type: 'success' });
       } catch (e) { api.toast({ title: 'Playback failed', message: String(e), type: 'error' }); }
     }
@@ -1228,18 +1245,18 @@
         if (isPlaying) { spotApi('PUT', '/me/player/pause'); isPlaying = false; }
         else { spotApi('PUT', '/me/player/play'); isPlaying = true; }
         if (playPauseBtnRef) playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
-        emitNowPlaying(); setTimeout(immediateRefresh, 300);
+        emitNowPlaying();
       } else if (cmd === 'next') {
-        spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200);
+        spotApi('POST', '/me/player/next'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200);
       } else if (cmd === 'prev') {
-        spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200);
+        spotApi('POST', '/me/player/previous'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200);
       } else if (cmd === 'set-volume') {
         var val = typeof payload === 'object' && payload ? Number(payload.value) : NaN;
         if (!isNaN(val)) {
           volumePercent = Math.max(0, Math.min(100, Math.round(val)));
           spotApi('PUT', '/me/player/volume?volume_percent=' + volumePercent);
           if (nowPlayingContainer) renderNowPlaying(nowPlayingContainer);
-          emitNowPlaying(); setTimeout(immediateRefresh, 300);
+          emitNowPlaying();
         }
       }
     });
@@ -1261,17 +1278,17 @@
             if (isPlaying) { spotApi('PUT', '/me/player/pause'); isPlaying = false; }
             else { spotApi('PUT', '/me/player/play'); isPlaying = true; }
             if (playPauseBtnRef) playPauseBtnRef.innerHTML = isPlaying ? svgPause : svgPlay;
-            emitNowPlaying(); setTimeout(immediateRefresh, 300);
+            emitNowPlaying();
           } else if (cmd === 'next') {
-            spotApi('POST', '/me/player/next'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200);
+            spotApi('POST', '/me/player/next'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200);
           } else if (cmd === 'prev') {
-            spotApi('POST', '/me/player/previous'); setTimeout(immediateRefresh, 300); setTimeout(immediateRefresh, 1200);
+            spotApi('POST', '/me/player/previous'); setTimeout(fetchNowPlaying, 300); setTimeout(fetchNowPlaying, 1200);
           } else if (cmd === 'set-volume') {
             var val = typeof payload === 'object' && payload ? Number(payload.value) : NaN;
             if (!isNaN(val)) {
               volumePercent = Math.max(0, Math.min(100, Math.round(val)));
               spotApi('PUT', '/me/player/volume?volume_percent=' + volumePercent);
-              emitNowPlaying(); setTimeout(immediateRefresh, 300);
+              emitNowPlaying();
             }
           }
         });
