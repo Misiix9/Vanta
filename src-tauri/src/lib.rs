@@ -3020,8 +3020,8 @@ async fn open_spotify_mini_player(app_handle: tauri::AppHandle) -> Result<(), Va
         url,
     )
     .title("Spotify Mini Player")
-    .inner_size(420.0, 340.0)
-    .min_inner_size(340.0, 260.0)
+    .inner_size(320.0, 180.0)
+    .min_inner_size(220.0, 120.0)
     .resizable(true)
     .decorations(false)
     .transparent(true)

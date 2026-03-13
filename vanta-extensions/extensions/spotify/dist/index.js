@@ -27,6 +27,8 @@
     var lyricsCache = {};
     var syncedLines = null;
     var lyricsLineEls = [];
+    var lastActiveLyricIndex = -1;
+    var lyricsScrollRaf = null;
     var fetchNowPlayingSeq = 0;
     var LYRICS_LEAD_MS = 350;
 
@@ -876,6 +878,7 @@
       var lyricsTitle = document.createElement('div'); lyricsTitle.className = 'spot-lyrics-title'; lyricsTitle.textContent = 'Lyrics';
       lyricsWrap.appendChild(lyricsTitle);
       lyricsLineEls = [];
+      lastActiveLyricIndex = -1;
       var hasLyrics = false;
       if (syncedLines && syncedLines.length > 0) {
         hasLyrics = true;
@@ -940,12 +943,6 @@
       row.className = active ? 'spot-lyrics-line spot-lyrics-active' : 'spot-lyrics-line';
       if (!active) return;
       row.style.setProperty('--lyric-fill-duration', lyricFillDurationMsForIndex(idx) + 'ms');
-      var fill = row.querySelector('.spot-lyric-fill');
-      if (fill) {
-        fill.style.animation = 'none';
-        fill.offsetHeight;
-        fill.style.animation = '';
-      }
     }
 
     function updateLyricsHighlight() {
@@ -955,11 +952,17 @@
       for (var i = 0; i < syncedLines.length; i++) {
         if (syncedLines[i].time <= activeProgress) activeIdx = i;
       }
+      if (activeIdx === lastActiveLyricIndex) return;
+      lastActiveLyricIndex = activeIdx;
       for (var j = 0; j < lyricsLineEls.length; j++) {
         setLyricsRowActiveState(lyricsLineEls[j], j === activeIdx, j);
       }
-      var el = lyricsLineEls[activeIdx];
-      if (el && el.parentElement) el.scrollIntoView({block: 'center', behavior: 'smooth'});
+      if (lyricsScrollRaf) cancelAnimationFrame(lyricsScrollRaf);
+      lyricsScrollRaf = requestAnimationFrame(function() {
+        var el = lyricsLineEls[activeIdx];
+        if (el && el.parentElement) el.scrollIntoView({block: 'center', behavior: 'smooth'});
+        lyricsScrollRaf = null;
+      });
     }
 
     async function fetchNowPlaying() {

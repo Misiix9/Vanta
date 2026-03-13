@@ -31,8 +31,10 @@
 
   let nowPlaying = $state<NowPlayingState | null>(null);
   let unlistenRelay: (() => void) | null = null;
+  let lyricsContainer = $state<HTMLDivElement | null>(null);
   let lastUpdatedAt = $state(0);
   let isMaximized = $state(false);
+  let lastCenteredLyricIndex = $state(-1);
 
   function fmtTime(ms: number): string {
     const s = Math.floor(ms / 1000);
@@ -196,6 +198,19 @@
     setTimeout(() => void emit(REQUEST_STATE_EVENT, {}).catch(() => {}), 800);
   });
 
+  $effect(() => {
+    if (!isMaximized || !lyricsContainer || !hasSyncedLines || stableLyricIndex < 0) return;
+    if (stableLyricIndex === lastCenteredLyricIndex) return;
+    lastCenteredLyricIndex = stableLyricIndex;
+    const row = lyricsContainer.children[stableLyricIndex] as HTMLElement | undefined;
+    if (!row) return;
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+  });
+
+  $effect(() => {
+    if (!isMaximized) lastCenteredLyricIndex = -1;
+  });
+
   onDestroy(() => {
     window.removeEventListener("vanta-now-playing", handleNowPlaying as EventListener);
     unlistenRelay?.();
@@ -301,21 +316,21 @@
       {#if isMaximized && hasLyrics}
         <div class="mini-player-lyrics-pane" style={detectedFontFamily ? `font-family: ${detectedFontFamily}` : ""}>
           {#if hasSyncedLines}
-            <div class="mini-player-lyrics-lines mini-player-lyrics-static">
-              {#if previousLyricText && previousLyricText !== activeLyricText}
-                <div class="mini-player-lyric-line mini-player-lyric-muted">{previousLyricText}</div>
-              {/if}
-              <div class="mini-player-lyric-line mini-player-lyric-active" style={`--lyric-fill-duration: ${lyricFillDurationMs}ms;`}>
-                <span class="mini-player-lyric-active-base">{activeLyricText}</span>
-                {#key lyricAnimationKey}
-                  <span class="mini-player-lyric-active-fill" class:mini-player-lyric-active-fill-animate={lyricAnimateFill}>
-                    {activeLyricText}
-                  </span>
-                {/key}
-              </div>
-              {#if nextLyricText && nextLyricText !== activeLyricText}
-                <div class="mini-player-lyric-line mini-player-lyric-muted">{nextLyricText}</div>
-              {/if}
+            <div class="mini-player-lyrics-lines mini-player-lyrics-scroll" bind:this={lyricsContainer}>
+              {#each nowPlaying!.syncedLines! as line, idx}
+                <div class="mini-player-lyric-line" class:mini-player-lyric-active={idx === stableLyricIndex} style={idx === stableLyricIndex ? `--lyric-fill-duration: ${lyricFillDurationMs}ms;` : ""}>
+                  {#if idx === stableLyricIndex}
+                    <span class="mini-player-lyric-active-base">{line.text}</span>
+                    {#key lyricAnimationKey}
+                      <span class="mini-player-lyric-active-fill" class:mini-player-lyric-active-fill-animate={lyricAnimateFill}>
+                        {line.text}
+                      </span>
+                    {/key}
+                  {:else}
+                    <span>{line.text}</span>
+                  {/if}
+                </div>
+              {/each}
             </div>
           {:else if lyricLines.length > 0}
             <div class="mini-player-lyrics-lines mini-player-lyrics-static">
