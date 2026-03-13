@@ -2836,7 +2836,7 @@ input[type="range"] {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     overflow: hidden;
-    font-family: -apple-system, system-ui, sans-serif;
+    font-family: "Inter", "Noto Sans", "Noto Sans CJK JP", "Noto Sans CJK SC", "Noto Sans CJK KR", "Hiragino Sans", "Yu Gothic UI", "Segoe UI", system-ui, sans-serif;
     color: #fff;
     width: 100%;
     height: 100%;
@@ -2852,28 +2852,6 @@ input[type="range"] {
     filter: blur(32px) brightness(0.3) saturate(1.5);
     pointer-events: none;
     z-index: 0;
-    animation: mini-backdrop-fade-in 0.6s ease forwards;
-}
-
-.mini-player-backdrop-prev {
-    position: absolute;
-    inset: -24px;
-    background-size: cover;
-    background-position: center;
-    filter: blur(32px) brightness(0.3) saturate(1.5);
-    pointer-events: none;
-    z-index: 0;
-    animation: mini-backdrop-fade-out 0.6s ease forwards;
-}
-
-@keyframes mini-backdrop-fade-in {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-@keyframes mini-backdrop-fade-out {
-    from { opacity: 1; }
-    to   { opacity: 0; }
 }
 
 .mini-player-overlay {
@@ -2908,6 +2886,33 @@ input[type="range"] {
     letter-spacing: 0.3px;
 }
 
+.mini-player-window-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    -webkit-app-region: no-drag;
+}
+
+.mini-player-action-btn {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s;
+    padding: 0;
+}
+
+.mini-player-action-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+}
+
 .mini-player-close {
     width: 18px;
     height: 18px;
@@ -2933,22 +2938,56 @@ input[type="range"] {
     position: relative;
     z-index: 2;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 10px;
     padding: 0 12px 12px;
     flex: 1;
     min-height: 0;
 }
 
+.mini-player-content-split {
+    align-items: stretch;
+}
+
+.mini-player-content-centered {
+    align-items: center;
+    justify-content: center;
+}
+
+.mini-player-main-pane {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+.mini-player-main-pane-centered {
+    justify-content: center;
+}
+
+.mini-player-main-block {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
 .mini-player-top {
     display: flex;
     gap: 12px;
+    align-items: flex-start;
+}
+
+.mini-player-top-centered {
     align-items: center;
 }
 
 .mini-player-art {
-    width: 64px;
-    height: 64px;
+    width: 84px;
+    height: 84px;
     border-radius: 10px;
     object-fit: cover;
     flex-shrink: 0;
@@ -2956,8 +2995,8 @@ input[type="range"] {
 }
 
 .mini-player-art-placeholder {
-    width: 64px;
-    height: 64px;
+    width: 84px;
+    height: 84px;
     border-radius: 10px;
     flex-shrink: 0;
     background: rgba(255, 255, 255, 0.06);
@@ -2972,11 +3011,12 @@ input[type="range"] {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+    padding-top: 4px;
 }
 
 .mini-player-track {
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 600;
     color: #fff;
     white-space: nowrap;
@@ -2985,7 +3025,7 @@ input[type="range"] {
 }
 
 .mini-player-artist {
-    font-size: 11px;
+    font-size: 12px;
     color: rgba(255, 255, 255, 0.6);
     white-space: nowrap;
     overflow: hidden;
@@ -2995,8 +3035,8 @@ input[type="range"] {
 .mini-player-controls {
     display: flex;
     align-items: center;
-    gap: 4px;
-    margin-top: 4px;
+    justify-content: center;
+    gap: 6px;
 }
 
 .mini-player-ctrl {
@@ -3062,31 +3102,70 @@ input[type="range"] {
 .mini-player-times {
     display: flex;
     justify-content: space-between;
-    font-size: 9px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.4);
     margin-top: 3px;
     font-variant-numeric: tabular-nums;
 }
 
+.mini-player-volume-rail-wrap {
+    width: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.mini-player-volume-rail-hitbox {
+    width: 20px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mini-player-volume-rail-shell {
+    width: 6px;
+    height: 96px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.08;
+    transform: scaleY(0.8);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.mini-player-volume-rail-hitbox:hover .mini-player-volume-rail-shell {
+    opacity: 1;
+    transform: scaleY(1);
+}
+
+.mini-player-volume-rail {
+    -webkit-appearance: slider-vertical;
+    appearance: slider-vertical;
+    writing-mode: bt-lr;
+    width: 6px;
+    height: 90px;
+    margin: 0;
+    accent-color: rgba(255, 255, 255, 0.85);
+    background: transparent;
+    cursor: ns-resize;
+}
+
 .mini-player-lyrics-pane {
     min-height: 0;
-    max-height: 0;
+    flex: 1;
+    min-width: 42%;
+    max-width: 56%;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 0 10px;
+    padding: 8px 10px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    transition: max-height 0.4s ease, padding 0.4s ease, opacity 0.4s ease;
-    opacity: 0;
-}
-
-.mini-player-lyrics-pane.mini-player-lyrics-visible {
-    max-height: 300px;
-    padding: 8px 10px;
-    opacity: 1;
-    flex: 1;
 }
 
 .mini-player-lyrics-lines {
@@ -3098,21 +3177,21 @@ input[type="range"] {
 }
 
 .mini-player-lyric-line {
-    font-size: 11px;
-    line-height: 1.5;
+    font-size: 22px;
+    line-height: 1.45;
     color: rgba(255, 255, 255, 0.4);
-    transition: color 0.08s linear, font-size 0.08s linear;
+    transition: color 0.12s ease;
     padding: 1px 0;
 }
 
 .mini-player-lyric-active {
     color: #fff !important;
-    font-weight: 600;
-    font-size: 12px;
+    font-weight: 700;
+    font-size: 24px;
 }
 
 .mini-player-lyrics-empty {
-    font-size: 11px;
+    font-size: 14px;
     color: rgba(255, 255, 255, 0.3);
 }
 
