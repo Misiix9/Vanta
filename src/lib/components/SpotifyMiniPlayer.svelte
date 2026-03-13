@@ -118,7 +118,18 @@
       .filter((line: string) => line.length > 0)
       .slice(0, 10),
   );
+
   const hasLyrics = $derived(hasSyncedLines || lyricLines.length > 0);
+  
+  const detectedFontFamily = $derived((() => {
+    if (!lyricsText) return "";
+    if (/[\uac00-\ud7af\u1100-\u11ff]/.test(lyricsText)) return "'Noto Sans CJK KR', 'Malgun Gothic', sans-serif";
+    if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(lyricsText)) return "'Noto Sans CJK JP', 'Noto Sans CJK SC', 'Noto Sans CJK TC', 'Hiragino Sans', sans-serif";
+    if (/[\u0600-\u06ff]/.test(lyricsText)) return "'Noto Kufi Arabic', Arial, sans-serif";
+    if (/[\u0400-\u04ff]/.test(lyricsText)) return "'Noto Sans', Arial, sans-serif";
+    return "";
+  })());
+  
   const volumeValue = $derived(Math.max(0, Math.min(100, Math.round(nowPlaying?.volumePercent ?? 100))));
 
   onMount(async () => {
@@ -244,7 +255,7 @@
       </div>
 
       {#if hasLyrics}
-        <div class="mini-player-lyrics-pane">
+        <div class="mini-player-lyrics-pane" style={detectedFontFamily ? `font-family: ${detectedFontFamily}` : ""}>
           {#if hasSyncedLines}
             <div class="mini-player-lyrics-lines" bind:this={lyricsContainer}>
               {#each nowPlaying!.syncedLines! as line, i}
