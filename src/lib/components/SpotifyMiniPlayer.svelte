@@ -46,10 +46,6 @@
     void emit(COMMAND_RELAY_EVENT, detail).catch(() => {});
   }
 
-  function handleNowPlaying(e: CustomEvent<NowPlayingState | null>) {
-    nowPlaying = e.detail;
-  }
-
   async function startDrag() {
     try {
       const win = getCurrentWebviewWindow();
@@ -92,8 +88,6 @@
   const hasLyrics = $derived(hasSyncedLines || lyricLines.length > 0);
 
   onMount(async () => {
-    window.addEventListener("vanta-now-playing", handleNowPlaying as EventListener);
-
     unlistenRelay = await listen<NowPlayingState | null>(NOW_PLAYING_RELAY_EVENT, (event) => {
       const incoming = event.payload;
       const newArt = incoming?.albumArt ?? null;
@@ -113,12 +107,11 @@
   $effect(() => {
     if (lyricsContainer && activeLyricIndex >= 0) {
       const el = lyricsContainer.children[activeLyricIndex] as HTMLElement | undefined;
-      if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (el) el.scrollIntoView({ block: "center", behavior: "auto" });
     }
   });
 
   onDestroy(() => {
-    window.removeEventListener("vanta-now-playing", handleNowPlaying as EventListener);
     unlistenRelay?.();
   });
 </script>
