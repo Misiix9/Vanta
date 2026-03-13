@@ -127,6 +127,29 @@
       ? nowPlaying?.syncedLines?.[Math.min(stableLyricIndex + 1, (nowPlaying?.syncedLines?.length || 1) - 1)]?.text || ""
       : "",
   );
+  const lyricFillDurationMs = $derived(
+    !hasSyncedLines || stableLyricIndex < 0 || !nowPlaying?.syncedLines?.length
+      ? 0
+      : (() => {
+          const lines = nowPlaying.syncedLines;
+          const current = lines[stableLyricIndex];
+          const next = lines[stableLyricIndex + 1];
+          if (current && next && next.time > current.time) {
+            return Math.max(350, Math.min(12000, next.time - current.time));
+          }
+          if (nowPlaying.durationMs > 0) {
+            const remaining = nowPlaying.durationMs - (nowPlaying.progressMs || 0);
+            return Math.max(350, Math.min(5000, remaining));
+          }
+          return 1800;
+        })(),
+  );
+  const lyricAnimateFill = $derived(
+    Boolean(isMaximized && hasSyncedLines && activeLyricText && lyricFillDurationMs > 0 && nowPlaying?.isPlaying),
+  );
+  const lyricAnimationKey = $derived(
+    `${nowPlaying?.track || ""}::${stableLyricIndex}::${activeLyricText}`,
+  );
   const lyricsText = $derived((nowPlaying?.lyrics || "").trim());
   const lyricLines = $derived(
     lyricsText
@@ -282,7 +305,14 @@
               {#if previousLyricText && previousLyricText !== activeLyricText}
                 <div class="mini-player-lyric-line mini-player-lyric-muted">{previousLyricText}</div>
               {/if}
-              <div class="mini-player-lyric-line mini-player-lyric-active">{activeLyricText}</div>
+              <div class="mini-player-lyric-line mini-player-lyric-active" style={`--lyric-fill-duration: ${lyricFillDurationMs}ms;`}>
+                <span class="mini-player-lyric-active-base">{activeLyricText}</span>
+                {#key lyricAnimationKey}
+                  <span class="mini-player-lyric-active-fill" class:mini-player-lyric-active-fill-animate={lyricAnimateFill}>
+                    {activeLyricText}
+                  </span>
+                {/key}
+              </div>
               {#if nextLyricText && nextLyricText !== activeLyricText}
                 <div class="mini-player-lyric-line mini-player-lyric-muted">{nextLyricText}</div>
               {/if}

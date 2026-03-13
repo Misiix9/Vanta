@@ -111,12 +111,20 @@
       '.spot-vol-icon{color:rgba(255,255,255,0.45);flex-shrink:0;display:flex;align-items:center}',
       '.spot-vol-bar{flex:1;height:4px;background:rgba(255,255,255,0.1);border-radius:2px;cursor:pointer;position:relative}',
       '.spot-vol-fill{height:100%;background:rgba(255,255,255,0.7);border-radius:2px;transition:width .1s}',
-      '.spot-lyrics{margin:0 16px 8px;padding:14px 16px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:10px;flex:1;min-height:80px;overflow:auto;backdrop-filter:blur(4px);animation:spot-fade-in .3s ease}',
+      '.spot-lyrics{margin:0 16px 8px;padding:14px 16px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);border-radius:10px;flex:1;min-height:80px;overflow:auto;backdrop-filter:blur(4px);animation:spot-fade-in .3s ease;scrollbar-width:none;-ms-overflow-style:none}',
+      '.spot-lyrics::-webkit-scrollbar{display:none}',
       '@keyframes spot-fade-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}',
       '.spot-lyrics-title{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,0.4);margin-bottom:10px;font-weight:500}',
-      '.spot-lyrics-line{font-size:32px;line-height:1.5;color:rgba(255,255,255,0.4);margin:0 0 6px;font-weight:500;transition:all .35s ease}',
+      '.spot-lyrics-line{font-size:32px;line-height:1.5;color:rgba(255,255,255,0.4);margin:0 0 6px;font-weight:500;transition:all .28s ease;position:relative;overflow:visible;white-space:normal;overflow-wrap:anywhere;word-break:break-word}',
       '.spot-lyrics-empty{font-size:15px;color:rgba(255,255,255,0.35)}',
-      '.spot-lyrics-active{color:#fff!important;font-weight:700;font-size:36px;transition:all .35s ease}',
+      '.spot-lyrics-active{color:#fff!important;font-weight:700;font-size:36px;transition:all .35s ease;line-height:1.12;animation:spot-lyric-emphasis .36s cubic-bezier(.2,.8,.2,1)}',
+      '.spot-lyric-base,.spot-lyric-fill{display:block;white-space:normal;max-width:100%;overflow-wrap:anywhere;word-break:break-word}',
+      '.spot-lyric-base{color:rgba(255,255,255,0.26)}',
+      '.spot-lyric-fill{position:absolute;inset:0;width:100%;color:transparent;background:linear-gradient(90deg,rgba(255,255,255,1) 0%,rgba(255,255,255,.96) 45%,rgba(255,255,255,.25) 78%,rgba(255,255,255,.1) 100%);background-size:200% 100%;background-position:100% 0;-webkit-background-clip:text;background-clip:text;text-shadow:0 0 20px rgba(255,255,255,.2)}',
+      '.spot-lyrics-active .spot-lyric-fill{animation:spot-lyric-karaoke var(--lyric-fill-duration,1800ms) linear forwards}',
+      '@keyframes spot-lyric-karaoke{from{background-position:100% 0;filter:brightness(.9)}to{background-position:0% 0;filter:brightness(1.06)}}',
+      '@keyframes spot-lyric-emphasis{0%{opacity:.55;transform:translateY(6px) scale(.985)}100%{opacity:1;transform:translateY(0) scale(1)}}',
+      '@media (prefers-reduced-motion: reduce){.spot-lyrics-active,.spot-lyrics-active .spot-lyric-fill{animation:none!important}}',
 
       '.spot-empty{text-align:center;padding:20px 16px;color:rgba(255,255,255,0.45);font-size:13px}',
       '.spot-empty-icon{margin-bottom:12px;opacity:.3}',
@@ -879,7 +887,15 @@
         syncedLines.forEach(function(line, idx) {
           var row = document.createElement('div');
           row.className = 'spot-lyrics-line' + (idx === activeIdx ? ' spot-lyrics-active' : '');
-          row.textContent = line.text;
+          row.style.setProperty('--lyric-fill-duration', lyricFillDurationMsForIndex(idx) + 'ms');
+          var base = document.createElement('span');
+          base.className = 'spot-lyric-base';
+          base.textContent = line.text;
+          var fill = document.createElement('span');
+          fill.className = 'spot-lyric-fill';
+          fill.textContent = line.text;
+          row.appendChild(base);
+          row.appendChild(fill);
           lyricsLineEls.push(row);
           lyricsWrap.appendChild(row);
         });
@@ -905,6 +921,33 @@
       if (progressCurEl) progressCurEl.textContent = fmtTime(progressMs);
     }
 
+    function lyricFillDurationMsForIndex(idx) {
+      if (!syncedLines || syncedLines.length === 0 || idx < 0) return 1800;
+      var cur = syncedLines[idx];
+      var next = syncedLines[idx + 1];
+      if (cur && next && next.time > cur.time) {
+        return Math.max(350, Math.min(12000, next.time - cur.time));
+      }
+      if (durationMs > 0) {
+        var remaining = durationMs - progressMs;
+        return Math.max(350, Math.min(5000, remaining));
+      }
+      return 1800;
+    }
+
+    function setLyricsRowActiveState(row, active, idx) {
+      if (!row) return;
+      row.className = active ? 'spot-lyrics-line spot-lyrics-active' : 'spot-lyrics-line';
+      if (!active) return;
+      row.style.setProperty('--lyric-fill-duration', lyricFillDurationMsForIndex(idx) + 'ms');
+      var fill = row.querySelector('.spot-lyric-fill');
+      if (fill) {
+        fill.style.animation = 'none';
+        fill.offsetHeight;
+        fill.style.animation = '';
+      }
+    }
+
     function updateLyricsHighlight() {
       if (!syncedLines || syncedLines.length === 0 || lyricsLineEls.length === 0) return;
       var activeIdx = 0;
@@ -913,7 +956,7 @@
         if (syncedLines[i].time <= activeProgress) activeIdx = i;
       }
       for (var j = 0; j < lyricsLineEls.length; j++) {
-        lyricsLineEls[j].className = j === activeIdx ? 'spot-lyrics-line spot-lyrics-active' : 'spot-lyrics-line';
+        setLyricsRowActiveState(lyricsLineEls[j], j === activeIdx, j);
       }
       var el = lyricsLineEls[activeIdx];
       if (el && el.parentElement) el.scrollIntoView({block: 'center', behavior: 'smooth'});
