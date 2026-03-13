@@ -1,4 +1,4 @@
-name: Release Vanta v5.6.0
+name: Release Vanta v5.8.0
 
 on:
   push:
@@ -86,17 +86,17 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v5.6.0 -- Phase 37 Result Preview And Context Actions
+            ## Vanta v5.8.0 -- Phase 39 Extension Lifecycle And Ecosystem Health
 
-            Minor release adding result inspection and action flexibility.
+            Minor release focused on extension reliability, updates, rollback safety, and user-visible lifecycle feedback.
 
             ### Highlights
-            - Quick Look preview panel (Space) — file metadata, image preview, text content, non-file result info.
-            - Right-click context menu on results with all available actions.
-            - Image file thumbnails displayed inline in result rows.
-            - Contextual empty states with filter hint chips.
-            - Fuzzy score debug overlay (Ctrl+D) showing match scores.
-            - Drag-and-drop from result items (text/plain data transfer).
+            - Added store-side extension update detection against installed versions.
+            - Added one-click extension update actions directly in Vanta Store.
+            - Added extension rollback flow with version backups.
+            - Added install-time dependency validation for extension `requires` declarations.
+            - Added notification center with lifecycle event history.
+            - Added in-app toasts for success/error states across launcher, extension host, and store actions.
 
             ### Packaging
             - Deb and RPM bundles are published for this release with package verification checks.

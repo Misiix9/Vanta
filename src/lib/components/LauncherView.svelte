@@ -27,6 +27,7 @@
   import SearchInput from "$lib/components/SearchInput.svelte";
   import ResultsList from "$lib/components/ResultsList.svelte";
   import StatusBar from "$lib/components/StatusBar.svelte";
+  import NotificationCenter from "$lib/components/NotificationCenter.svelte";
   import MacroPreview from "$lib/components/MacroPreview.svelte";
   import NowPlayingBar from "$lib/components/NowPlayingBar.svelte";
   import FirstRunWizard from "$lib/components/FirstRunWizard.svelte";
@@ -36,6 +37,8 @@
   import KeyboardShortcutsModal from "$lib/components/KeyboardShortcutsModal.svelte";
   import PreviewPanel from "$lib/components/PreviewPanel.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
+  import type { ToastOptions } from "$lib/sdk/types";
+  import { toastHistory } from "$lib/stores/toastStore";
 
   type ViewId = "launcher" | "settings" | "store" | "featureHub" | "communityHub" | "themeHub" | "extensionsHub";
 
@@ -56,6 +59,7 @@
     view = $bindable<ViewId>(),
     settingsStartSection = $bindable<string | null>(),
     extensionView = $bindable<{ extId: string; command: string; extPath: string } | null>(),
+    onToast,
     onResetAndHide,
     onSaveConfigUpdate,
   }: {
@@ -71,6 +75,7 @@
     view: ViewId;
     settingsStartSection: string | null;
     extensionView: { extId: string; command: string; extPath: string } | null;
+    onToast: (options: ToastOptions) => void;
     onResetAndHide: () => void;
     onSaveConfigUpdate: (mutator: (cfg: VantaConfig) => void) => Promise<void>;
   } = $props();
@@ -107,8 +112,10 @@
   let previewResult = $state<SearchResult | null>(null);
   let contextMenu = $state<{ result: SearchResult; x: number; y: number } | null>(null);
   let showScoreOverlay = $state(false);
+  let showNotifications = $state(false);
   let groupBySection = $derived(query.trim() === "");
   let totalItems = $derived(visibleRowCount);
+  let notificationCount = $derived($toastHistory.length);
 
   $effect(() => {
     if (extensionView || currentMode !== "launcher") return;
@@ -185,7 +192,10 @@
   async function dryRunMacro(macro: WorkflowMacro) {
     macroBusy = true; macroError = null;
     try { macroDryRun = await invoke<MacroDryRunResult>("dry_run_macro", { macroId: macro.id, args: macroArgs }); }
-    catch (e) { macroError = String(e); console.error("Dry-run failed", e); }
+    catch (e) {
+      macroError = String(e); console.error("Dry-run failed", e);
+      onToast({ title: "Macro Dry Run Failed", message: String(e), type: "error" });
+    }
     finally { macroBusy = false; }
   }
 
@@ -197,6 +207,7 @@
     } catch (e) {
       if (handlePermissionError(e)) { macroBusy = false; return; }
       macroError = String(e); console.error("Run macro failed", e);
+      onToast({ title: "Macro Run Failed", message: String(e), type: "error" });
     } finally { macroBusy = false; }
   }
 
@@ -214,6 +225,7 @@
       selectedIndex = results.length > 0 ? 1 : 0;
     } catch (e) {
       console.error("Failed to load suggestions:", e);
+      onToast({ title: "Suggestions Failed", message: String(e), type: "error" });
       try {
         const fallback = await invoke<SearchResult[]>("search_v3", { query: "" });
         if (requestId === searchRequestId) {
@@ -221,7 +233,10 @@
           results = composeResults(baseResults, "", availableMacros, config);
           if (results.length > 0) selectedIndex = 1;
         }
-      } catch (err) { console.error("Fallback search failed:", err); }
+      } catch (err) {
+        console.error("Fallback search failed:", err);
+        onToast({ title: "Search Failed", message: String(err), type: "error" });
+      }
     }
   }
 
@@ -308,11 +323,22 @@
           const updated = await invoke<VantaConfig>("switch_profile", { profileId: command.id });
           await onSaveConfigUpdate((cfg) => Object.assign(cfg, updated));
           await loadSuggestions(); searchInputRef?.focus?.();
-        } catch (e) { console.error("Profile switch failed", e); }
+          onToast({ title: "Profile Switched", message: command.id, type: "success" });
+        } catch (e) {
+          console.error("Profile switch failed", e);
+          onToast({ title: "Profile Switch Failed", message: String(e), type: "error" });
+        }
         return;
       }
       if (command.kind === "system_action") {
-        try { await invoke("system_action", { action: command.action }); onResetAndHide(); } catch (e) { console.error("System action failed", e); }
+        try {
+          await invoke("system_action", { action: command.action });
+          onToast({ title: "System Action", message: `${command.action} executed`, type: "success" });
+          onResetAndHide();
+        } catch (e) {
+          console.error("System action failed", e);
+          onToast({ title: "System Action Failed", message: String(e), type: "error" });
+        }
         return;
       }
       if (command.kind === "open_settings") { settingsStartSection = null; view = "settings"; return; }
@@ -323,13 +349,40 @@
         view = "featureHub"; return;
       }
       if (command.kind === "open_store") { view = "store"; return; }
-      if (command.kind === "copy_path") { await navigator.clipboard.writeText(command.value); onResetAndHide(); }
-      else if (command.kind === "reveal_path") { await invoke("reveal_in_file_manager", { path: command.path }); onResetAndHide(); }
-      else if (command.kind === "open_with_editor") { await invoke("open_with_editor", { path: command.path }); onResetAndHide(); }
-      else if (command.kind === "copy_text") { await navigator.clipboard.writeText(command.value); onResetAndHide(); }
-      else if (command.kind === "open_file") { await invoke("open_path", { path: command.path }); onResetAndHide(); }
-      else { await invoke("launch_app", { exec: commandToExec(command) }); onResetAndHide(); }
-    } catch (e) { console.error("Launch/Copy failed:", e); }
+      if (command.kind === "copy_path") {
+        await navigator.clipboard.writeText(command.value);
+        onToast({ title: "Path Copied", message: command.value, type: "success" });
+        onResetAndHide();
+      }
+      else if (command.kind === "reveal_path") {
+        await invoke("reveal_in_file_manager", { path: command.path });
+        onToast({ title: "Opened In File Manager", message: command.path, type: "success" });
+        onResetAndHide();
+      }
+      else if (command.kind === "open_with_editor") {
+        await invoke("open_with_editor", { path: command.path });
+        onToast({ title: "Opened In Editor", message: command.path, type: "success" });
+        onResetAndHide();
+      }
+      else if (command.kind === "copy_text") {
+        await navigator.clipboard.writeText(command.value);
+        onToast({ title: "Copied", message: command.value, type: "success" });
+        onResetAndHide();
+      }
+      else if (command.kind === "open_file") {
+        await invoke("open_path", { path: command.path });
+        onToast({ title: "Opening File", message: command.path, type: "success" });
+        onResetAndHide();
+      }
+      else {
+        await invoke("launch_app", { exec: commandToExec(command) });
+        onToast({ title: "Launching", message: result.title, type: "success" });
+        onResetAndHide();
+      }
+    } catch (e) {
+      console.error("Launch/Copy failed:", e);
+      onToast({ title: "Action Failed", message: String(e), type: "error" });
+    }
     finally { actionInFlight = false; }
   }
 
@@ -496,7 +549,13 @@
     const ext = availableExtensions.find((e) => e.manifest.name === 'spotify');
     if (ext) extensionView = { extId: 'spotify', command: 'player', extPath: ext.path ?? '' };
   }} />
-  <StatusBar resultCount={activeMacroId ? macroDryRun?.steps.length ?? 0 : visibleRowCount} {searchTime} {isSearching} />
+  <StatusBar
+    resultCount={activeMacroId ? macroDryRun?.steps.length ?? 0 : visibleRowCount}
+    {searchTime}
+    {isSearching}
+    {notificationCount}
+    onOpenNotifications={() => (showNotifications = true)}
+  />
 
   {#if pendingConfirmResult}
     {@const confirmSpec = getConfirmSpec(pendingConfirmResult)}
@@ -525,6 +584,10 @@
       onAction={handleContextMenuAction}
       onClose={() => (contextMenu = null)}
     />
+  {/if}
+
+  {#if showNotifications}
+    <NotificationCenter onClose={() => (showNotifications = false)} />
   {/if}
 
   {#if onboardingOpen && config}

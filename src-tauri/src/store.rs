@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use semver::Version;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use crate::extensions::{self, ExtensionManifest};
+use crate::extensions::{self, ExtensionDependency, ExtensionManifest};
 use crate::errors::VantaError;
 use crate::config;
 use crate::permissions;
@@ -50,6 +51,13 @@ pub struct StoreExtensionInfo {
     pub commands_count: usize,
     #[serde(skip_deserializing)]
     pub installed: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ExtensionUpdateInfo {
+    pub name: String,
+    pub current_version: String,
+    pub latest_version: String,
 }
 
 fn default_category() -> String {
@@ -455,6 +463,16 @@ fn normalize_store_entry(entry: &mut StoreExtensionInfo) {
     }
 }
 
+fn is_registry_version_newer(registry_version: &str, installed_version: &str) -> bool {
+    let registry_trimmed = registry_version.trim().trim_start_matches('v');
+    let installed_trimmed = installed_version.trim().trim_start_matches('v');
+
+    match (Version::parse(registry_trimmed), Version::parse(installed_trimmed)) {
+        (Ok(registry), Ok(installed)) => registry > installed,
+        _ => registry_trimmed != installed_trimmed,
+    }
+}
+
 fn apply_ratings_snapshot(exts: &mut [StoreExtensionInfo], ratings: &[RatingEntry]) {
     let mut by_name = std::collections::HashMap::new();
     for item in ratings {
@@ -548,6 +566,158 @@ fn validate_downloaded_manifest(
     Ok(manifest)
 }
 
+fn collect_installed_extension_versions() -> std::collections::HashMap<String, String> {
+    let mut versions = std::collections::HashMap::new();
+    for entry in extensions::scan_extensions() {
+        versions.insert(entry.manifest.name, entry.manifest.version);
+    }
+    versions
+}
+
+fn validate_dependency(
+    dependency: &ExtensionDependency,
+    installed_versions: &std::collections::HashMap<String, String>,
+) -> Result<(), String> {
+    let ext_id = dependency.ext_id.trim();
+    let version_range = dependency.version_range.trim();
+
+    if ext_id.is_empty() {
+        return Err("dependency ext_id cannot be empty".to_string());
+    }
+    if version_range.is_empty() {
+        return Err(format!("dependency '{}' has empty version_range", ext_id));
+    }
+
+    let installed = installed_versions
+        .get(ext_id)
+        .ok_or_else(|| format!("missing dependency '{}'", ext_id))?;
+
+    let req = semver::VersionReq::parse(version_range)
+        .map_err(|e| format!("invalid version range '{}' for '{}': {}", version_range, ext_id, e))?;
+
+    let installed_version = Version::parse(installed.trim().trim_start_matches('v'))
+        .map_err(|e| format!("installed dependency '{}' has invalid version '{}': {}", ext_id, installed, e))?;
+
+    if req.matches(&installed_version) {
+        return Ok(());
+    }
+
+    Err(format!(
+        "dependency '{}' requires '{}' but installed version is '{}'",
+        ext_id, version_range, installed
+    ))
+}
+
+fn validate_manifest_dependencies(
+    manifest: &ExtensionManifest,
+    installed_versions: &std::collections::HashMap<String, String>,
+) -> Result<(), VantaError> {
+    let mut failures = Vec::new();
+
+    for dependency in &manifest.requires {
+        if dependency.ext_id == manifest.name {
+            failures.push(format!(
+                "dependency '{}' cannot reference itself",
+                dependency.ext_id
+            ));
+            continue;
+        }
+
+        if let Err(e) = validate_dependency(dependency, installed_versions) {
+            failures.push(e);
+        }
+    }
+
+    if failures.is_empty() {
+        return Ok(());
+    }
+
+    Err(format!(
+        "Install blocked by dependency validation for '{}': {}",
+        manifest.name,
+        failures.join("; ")
+    )
+    .into())
+}
+
+fn extension_backup_root() -> PathBuf {
+    config::config_dir().join("extension-versions")
+}
+
+fn extension_backup_dir(name: &str) -> PathBuf {
+    extension_backup_root().join(name)
+}
+
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), VantaError> {
+    if !src.exists() {
+        return Err(format!("Source path does not exist: {}", src.display()).into());
+    }
+
+    fs::create_dir_all(dst)
+        .map_err(|e| format!("Failed to create backup dir '{}': {}", dst.display(), e))?;
+
+    for entry in fs::read_dir(src)
+        .map_err(|e| format!("Failed to read dir '{}': {}", src.display(), e))?
+    {
+        let entry = entry.map_err(|e| format!("Failed to read dir entry: {}", e))?;
+        let path = entry.path();
+        let target = dst.join(entry.file_name());
+
+        if path.is_dir() {
+            copy_dir_recursive(&path, &target)?;
+        } else {
+            if let Some(parent) = target.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create parent dir '{}': {}", parent.display(), e))?;
+            }
+            fs::copy(&path, &target).map_err(|e| {
+                format!(
+                    "Failed to copy '{}' to '{}': {}",
+                    path.display(),
+                    target.display(),
+                    e
+                )
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
+fn create_extension_backup(name: &str, ext_dir: &Path) -> Result<PathBuf, VantaError> {
+    let timestamp = chrono::Utc::now().format("%Y%m%d%H%M%S").to_string();
+    let backup_dir = extension_backup_dir(name).join(timestamp);
+    copy_dir_recursive(ext_dir, &backup_dir)?;
+    Ok(backup_dir)
+}
+
+fn restore_extension_from_backup(ext_dir: &Path, backup_dir: &Path) -> Result<(), VantaError> {
+    if ext_dir.exists() {
+        fs::remove_dir_all(ext_dir)
+            .map_err(|e| format!("Failed to remove extension dir '{}': {}", ext_dir.display(), e))?;
+    }
+    copy_dir_recursive(backup_dir, ext_dir)?;
+    Ok(())
+}
+
+fn latest_backup_for_extension(name: &str) -> Result<PathBuf, VantaError> {
+    let backups_root = extension_backup_dir(name);
+    if !backups_root.exists() {
+        return Err(format!("No rollback backup available for extension '{}'", name).into());
+    }
+
+    let mut backup_dirs: Vec<PathBuf> = fs::read_dir(&backups_root)
+        .map_err(|e| format!("Failed to read backup dir '{}': {}", backups_root.display(), e))?
+        .filter_map(|entry| entry.ok().map(|e| e.path()))
+        .filter(|path| path.is_dir())
+        .collect();
+
+    backup_dirs.sort();
+    backup_dirs
+        .pop()
+        .ok_or_else(|| format!("No rollback backup available for extension '{}'", name).into())
+}
+
 #[tauri::command]
 pub async fn fetch_store_registry() -> Result<Vec<StoreExtensionInfo>, VantaError> {
     let client = reqwest::Client::new();
@@ -599,6 +769,34 @@ pub async fn fetch_store_registry() -> Result<Vec<StoreExtensionInfo>, VantaErro
     }
 
     Ok(exts)
+}
+
+#[tauri::command]
+pub async fn check_store_extension_updates() -> Result<Vec<ExtensionUpdateInfo>, VantaError> {
+    let registry = fetch_store_registry().await?;
+    let installed_entries = extensions::scan_extensions();
+
+    let mut installed_by_name: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    for entry in installed_entries {
+        installed_by_name.insert(entry.manifest.name, entry.manifest.version);
+    }
+
+    let mut updates = Vec::new();
+    for ext in registry {
+        if let Some(current_version) = installed_by_name.get(&ext.name) {
+            if is_registry_version_newer(&ext.version, current_version) {
+                updates.push(ExtensionUpdateInfo {
+                    name: ext.name,
+                    current_version: current_version.clone(),
+                    latest_version: ext.version,
+                });
+            }
+        }
+    }
+
+    updates.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(updates)
 }
 
 #[tauri::command]
@@ -682,6 +880,15 @@ pub async fn install_store_extension(name: String) -> Result<(), VantaError> {
 
     let ext_dir = extensions::extensions_dir().join(&name);
     let dist_dir = ext_dir.join("dist");
+    let ext_existed = ext_dir.exists();
+    let backup_path = if ext_existed {
+        Some(create_extension_backup(&name, &ext_dir).map_err(|e| {
+            format!("Failed to create backup before update: {}", e)
+        })?)
+    } else {
+        None
+    };
+
     fs::create_dir_all(&dist_dir)
         .map_err(|e| format!("Failed to create extension directory: {}", e))?;
 
@@ -691,6 +898,9 @@ pub async fn install_store_extension(name: String) -> Result<(), VantaError> {
     let manifest_bytes = download_file(&client, &format!("{}/manifest.json", base)).await?;
     let manifest = validate_downloaded_manifest(&name, &manifest_bytes)
         .map_err(|e| format!("Install blocked by manifest validation: {}", e))?;
+
+    let installed_versions = collect_installed_extension_versions();
+    validate_manifest_dependencies(&manifest, &installed_versions)?;
 
     if cfg.policy.require_verified_extensions {
         let is_verified = manifest
@@ -721,7 +931,11 @@ pub async fn install_store_extension(name: String) -> Result<(), VantaError> {
         .map_err(|e| format!("Failed to serialize normalized manifest: {}", e))?;
 
     if let Err(e) = fs::write(ext_dir.join("manifest.json"), normalized_manifest) {
-        let _ = fs::remove_dir_all(&ext_dir);
+        if let Some(backup) = &backup_path {
+            let _ = restore_extension_from_backup(&ext_dir, backup);
+        } else {
+            let _ = fs::remove_dir_all(&ext_dir);
+        }
         return Err(format!(
             "Failed to write manifest.json: {}. Installation rolled back.",
             e
@@ -731,11 +945,19 @@ pub async fn install_store_extension(name: String) -> Result<(), VantaError> {
     let bundle_bytes = download_file(&client, &format!("{}/dist/index.js", base))
         .await
         .map_err(|e| {
-            let _ = fs::remove_dir_all(&ext_dir);
+            if let Some(backup) = &backup_path {
+                let _ = restore_extension_from_backup(&ext_dir, backup);
+            } else {
+                let _ = fs::remove_dir_all(&ext_dir);
+            }
             format!("Failed to download extension bundle: {}", e)
         })?;
     if let Err(e) = fs::write(dist_dir.join("index.js"), &bundle_bytes) {
-        let _ = fs::remove_dir_all(&ext_dir);
+        if let Some(backup) = &backup_path {
+            let _ = restore_extension_from_backup(&ext_dir, backup);
+        } else {
+            let _ = fs::remove_dir_all(&ext_dir);
+        }
         return Err(format!(
             "Failed to write dist/index.js: {}. Installation rolled back.",
             e
@@ -771,6 +993,37 @@ pub async fn install_store_extension(name: String) -> Result<(), VantaError> {
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn rollback_store_extension(name: String) -> Result<String, VantaError> {
+    validate_requested_name(&name)?;
+
+    let ext_dir = extensions::extensions_dir().join(&name);
+    let backup_dir = latest_backup_for_extension(&name)?;
+
+    if ext_dir.exists() {
+        let _ = create_extension_backup(&name, &ext_dir);
+    }
+
+    restore_extension_from_backup(&ext_dir, &backup_dir)?;
+
+    let manifest_path = ext_dir.join("manifest.json");
+    let restored_version = fs::read_to_string(&manifest_path)
+        .ok()
+        .and_then(|text| serde_json::from_str::<ExtensionManifest>(&text).ok())
+        .map(|m| m.version)
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let _ = permissions::record_audit_event(
+        "extension_rollback",
+        "store",
+        &name,
+        "allowed",
+        Some(format!("restored_version={}", restored_version)),
+    );
+
+    Ok(restored_version)
 }
 
 #[tauri::command]

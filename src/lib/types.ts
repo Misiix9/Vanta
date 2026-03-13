@@ -353,6 +353,11 @@ export interface ExtensionCommand {
     icon?: string;
 }
 
+export interface ExtensionDependency {
+    ext_id: string;
+    version_range: string;
+}
+
 export interface ExtensionManifest {
     name: string;
     title: string;
@@ -363,6 +368,7 @@ export interface ExtensionManifest {
     safe?: boolean;
     icon?: string;
     permissions: Capability[];
+    requires?: ExtensionDependency[];
     commands: ExtensionCommand[];
 }
 
@@ -392,4 +398,10 @@ export interface StoreExtensionInfo {
     permission_risk: "Low" | "Medium" | "High" | string;
     commands_count: number;
     installed: boolean;
+}
+
+export interface ExtensionUpdateInfo {
+    name: string;
+    current_version: string;
+    latest_version: string;
 }

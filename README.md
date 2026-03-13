@@ -38,7 +38,19 @@ Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/rele
 sudo rpm -i vanta-5.5.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.6.0)
+### Latest Minor (v5.8.0)
+- Added in-app toast notifications with auto-dismiss and severity styling (info/success/error).
+- Replaced key silent launcher/store failures with user-visible feedback toasts.
+- Added store-side update detection for installed extensions using semver comparisons against the registry.
+- Added extension update action in Vanta Store (`Update to vX`) when newer versions are available.
+- Added extension rollback support with backup snapshots and one-click rollback from Vanta Store.
+- Added extension dependency contract support (`requires`) with install-time dependency/version validation.
+- Added notification center panel from status bar with recent event history.
+
+### Previous Minor (v5.7.0)
+- Added Phase 38 notification and feedback architecture baseline across launcher/store/extension-host flows.
+
+### Previous Minor (v5.6.0)
 - Quick Look preview panel (Space key) — shows file metadata, image preview, text content (up to 4 KB), directory listing; non-file results show source info and exec details.
 - Right-click context menu on any result row — lists primary action plus all available actions (reveal, copy path, open-with, etc.).
 - Image file thumbnails displayed inline in result rows for common image formats (png, jpg, gif, webp, svg, etc.).

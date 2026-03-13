@@ -38,6 +38,12 @@ pub struct ExtensionCommand {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ExtensionDependency {
+    pub ext_id: String,
+    pub version_range: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExtensionManifest {
     pub name: String,
     pub title: String,
@@ -57,6 +63,8 @@ pub struct ExtensionManifest {
     pub icon: Option<String>,
     #[serde(default)]
     pub permissions: Vec<Capability>,
+    #[serde(default)]
+    pub requires: Vec<ExtensionDependency>,
     pub commands: Vec<ExtensionCommand>,
 }
 
@@ -118,6 +126,7 @@ pub async fn create_extension_template(name: String) -> Result<String, VantaErro
         "publisher": "Community",
         "safe": false,
         "permissions": [],
+        "requires": [],
         "commands": [
             {
                 "name": "hello",
@@ -716,6 +725,7 @@ mod tests {
             safe: None,
             icon: None,
             permissions: vec![],
+            requires: vec![],
             commands: vec![ExtensionCommand {
                 name: "run".to_string(),
                 title: "Run".to_string(),
@@ -740,6 +750,7 @@ mod tests {
             safe: None,
             icon: None,
             permissions: vec![],
+            requires: vec![],
             commands: vec![ExtensionCommand {
                 name: "run".to_string(),
                 title: "Run".to_string(),
@@ -764,6 +775,7 @@ mod tests {
             safe: None,
             icon: None,
             permissions: vec![],
+            requires: vec![],
             commands: vec![],
         };
         assert!(validate_manifest(&manifest, Path::new("/tmp/test")).is_err());
@@ -783,6 +795,7 @@ mod tests {
                 safe: None,
                 icon: None,
                 permissions: vec![],
+                requires: vec![],
                 commands: vec![ExtensionCommand {
                     name: "run".to_string(),
                     title: "Run".to_string(),

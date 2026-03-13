@@ -6,10 +6,14 @@
     resultCount = 0,
     searchTime = null,
     isSearching = false,
+    notificationCount = 0,
+    onOpenNotifications,
   }: {
     resultCount: number;
     searchTime: number | null;
     isSearching?: boolean;
+    notificationCount?: number;
+    onOpenNotifications?: () => void;
   } = $props();
 
   let appVersion = $state("…");
@@ -40,6 +44,17 @@
       </span>
     {/if}
     <span class="status-version">v{appVersion}</span>
+    <button
+      class="status-notifications"
+      onclick={() => onOpenNotifications?.()}
+      aria-label="Open notifications"
+      title="Open notifications"
+    >
+      <span>Notifications</span>
+      {#if notificationCount > 0}
+        <span class="notification-count">{notificationCount}</span>
+      {/if}
+    </button>
   </div>
 </div>
 
@@ -78,6 +93,36 @@
 
   .status-version {
     opacity: 0.5;
+  }
+
+  .status-notifications {
+    border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.12));
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    color: var(--ds-text-secondary, #999);
+    background: rgba(255, 255, 255, 0.04);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  .status-notifications:hover {
+    color: var(--ds-text-primary, #ddd);
+  }
+
+  .notification-count {
+    min-width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    background: rgba(96, 165, 250, 0.25);
+    color: #dbeafe;
+    padding: 0 4px;
   }
 
   .status-searching {

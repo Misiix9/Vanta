@@ -4,6 +4,7 @@
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
   import { onDestroy, onMount } from "svelte";
   import { fade } from "svelte/transition";
+  import type { ToastOptions } from "$lib/sdk/types";
   import type {
     VantaConfig,
     BlurStatus,
@@ -24,6 +25,8 @@
   import SpotifyMiniPlayer from "$lib/components/SpotifyMiniPlayer.svelte";
   import ExtensionHost from "$lib/components/ExtensionHost.svelte";
   import LauncherView from "$lib/components/LauncherView.svelte";
+  import ToastContainer from "$lib/components/ToastContainer.svelte";
+  import { addToast } from "$lib/stores/toastStore";
 
   type ViewId = "launcher" | "settings" | "store" | "featureHub" | "communityHub" | "themeHub" | "extensionsHub";
 
@@ -63,11 +66,19 @@
   const unlisteners: Array<() => void> = [];
   let fadeDuration = $derived(vantaConfig?.accessibility?.reduced_motion ? 0 : 150);
 
+  function notify(options: ToastOptions) {
+    addToast(options);
+  }
+
   async function maybeRescanApps(force = false) {
     const now = Date.now();
     if (!force && now - lastAppRescan < RESCAN_INTERVAL_MS) return;
     lastAppRescan = now;
-    try { await invoke<number>("rescan_apps"); } catch (e) { console.error("App rescan failed", e); }
+    try { await invoke<number>("rescan_apps"); }
+    catch (e) {
+      console.error("App rescan failed", e);
+      notify({ title: "Rescan Failed", message: String(e), type: "error" });
+    }
   }
 
   function injectThemeCss(css: string) {
@@ -100,7 +111,10 @@
     mutator(vantaConfig);
     applyThemeFromConfig(vantaConfig);
     try { await invoke("save_config", { newConfig: vantaConfig }); }
-    catch (e) { console.error("Failed to save config", e); }
+    catch (e) {
+      console.error("Failed to save config", e);
+      notify({ title: "Save Failed", message: String(e), type: "error" });
+    }
   }
 
   function resetAndHide() {
@@ -174,27 +188,45 @@
         await listen("open_clipboard", async () => {
           currentMode = "clipboard";
           try { clipboardHistory = await invoke("get_clipboard_history"); }
-          catch (e) { console.error("Failed to fetch history", e); }
+          catch (e) {
+            console.error("Failed to fetch history", e);
+            notify({ title: "Clipboard Error", message: String(e), type: "error" });
+          }
           await invoke("show_window");
         }),
       );
-    } catch (e) { console.error("Failed to bind clipboard listener", e); }
+    } catch (e) {
+      console.error("Failed to bind clipboard listener", e);
+      notify({ title: "Listener Error", message: String(e), type: "error" });
+    }
 
     try { availableThemes = await invoke<ThemeMeta[]>("get_installed_themes"); }
-    catch (e) { console.error("Failed to load themes:", e); }
+    catch (e) {
+      console.error("Failed to load themes:", e);
+      notify({ title: "Theme Load Failed", message: String(e), type: "error" });
+    }
 
     try {
       const config = await invoke<VantaConfig>("get_config");
       vantaConfig = config;
       applyThemeFromConfig(config);
-    } catch (e) { console.error("Failed to load config:", e); }
+    } catch (e) {
+      console.error("Failed to load config:", e);
+      notify({ title: "Config Load Failed", message: String(e), type: "error" });
+    }
 
     if (isMiniPlayer) return;
 
     try { availableExtensions = await invoke<ExtensionEntry[]>("get_extensions"); }
-    catch (e) { console.error("Failed to load extensions:", e); }
+    catch (e) {
+      console.error("Failed to load extensions:", e);
+      notify({ title: "Extensions Load Failed", message: String(e), type: "error" });
+    }
     try { availableMacros = await invoke<WorkflowMacro[]>("get_workflows"); }
-    catch (e) { console.error("Failed to load macros:", e); }
+    catch (e) {
+      console.error("Failed to load macros:", e);
+      notify({ title: "Workflow Load Failed", message: String(e), type: "error" });
+    }
 
 
     unlisteners.push(
@@ -258,7 +290,7 @@
 
     {#if view === "store"}
       <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
-        <StoreView onClose={() => (view = "launcher")} />
+        <StoreView onClose={() => (view = "launcher")} onToast={notify} />
       </div>
     {:else if view === "featureHub"}
       <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
@@ -279,7 +311,10 @@
             if (!vantaConfig) return;
             vantaConfig.general.community_feed_opt_in = next;
             try { await invoke("save_config", { newConfig: vantaConfig }); }
-            catch (e) { console.error("Failed to save community feed opt-in", e); }
+            catch (e) {
+              console.error("Failed to save community feed opt-in", e);
+              notify({ title: "Save Failed", message: String(e), type: "error" });
+            }
           }}
           onClose={() => (view = "featureHub")}
         />
@@ -313,7 +348,7 @@
           commandName={extensionView.command}
           extPath={extensionView.extPath}
           onClose={() => { extensionView = null; }}
-          onToast={(opts) => console.log("[toast]", opts.title, opts.message)}
+          onToast={(opts) => notify(opts)}
         />
       </div>
     {:else}
@@ -332,11 +367,14 @@
           bind:view
           bind:settingsStartSection
           bind:extensionView
+          onToast={notify}
           onResetAndHide={resetAndHide}
           onSaveConfigUpdate={saveConfigUpdate}
         />
       </div>
     {/if}
+
+    <ToastContainer />
 
     {#if permissionPrompt}
       <PermissionModal

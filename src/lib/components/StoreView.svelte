@@ -2,12 +2,15 @@
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { onMount, onDestroy } from "svelte";
-  import type { StoreExtensionInfo, ExtensionEntry } from "$lib/types";
+  import type { StoreExtensionInfo, ExtensionEntry, ExtensionUpdateInfo } from "$lib/types";
+  import type { ToastOptions } from "$lib/sdk/types";
 
   let {
     onClose,
+    onToast,
   }: {
     onClose: () => void;
+    onToast: (options: ToastOptions) => void;
   } = $props();
 
   let extensions: StoreExtensionInfo[] = $state([]);
@@ -16,7 +19,9 @@
   let actionMessage = $state<string | null>(null);
   let actionLevel = $state<"info" | "success" | "error">("info");
   let installingSet = $state<Set<string>>(new Set());
+  let rollbackingSet = $state<Set<string>>(new Set());
   let uninstallingSet = $state<Set<string>>(new Set());
+  let updatesByName = $state<Record<string, string>>({});
   let selectedCategory = $state<string>("All");
   let ratingBusy = $state<string | null>(null);
 
@@ -39,6 +44,7 @@
     unlisteners.push(
       await listen<ExtensionEntry[]>("extensions-changed", async () => {
         await refreshInstallState();
+        await refreshAvailableUpdates();
       }),
     );
   });
@@ -53,11 +59,25 @@
     actionMessage = null;
     try {
       extensions = await invoke<StoreExtensionInfo[]>("fetch_store_registry");
+      await refreshAvailableUpdates();
     } catch (e) {
       error = String(e);
       console.error("Failed to fetch store registry:", e);
+      onToast({ title: "Store Load Failed", message: String(e), type: "error" });
     } finally {
       loading = false;
+    }
+  }
+
+  async function refreshAvailableUpdates() {
+    try {
+      const updates = await invoke<ExtensionUpdateInfo[]>("check_store_extension_updates");
+      const next: Record<string, string> = {};
+      for (const update of updates) next[update.name] = update.latest_version;
+      updatesByName = next;
+    } catch (e) {
+      console.error("Failed to check extension updates:", e);
+      onToast({ title: "Update Check Failed", message: String(e), type: "error" });
     }
   }
 
@@ -71,6 +91,7 @@
       }));
     } catch (e) {
       console.error("Failed to refresh install state:", e);
+      onToast({ title: "Refresh Failed", message: String(e), type: "error" });
     }
   }
 
@@ -83,11 +104,16 @@
         ext.name === name ? { ...ext, installed: true } : ext,
       );
       actionLevel = "success";
-      actionMessage = `Installed ${name}.`;
+      actionMessage = updatesByName[name]
+        ? `Updated ${name} to v${updatesByName[name]}.`
+        : `Installed ${name}.`;
+      onToast({ title: updatesByName[name] ? "Extension Updated" : "Extension Installed", message: name, type: "success" });
+      await refreshAvailableUpdates();
     } catch (e) {
       console.error(`Failed to install ${name}:`, e);
       actionLevel = "error";
       actionMessage = `Failed to install ${name}: ${String(e)}`;
+      onToast({ title: "Install Failed", message: String(e), type: "error" });
     } finally {
       const next = new Set(installingSet);
       next.delete(name);
@@ -105,14 +131,39 @@
       );
       actionLevel = "success";
       actionMessage = `Uninstalled ${name}.`;
+      onToast({ title: "Extension Uninstalled", message: name, type: "success" });
+      await refreshAvailableUpdates();
     } catch (e) {
       console.error(`Failed to uninstall ${name}:`, e);
       actionLevel = "error";
       actionMessage = `Failed to uninstall ${name}: ${String(e)}`;
+      onToast({ title: "Uninstall Failed", message: String(e), type: "error" });
     } finally {
       const next = new Set(uninstallingSet);
       next.delete(name);
       uninstallingSet = next;
+    }
+  }
+
+  async function rollbackExtension(name: string) {
+    rollbackingSet = new Set([...rollbackingSet, name]);
+    actionMessage = null;
+    try {
+      const restoredVersion = await invoke<string>("rollback_store_extension", { name });
+      actionLevel = "success";
+      actionMessage = `Rolled back ${name} to v${restoredVersion}.`;
+      onToast({ title: "Rollback Complete", message: `${name} -> v${restoredVersion}`, type: "success" });
+      await refreshInstallState();
+      await refreshAvailableUpdates();
+    } catch (e) {
+      console.error(`Failed to rollback ${name}:`, e);
+      actionLevel = "error";
+      actionMessage = `Failed to rollback ${name}: ${String(e)}`;
+      onToast({ title: "Rollback Failed", message: String(e), type: "error" });
+    } finally {
+      const next = new Set(rollbackingSet);
+      next.delete(name);
+      rollbackingSet = next;
     }
   }
 
@@ -126,10 +177,12 @@
       });
       actionLevel = "success";
       actionMessage = `Opened rating form for ${name} (${rating} stars).`;
+      onToast({ title: "Thanks For Rating", message: `${name} (${rating} stars)`, type: "success" });
     } catch (e) {
       console.error(`Failed to submit rating for ${name}:`, e);
       actionLevel = "error";
       actionMessage = `Failed to open rating form: ${String(e)}`;
+      onToast({ title: "Rating Failed", message: String(e), type: "error" });
     } finally {
       ratingBusy = null;
     }
@@ -299,6 +352,17 @@
             </div>
             {#if ext.installed}
               <button
+                class="btn-secondary"
+                disabled={rollbackingSet.has(ext.name)}
+                onclick={() => rollbackExtension(ext.name)}
+              >
+                {#if rollbackingSet.has(ext.name)}
+                  <i class="fa-solid fa-spinner spin"></i> Rolling Back...
+                {:else}
+                  Rollback
+                {/if}
+              </button>
+              <button
                 class="btn-uninstall btn-secondary"
                 disabled={uninstallingSet.has(ext.name)}
                 onclick={() => uninstallExtension(ext.name)}
@@ -322,6 +386,19 @@
                   <i class="fa-solid fa-spinner spin"></i> Installing...
                 {:else}
                   <i class="fa-solid fa-download"></i> Install
+                {/if}
+              </button>
+            {/if}
+            {#if ext.installed && updatesByName[ext.name]}
+              <button
+                class="btn-install btn-primary"
+                disabled={installingSet.has(ext.name)}
+                onclick={() => installExtension(ext.name)}
+              >
+                {#if installingSet.has(ext.name)}
+                  <i class="fa-solid fa-spinner spin"></i> Updating...
+                {:else}
+                  <i class="fa-solid fa-arrow-up"></i> Update to v{updatesByName[ext.name]}
                 {/if}
               </button>
             {/if}
