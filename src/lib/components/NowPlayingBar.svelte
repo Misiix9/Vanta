@@ -10,6 +10,7 @@
     isPlaying: boolean;
     progressMs: number;
     durationMs: number;
+    updatedAt?: number;
     volumePercent?: number;
     lyrics?: string | null;
     syncedLines?: { time: number; text: string }[] | null;
@@ -20,40 +21,25 @@
   const NOW_PLAYING_RELAY_EVENT = "spotify-now-playing-relay";
   const COMMAND_RELAY_EVENT = "spotify-command-relay";
   const REQUEST_STATE_EVENT = "spotify-request-state";
-  const NOW_PLAYING_STORAGE_KEY = "vanta.spotify.nowPlaying";
 
   let { onOpenExtension }: { onOpenExtension?: () => void } = $props();
 
   let nowPlaying = $state<NowPlayingState | null>(null);
   let unlistenCommandRelay: (() => void) | null = null;
   let unlistenRequestState: (() => void) | null = null;
-  let tickTimer: number | null = null;
-
-  function safeStoreNowPlaying(snapshot: NowPlayingState | null) {
-    try {
-      if (snapshot) {
-        localStorage.setItem(NOW_PLAYING_STORAGE_KEY, JSON.stringify(snapshot));
-      } else {
-        localStorage.removeItem(NOW_PLAYING_STORAGE_KEY);
-      }
-    } catch {
-      // ignore storage failures in restricted environments
-    }
-  }
-
-  function loadStoredSnapshot(): NowPlayingState | null {
-    try {
-      const raw = localStorage.getItem(NOW_PLAYING_STORAGE_KEY);
-      if (!raw) return null;
-      return JSON.parse(raw) as NowPlayingState;
-    } catch {
-      return null;
-    }
-  }
+  let lastUpdatedAt = $state(0);
 
   function handleNowPlaying(e: CustomEvent<NowPlayingState | null>) {
-    nowPlaying = e.detail;
-    safeStoreNowPlaying(e.detail);
+    const incoming = e.detail;
+    if (!incoming) {
+      nowPlaying = null;
+      lastUpdatedAt = 0;
+    } else {
+      const ts = Number(incoming.updatedAt || Date.now());
+      if (ts < lastUpdatedAt) return;
+      lastUpdatedAt = ts;
+      nowPlaying = incoming;
+    }
     void emit(NOW_PLAYING_RELAY_EVENT, e.detail).catch(() => {
       // best-effort cross-window relay
     });
@@ -76,15 +62,6 @@
   onMount(async () => {
     window.addEventListener("vanta-now-playing", handleNowPlaying as EventListener);
 
-    const existing = (window as any).__vanta_now_playing;
-    if (existing && (existing.track || existing.isPlaying)) {
-      nowPlaying = existing;
-      safeStoreNowPlaying(existing);
-    } else {
-      const stored = loadStoredSnapshot();
-      if (stored) nowPlaying = stored;
-    }
-
     unlistenCommandRelay = await listen(COMMAND_RELAY_EVENT, (event) => {
       window.dispatchEvent(
         new CustomEvent("vanta-spotify-command", {
@@ -94,30 +71,16 @@
     });
 
     unlistenRequestState = await listen(REQUEST_STATE_EVENT, () => {
-      if (nowPlaying) {
+      if (nowPlaying && Date.now() - lastUpdatedAt < 5000) {
         void emit(NOW_PLAYING_RELAY_EVENT, nowPlaying).catch(() => {});
       }
     });
-
-    tickTimer = window.setInterval(() => {
-      if (!nowPlaying || !nowPlaying.isPlaying || nowPlaying.durationMs <= 0) return;
-      nowPlaying = {
-        ...nowPlaying,
-        progressMs: Math.min(nowPlaying.progressMs + 1000, nowPlaying.durationMs),
-      };
-      safeStoreNowPlaying(nowPlaying);
-      void emit(NOW_PLAYING_RELAY_EVENT, nowPlaying).catch(() => {});
-    }, 1000);
   });
 
   onDestroy(() => {
     window.removeEventListener("vanta-now-playing", handleNowPlaying as EventListener);
     unlistenCommandRelay?.();
     unlistenRequestState?.();
-    if (tickTimer !== null) {
-      window.clearInterval(tickTimer);
-      tickTimer = null;
-    }
   });
 </script>
 

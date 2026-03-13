@@ -16,6 +16,7 @@
     isPlaying: boolean;
     progressMs: number;
     durationMs: number;
+    updatedAt?: number;
     volumePercent?: number;
     lyrics?: string | null;
     syncedLines?: SyncedLine[] | null;
@@ -26,12 +27,12 @@
   const NOW_PLAYING_RELAY_EVENT = "spotify-now-playing-relay";
   const COMMAND_RELAY_EVENT = "spotify-command-relay";
   const REQUEST_STATE_EVENT = "spotify-request-state";
+  const LYRICS_LEAD_MS = 350;
 
   let nowPlaying = $state<NowPlayingState | null>(null);
   let unlistenRelay: (() => void) | null = null;
   let lyricsContainer = $state<HTMLDivElement | null>(null);
-  let albumArtKey = $state(0);
-  let prevAlbumArt = $state<string | null>(null);
+  let lastUpdatedAt = $state(0);
 
   function fmtTime(ms: number): string {
     const s = Math.floor(ms / 1000);
@@ -43,7 +44,22 @@
   function sendCommand(cmd: SpotifyCommand, value?: number) {
     const detail = cmd === "set-volume" ? { cmd, value } : cmd;
     window.dispatchEvent(new CustomEvent("vanta-spotify-command", { detail }));
-    void emit(COMMAND_RELAY_EVENT, detail).catch(() => {});
+    void emit(COMMAND_RELAY_EVENT, detail).catch(() => {
+      // best-effort relay to main launcher window
+    });
+  }
+
+  function handleNowPlaying(e: CustomEvent<NowPlayingState | null>) {
+    const incoming = e.detail;
+    if (!incoming) {
+      nowPlaying = null;
+      lastUpdatedAt = 0;
+      return;
+    }
+    const ts = Number(incoming.updatedAt || Date.now());
+    if (ts < lastUpdatedAt) return;
+    lastUpdatedAt = ts;
+    nowPlaying = incoming;
   }
 
   async function startDrag() {
@@ -73,7 +89,7 @@
       ? -1
       : nowPlaying.syncedLines.reduce(
           (acc: number, line: SyncedLine, i: number) =>
-            line.time <= (nowPlaying?.progressMs || 0) ? i : acc,
+            line.time <= Math.max(0, (nowPlaying?.progressMs || 0) + LYRICS_LEAD_MS) ? i : acc,
           0,
         ),
   );
@@ -85,21 +101,15 @@
       .filter((line: string) => line.length > 0)
       .slice(0, 10),
   );
-  const hasLyrics = $derived(hasSyncedLines || lyricLines.length > 0);
 
   onMount(async () => {
+    window.addEventListener("vanta-now-playing", handleNowPlaying as EventListener);
+
     unlistenRelay = await listen<NowPlayingState | null>(NOW_PLAYING_RELAY_EVENT, (event) => {
-      const incoming = event.payload;
-      const newArt = incoming?.albumArt ?? null;
-      if (newArt !== (nowPlaying?.albumArt ?? null)) {
-        prevAlbumArt = nowPlaying?.albumArt ?? null;
-        albumArtKey += 1;
-      }
-      nowPlaying = incoming;
+      handleNowPlaying({ detail: event.payload } as CustomEvent<NowPlayingState | null>);
     });
 
-    // Request current state immediately, then once more after 800ms in case
-    // the extension finishes loading after us
+    // Request current state from NowPlayingBar immediately
     void emit(REQUEST_STATE_EVENT, {}).catch(() => {});
     setTimeout(() => void emit(REQUEST_STATE_EVENT, {}).catch(() => {}), 800);
   });
@@ -107,23 +117,19 @@
   $effect(() => {
     if (lyricsContainer && activeLyricIndex >= 0) {
       const el = lyricsContainer.children[activeLyricIndex] as HTMLElement | undefined;
-      if (el) el.scrollIntoView({ block: "center", behavior: "auto" });
+      if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
     }
   });
 
   onDestroy(() => {
+    window.removeEventListener("vanta-now-playing", handleNowPlaying as EventListener);
     unlistenRelay?.();
   });
 </script>
 
 <div class="mini-player-root">
-  {#if prevAlbumArt}
-    <div class="mini-player-backdrop mini-player-backdrop-prev" style={`background-image:url('${prevAlbumArt}')`}></div>
-  {/if}
   {#if nowPlaying?.albumArt}
-    {#key albumArtKey}
-      <div class="mini-player-backdrop" style={`background-image:url('${nowPlaying.albumArt}')`}></div>
-    {/key}
+    <div class="mini-player-backdrop" style={`background-image:url('${nowPlaying.albumArt}')`}></div>
   {/if}
   <div class="mini-player-overlay"></div>
 
@@ -140,9 +146,7 @@
       <!-- Top section: art + info + controls -->
       <div class="mini-player-top">
         {#if nowPlaying?.albumArt}
-          {#key albumArtKey}
-            <img class="mini-player-art" src={nowPlaying.albumArt} alt="" />
-          {/key}
+          <img class="mini-player-art" src={nowPlaying.albumArt} alt="" />
         {:else}
           <div class="mini-player-art-placeholder">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
@@ -180,8 +184,8 @@
         </div>
       </div>
 
-      <!-- Lyrics section: collapses when no lyrics, expands with class -->
-      <div class="mini-player-lyrics-pane" class:mini-player-lyrics-visible={hasLyrics}>
+      <!-- Lyrics section -->
+      <div class="mini-player-lyrics-pane">
         {#if hasSyncedLines}
           <div class="mini-player-lyrics-lines" bind:this={lyricsContainer}>
             {#each nowPlaying!.syncedLines! as line, i}
@@ -196,6 +200,8 @@
               <div class="mini-player-lyric-line">{line}</div>
             {/each}
           </div>
+        {:else}
+          <div class="mini-player-lyrics-empty">Lyrics unavailable</div>
         {/if}
       </div>
     </div>
