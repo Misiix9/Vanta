@@ -32,6 +32,7 @@ export function createVantaAPI(options: {
     network: {
       fetch: async (url: string, opts?: { method?: string }) => {
         return await invoke<string>('extension_fetch', {
+          extId: options.extensionName,
           url,
           method: opts?.method ?? 'GET',
         });
@@ -40,6 +41,7 @@ export function createVantaAPI(options: {
     shell: {
       execute: async (command: string, args?: string[]) => {
         return await invoke<string>('extension_shell_execute', {
+          extId: options.extensionName,
           command,
           args: args ?? [],
         });

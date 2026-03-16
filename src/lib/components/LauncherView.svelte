@@ -150,6 +150,10 @@
         }
       }
     });
+
+    if (currentMode === "launcher" && query.trim() === "") {
+      await loadSuggestions();
+    }
   });
 
   onDestroy(() => {

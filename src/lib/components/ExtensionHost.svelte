@@ -1,5 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { listen } from '@tauri-apps/api/event';
+  import { onDestroy, onMount } from 'svelte';
   import { mount, unmount } from 'svelte';
   import { setupHost, loadExtension, unloadExtension, getRegistration } from '$lib/sdk/loader';
   import { createVantaAPI } from '$lib/sdk/api';
@@ -31,6 +33,7 @@
   let injectedStyleEl: HTMLStyleElement | null = $state(null);
 
   let navStack: Array<{ component: any; props?: Record<string, any> }> = $state([]);
+  const unlisteners: Array<() => void> = [];
 
   function handlePush(component: any, props?: Record<string, any>) {
     navStack.push({ component, props });
@@ -61,6 +64,7 @@
     } catch (err: any) {
       console.error(`[Vanta] Extension mount error:`, err);
       error = `Extension component crashed: ${err?.message ?? err}`;
+      onToast?.({ title: 'Extension Render Error', message: error, type: 'error' });
     }
   }
 
@@ -102,6 +106,7 @@
 
       let registration = getRegistration(extId) ?? undefined;
       if (!registration) {
+        unloadExtension(extId);
         const bundleCode: string = await invoke('get_extension_bundle', { extId });
         registration = (await loadExtension(extId, bundleCode, { timeoutMs: 8000 })) ?? undefined;
       }
@@ -147,6 +152,7 @@
     } catch (err: any) {
       console.error(`[Vanta] Extension init error:`, err);
       error = `Failed to initialize extension: ${err?.message ?? err}`;
+      onToast?.({ title: 'Extension Init Failed', message: error, type: 'error' });
     }
 
     loading = false;
@@ -159,6 +165,27 @@
       handlePop();
     }
   }
+
+  onMount(async () => {
+    unlisteners.push(
+      await listen<any[]>('extensions-changed', (event) => {
+        const changed = Array.isArray(event.payload) &&
+          event.payload.some((entry: any) => entry?.manifest?.name === extId);
+
+        if (!changed) return;
+
+        unloadExtension(extId);
+        void initExtension();
+        onToast?.({ title: 'Extension Reloaded', message: extId, type: 'info' });
+      }),
+    );
+  });
+
+  onDestroy(() => {
+    for (const unlisten of unlisteners) {
+      try { unlisten(); } catch {}
+    }
+  });
 
   $effect(() => {
     if (extId && commandName) {

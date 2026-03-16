@@ -43,6 +43,16 @@ pub struct ExtensionDependency {
     pub version_range: String,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct ExtensionPermissionScopes {
+    #[serde(default)]
+    pub filesystem_paths: Vec<String>,
+    #[serde(default)]
+    pub network_domains: Vec<String>,
+    #[serde(default)]
+    pub shell_commands: Vec<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExtensionManifest {
     pub name: String,
@@ -65,6 +75,8 @@ pub struct ExtensionManifest {
     pub permissions: Vec<Capability>,
     #[serde(default)]
     pub requires: Vec<ExtensionDependency>,
+    #[serde(default)]
+    pub permission_scopes: ExtensionPermissionScopes,
     pub commands: Vec<ExtensionCommand>,
 }
 
@@ -127,6 +139,11 @@ pub async fn create_extension_template(name: String) -> Result<String, VantaErro
         "safe": false,
         "permissions": [],
         "requires": [],
+        "permission_scopes": {
+            "filesystem_paths": [],
+            "network_domains": [],
+            "shell_commands": []
+        },
         "commands": [
             {
                 "name": "hello",
@@ -559,6 +576,115 @@ pub fn watch_extensions(app_handle: tauri::AppHandle) {
     }
 }
 
+fn load_extension_manifest(ext_id: &str) -> Result<ExtensionManifest, VantaError> {
+    let manifest_path = extensions_dir().join(ext_id).join("manifest.json");
+    if !manifest_path.exists() {
+        return Err(format!("Extension '{}' is not installed", ext_id).into());
+    }
+
+    let manifest_str = fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("Could not read manifest for '{}': {}", ext_id, e))?;
+    serde_json::from_str::<ExtensionManifest>(&manifest_str)
+        .map_err(|e| format!("Invalid manifest for '{}': {}", ext_id, e).into())
+}
+
+fn ensure_extension_capability(
+    ext_id: &str,
+    manifest: &ExtensionManifest,
+    capability: Capability,
+) -> Result<(), VantaError> {
+    if manifest.permissions.contains(&capability) {
+        return Ok(());
+    }
+    let _ = permissions::record_block_event(
+        ext_id,
+        capability.clone(),
+        Some("capability-not-declared".to_string()),
+    );
+    Err(format!("Extension '{}' is missing required capability '{:?}'", ext_id, capability).into())
+}
+
+fn command_basename(command: &str) -> &str {
+    command.rsplit('/').next().unwrap_or(command)
+}
+
+fn is_shell_command_allowed(command: &str, allowed: &[String]) -> bool {
+    if allowed.is_empty() {
+        // Backward-compatibility: no scope list means legacy unrestricted shell capability.
+        return true;
+    }
+
+    let cmd = command.trim();
+    let base = command_basename(cmd);
+    allowed
+        .iter()
+        .map(|s| s.trim())
+        .any(|allowed_cmd| allowed_cmd.eq_ignore_ascii_case(cmd) || allowed_cmd.eq_ignore_ascii_case(base))
+}
+
+fn is_network_domain_allowed(url: &str, allowed: &[String]) -> bool {
+    if allowed.is_empty() {
+        // Backward-compatibility: no scope list means legacy unrestricted network capability.
+        return true;
+    }
+
+    let parsed = match reqwest::Url::parse(url) {
+        Ok(url) => url,
+        Err(_) => return false,
+    };
+
+    let host = match parsed.host_str() {
+        Some(host) => host.to_ascii_lowercase(),
+        None => return false,
+    };
+
+    allowed.iter().any(|raw| {
+        let item = raw.trim().to_ascii_lowercase();
+        if item.is_empty() {
+            return false;
+        }
+
+        if let Some(suffix) = item.strip_prefix("*.") {
+            return host == suffix || host.ends_with(&format!(".{}", suffix));
+        }
+
+        host == item || host.ends_with(&format!(".{}", item))
+    })
+}
+
+fn expand_home(path: &str) -> PathBuf {
+    if let Some(rest) = path.strip_prefix("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(rest);
+        }
+    }
+    PathBuf::from(path)
+}
+
+fn is_absolute_or_home_path_token(token: &str) -> bool {
+    token.starts_with('/') || token.starts_with("~/")
+}
+
+fn is_filesystem_path_allowed(path: &str, allowed_paths: &[String]) -> bool {
+    if allowed_paths.is_empty() {
+        // Backward-compatibility: no path scopes means legacy unrestricted filesystem capability.
+        return true;
+    }
+
+    let candidate = expand_home(path);
+    let candidate_normalized = candidate
+        .canonicalize()
+        .unwrap_or_else(|_| candidate.clone());
+
+    allowed_paths.iter().any(|allowed| {
+        let allowed_buf = expand_home(allowed.trim());
+        let allowed_normalized = allowed_buf
+            .canonicalize()
+            .unwrap_or_else(|_| allowed_buf.clone());
+        candidate_normalized.starts_with(&allowed_normalized)
+    })
+}
+
 fn extension_data_dir() -> PathBuf {
     let dir = config::config_dir().join("extension-data");
     if !dir.exists() {
@@ -586,7 +712,22 @@ fn save_storage_map(ext_id: &str, map: &HashMap<String, String>) -> Result<(), V
 }
 
 #[tauri::command]
-pub async fn extension_fetch(url: String, method: Option<String>) -> Result<String, VantaError> {
+pub async fn extension_fetch(
+    ext_id: String,
+    url: String,
+    method: Option<String>,
+) -> Result<String, VantaError> {
+    let manifest = load_extension_manifest(&ext_id)?;
+    ensure_extension_capability(&ext_id, &manifest, Capability::Network)?;
+    if !is_network_domain_allowed(&url, &manifest.permission_scopes.network_domains) {
+        let _ = permissions::record_block_event(
+            &ext_id,
+            Capability::Network,
+            Some(format!("domain-not-allowed: {}", url)),
+        );
+        return Err(format!("Network request blocked for extension '{}': domain is not allowed", ext_id).into());
+    }
+
     let client = reqwest::Client::new();
     let req = match method.as_deref().unwrap_or("GET") {
         "POST" => client.post(&url),
@@ -605,10 +746,58 @@ pub async fn extension_fetch(url: String, method: Option<String>) -> Result<Stri
 
 #[tauri::command]
 pub async fn extension_shell_execute(
+    ext_id: String,
     command: String,
     args: Option<Vec<String>>,
 ) -> Result<String, VantaError> {
+    let manifest = load_extension_manifest(&ext_id)?;
+    ensure_extension_capability(&ext_id, &manifest, Capability::Shell)?;
+    if !is_shell_command_allowed(&command, &manifest.permission_scopes.shell_commands) {
+        let _ = permissions::record_block_event(
+            &ext_id,
+            Capability::Shell,
+            Some(format!("shell-command-not-allowed: {}", command)),
+        );
+        return Err(format!("Shell command blocked for extension '{}': '{}' is not allowed", ext_id, command).into());
+    }
+
     let args = args.unwrap_or_default();
+
+    if manifest.permissions.contains(&Capability::Filesystem)
+        && !manifest.permission_scopes.filesystem_paths.is_empty()
+    {
+        let mut path_tokens: Vec<String> = Vec::new();
+
+        if is_absolute_or_home_path_token(&command) {
+            path_tokens.push(command.clone());
+        }
+
+        for arg in &args {
+            if arg.starts_with('-') {
+                continue;
+            }
+            if is_absolute_or_home_path_token(arg) {
+                path_tokens.push(arg.clone());
+            }
+        }
+
+        if let Some(blocked) = path_tokens
+            .iter()
+            .find(|token| !is_filesystem_path_allowed(token, &manifest.permission_scopes.filesystem_paths))
+        {
+            let _ = permissions::record_block_event(
+                &ext_id,
+                Capability::Filesystem,
+                Some(format!("filesystem-path-not-allowed: {}", blocked)),
+            );
+            return Err(format!(
+                "Filesystem path blocked for extension '{}': '{}' is outside allowed paths",
+                ext_id, blocked
+            )
+            .into());
+        }
+    }
+
     let output = Command::new(&command)
         .args(&args)
         .output()
@@ -726,6 +915,7 @@ mod tests {
             icon: None,
             permissions: vec![],
             requires: vec![],
+            permission_scopes: ExtensionPermissionScopes::default(),
             commands: vec![ExtensionCommand {
                 name: "run".to_string(),
                 title: "Run".to_string(),
@@ -751,6 +941,7 @@ mod tests {
             icon: None,
             permissions: vec![],
             requires: vec![],
+            permission_scopes: ExtensionPermissionScopes::default(),
             commands: vec![ExtensionCommand {
                 name: "run".to_string(),
                 title: "Run".to_string(),
@@ -776,6 +967,7 @@ mod tests {
             icon: None,
             permissions: vec![],
             requires: vec![],
+            permission_scopes: ExtensionPermissionScopes::default(),
             commands: vec![],
         };
         assert!(validate_manifest(&manifest, Path::new("/tmp/test")).is_err());
@@ -796,6 +988,7 @@ mod tests {
                 icon: None,
                 permissions: vec![],
                 requires: vec![],
+                permission_scopes: ExtensionPermissionScopes::default(),
                 commands: vec![ExtensionCommand {
                     name: "run".to_string(),
                     title: "Run".to_string(),

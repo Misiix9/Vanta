@@ -358,6 +358,12 @@ export interface ExtensionDependency {
     version_range: string;
 }
 
+export interface ExtensionPermissionScopes {
+    filesystem_paths?: string[];
+    network_domains?: string[];
+    shell_commands?: string[];
+}
+
 export interface ExtensionManifest {
     name: string;
     title: string;
@@ -369,6 +375,7 @@ export interface ExtensionManifest {
     icon?: string;
     permissions: Capability[];
     requires?: ExtensionDependency[];
+    permission_scopes?: ExtensionPermissionScopes;
     commands: ExtensionCommand[];
 }
 

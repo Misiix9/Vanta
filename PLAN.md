@@ -494,6 +494,13 @@ Phase template:
   - Extensions reload without restart.
   - Dependencies resolve before install.
 
+Implementation notes (March 2026):
+- Enforce scoped permissions at runtime in extension bridge commands (`extension_fetch`, `extension_shell_execute`) using manifest allowlists.
+- Keep backward compatibility: if scope arrays are omitted/empty for legacy extensions, allow existing behavior but emit warnings and guide migration.
+- Add `permission_scopes` to extension manifests (`network_domains`, `shell_commands`, `filesystem_paths`) and provide scoped defaults for first-party extensions.
+- Trigger hot-reload from extension filesystem watcher (`extensions-changed`) and remount active extension host view when current extension changes.
+- Block install when dependency requirements (`requires`) are not satisfied and return user-actionable errors.
+
 ### Phase 40 - v5.9.0 (Minor) - Workflow Engine v2 And Automation
 - **Goal:** Make workflows powerful enough for real automation — conditions, error handling, and composition.
 - **Prerequisites:** Phase 39.

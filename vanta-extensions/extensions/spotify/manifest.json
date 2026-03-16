@@ -9,6 +9,19 @@
     "Network",
     "Shell"
   ],
+  "permission_scopes": {
+    "network_domains": [
+      "api.spotify.com",
+      "accounts.spotify.com",
+      "lrclib.net",
+      "api.lyrics.ovh"
+    ],
+    "shell_commands": [
+      "curl",
+      "xdg-open"
+    ],
+    "filesystem_paths": []
+  },
   "commands": [
     {
       "name": "player",

@@ -125,6 +125,19 @@
     invoke("hide_window").catch((e) => console.error("Hide failed:", e));
   }
 
+  function closeExtensionAndReturnToLauncher() {
+    extensionView = null;
+    view = "launcher";
+    currentMode = "launcher";
+
+    void maybeRescanApps(true).finally(() => {
+      requestAnimationFrame(() => {
+        launcherRef?.refreshSuggestions();
+        launcherRef?.focus();
+      });
+    });
+  }
+
   // ── Permission handlers ──
   async function setDecision(decision: "Allow" | "Deny" | "Ask", caps: Capability[], note?: string) {
     if (!permissionPrompt) throw new Error("No permission prompt active");
@@ -347,7 +360,7 @@
           extId={extensionView.extId}
           commandName={extensionView.command}
           extPath={extensionView.extPath}
-          onClose={() => { extensionView = null; }}
+          onClose={closeExtensionAndReturnToLauncher}
           onToast={(opts) => notify(opts)}
         />
       </div>

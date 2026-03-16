@@ -8,6 +8,15 @@
   "permissions": [
     "Network"
   ],
+  "permission_scopes": {
+    "network_domains": [
+      "api.open-meteo.com",
+      "geocoding-api.open-meteo.com",
+      "ipapi.co"
+    ],
+    "shell_commands": [],
+    "filesystem_paths": []
+  },
   "commands": [
     {
       "name": "current",

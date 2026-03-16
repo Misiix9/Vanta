@@ -9,6 +9,16 @@
     "Network",
     "Shell"
   ],
+  "permission_scopes": {
+    "network_domains": [
+      "api.ipify.org"
+    ],
+    "shell_commands": [
+      "hostname",
+      "bash"
+    ],
+    "filesystem_paths": []
+  },
   "commands": [
     {
       "name": "info",
