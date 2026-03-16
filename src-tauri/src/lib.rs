@@ -16,6 +16,7 @@ pub mod themes;
 pub mod permissions;
 pub mod workflows;
 pub mod community;
+pub mod secrets;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -2612,6 +2613,21 @@ async fn get_workflows(
 }
 
 #[tauri::command]
+async fn list_workflow_secret_names() -> Result<Vec<String>, VantaError> {
+    secrets::list_secret_names()
+}
+
+#[tauri::command]
+async fn set_workflow_secret(name: String, value: String) -> Result<(), VantaError> {
+    secrets::set_secret(&name, &value)
+}
+
+#[tauri::command]
+async fn delete_workflow_secret(name: String) -> Result<bool, VantaError> {
+    secrets::delete_secret(&name)
+}
+
+#[tauri::command]
 async fn dry_run_macro(
     macro_id: String,
     args: HashMap<String, String>,
@@ -3313,6 +3329,9 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             community::export_community_snippet,
             community::import_community_snippet,
             get_workflows,
+            list_workflow_secret_names,
+            set_workflow_secret,
+            delete_workflow_secret,
             dry_run_macro,
             run_macro,
             start_macro_job,

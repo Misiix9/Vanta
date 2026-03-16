@@ -14,11 +14,14 @@ use crate::config::{
 use crate::errors::VantaError;
 use crate::extensions;
 use crate::permissions::{self, Capability, Decision};
+use crate::secrets;
 use crate::{launcher, AppState};
 
 /// Compiled once; matches `{AlphaNumeric_Key}` placeholders in workflow tokens.
 static TOKEN_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{([A-Za-z0-9_.]+)\}").expect("invalid token regex"));
+
+const REDACTED_SECRET: &str = "<secret>";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MacroDryRunStep {
@@ -93,7 +96,10 @@ pub fn dry_run_macro(
 ) -> Result<MacroDryRunResult, VantaError> {
     let macro_def = fetch_macro(state, macro_id)?;
     let macro_catalog = build_macro_catalog(list_macros(state)?);
-    let arg_map = resolve_args(&macro_def.args, &provided_args)?;
+    let mut arg_map = resolve_args(&macro_def.args, &provided_args)?;
+    if let Ok(masked) = secrets::secret_tokens_masked() {
+        arg_map.extend(masked);
+    }
     let resolved_steps = resolve_steps(&macro_def, &arg_map, Some(&macro_catalog))?;
 
     let mut steps = Vec::new();
@@ -157,7 +163,11 @@ pub fn run_macro(
             "Advanced workflow steps require macro job execution (blocking runner).".into(),
         );
     }
-    let arg_map = resolve_args(&macro_def.args, &provided_args)?;
+    let mut arg_map = resolve_args(&macro_def.args, &provided_args)?;
+    if let Ok(tokens) = secrets::secret_tokens_plain() {
+        arg_map.extend(tokens);
+    }
+    let secret_values = secrets::secret_values_plain().unwrap_or_default();
     let resolved_steps = resolve_steps(&macro_def, &arg_map, None)?;
 
     let mut steps = Vec::new();
@@ -198,7 +208,7 @@ pub fn run_macro(
                     index: idx,
                     kind: "extension".to_string(),
                     command: format!("{}:{}", ext_id, command),
-                    args: step.args,
+                    args: redact_args(&step.args, &secret_values),
                     capabilities: step.capabilities,
                     status: "ok".to_string(),
                 });
@@ -232,7 +242,7 @@ pub fn run_macro(
                     index: idx,
                     kind: "system".to_string(),
                     command: command.clone(),
-                    args: step.args,
+                    args: redact_args(&step.args, &secret_values),
                     capabilities: step.capabilities,
                     status: "ok".to_string(),
                 });
@@ -266,7 +276,11 @@ pub fn run_macro_blocking(
 ) -> Result<MacroRunResult, VantaError> {
     let macro_def = fetch_macro(state, macro_id)?;
     let macro_catalog = build_macro_catalog(list_macros(state)?);
-    let arg_map = resolve_args(&macro_def.args, &provided_args)?;
+    let mut arg_map = resolve_args(&macro_def.args, &provided_args)?;
+    if let Ok(tokens) = secrets::secret_tokens_plain() {
+        arg_map.extend(tokens);
+    }
+    let secret_values = secrets::secret_values_plain().unwrap_or_default();
     let mut value_map = arg_map.clone();
     let started = Instant::now();
     let mut call_stack = vec![macro_def.id.clone()];
@@ -283,6 +297,7 @@ pub fn run_macro_blocking(
         &macro_def.timeout_behavior,
         &macro_catalog,
         &mut call_stack,
+        &secret_values,
     )?;
 
     Ok(MacroRunResult {
@@ -370,6 +385,21 @@ fn render_token(token: &str, value_map: &HashMap<String, String>) -> Result<Stri
 
 fn step_output_placeholder(index: usize) -> String {
     format!("step.{}.output", index + 1)
+}
+
+fn redact_args(args: &[String], secret_values: &[String]) -> Vec<String> {
+    args.iter()
+        .map(|arg| {
+            if secret_values
+                .iter()
+                .any(|secret| !secret.is_empty() && arg.contains(secret))
+            {
+                REDACTED_SECRET.to_string()
+            } else {
+                arg.clone()
+            }
+        })
+        .collect()
 }
 
 enum CommandRunResult<T> {
@@ -678,6 +708,7 @@ fn execute_single_step(
     workflow_timeout_behavior: &TimeoutBehavior,
     macro_catalog: &HashMap<String, WorkflowMacro>,
     call_stack: &mut Vec<String>,
+    secret_values: &[String],
 ) -> Result<StepExecutionResult, VantaError> {
     match step {
         MacroStep::Extension {
@@ -760,6 +791,7 @@ fn execute_single_step(
                     workflow_timeout_behavior,
                     macro_catalog,
                     call_stack,
+                    secret_values,
                 )?;
             } else {
                 execute_steps_blocking(
@@ -773,6 +805,7 @@ fn execute_single_step(
                     workflow_timeout_behavior,
                     macro_catalog,
                     call_stack,
+                    secret_values,
                 )?;
             }
 
@@ -837,6 +870,7 @@ fn execute_single_step(
                 workflow_timeout_behavior,
                 macro_catalog,
                 call_stack,
+                secret_values,
             );
             let _ = call_stack.pop();
             nested_result?;
@@ -870,6 +904,7 @@ fn execute_steps_blocking(
     workflow_timeout_behavior: &TimeoutBehavior,
     macro_catalog: &HashMap<String, WorkflowMacro>,
     call_stack: &mut Vec<String>,
+    secret_values: &[String],
 ) -> Result<(), VantaError> {
     for (idx, step) in steps_def.iter().enumerate() {
         if let Some(limit_ms) = workflow_timeout_ms {
@@ -912,6 +947,7 @@ fn execute_steps_blocking(
                 workflow_timeout_behavior,
                 macro_catalog,
                 call_stack,
+                secret_values,
             ) {
                 Ok(result) => {
                     success = Some(result);
@@ -939,7 +975,7 @@ fn execute_steps_blocking(
                 index: step_index,
                 kind: result.kind,
                 command: result.command,
-                args: result.args,
+                args: redact_args(&result.args, secret_values),
                 capabilities: result.capabilities,
                 status,
             });
@@ -961,7 +997,7 @@ fn execute_steps_blocking(
                     index: step_index,
                     kind,
                     command,
-                    args,
+                    args: redact_args(&args, secret_values),
                     capabilities,
                     status: format!("skipped_on_failure: {}", err),
                 });
@@ -979,6 +1015,7 @@ fn execute_steps_blocking(
                         workflow_timeout_behavior,
                         macro_catalog,
                         call_stack,
+                        secret_values,
                     )?;
                 }
                 return Err(err);
@@ -997,6 +1034,7 @@ fn execute_steps_blocking(
                 workflow_timeout_behavior,
                 macro_catalog,
                 call_stack,
+                secret_values,
             )?;
         }
     }

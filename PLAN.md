@@ -528,6 +528,7 @@ Implementation notes (March 2026):
 - Added timeout controls for workflow and system steps (`timeout_ms`, `timeout_behavior` with `abort|skip`) and enforce timeout behavior during blocking macro execution.
 - Added workflow composition step support (`kind: "workflow"`) so a macro can invoke another macro by ID with argument mapping, including cycle detection and dry-run expansion.
 - Added periodic scheduled workflow execution support via optional macro `schedule` config (enabled, interval_minutes, run_on_startup) with background runner emitting `scheduled-workflow-run` events.
+- Added encrypted workflow secrets store (AES-GCM, encrypted at rest) with management commands and `secret.<name>` placeholder support in workflows, including runtime redaction in step result args.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.
