@@ -526,6 +526,7 @@ Implementation notes (March 2026):
 - Non-blocking `run_macro` now returns a clear error for conditional workflows and routes users toward macro job execution path.
 - Added per-step error policy (`on_error`) with retry count, skip-on-failure behavior, and recursive `finally_steps` cleanup execution in the blocking runner.
 - Added timeout controls for workflow and system steps (`timeout_ms`, `timeout_behavior` with `abort|skip`) and enforce timeout behavior during blocking macro execution.
+- Added workflow composition step support (`kind: "workflow"`) so a macro can invoke another macro by ID with argument mapping, including cycle detection and dry-run expansion.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.

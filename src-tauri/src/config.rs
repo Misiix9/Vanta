@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use tauri::Emitter;
@@ -571,6 +572,13 @@ pub enum MacroStep {
         then_steps: Vec<MacroStep>,
         #[serde(default)]
         else_steps: Vec<MacroStep>,
+        #[serde(default)]
+        on_error: StepErrorHandling,
+    },
+    Workflow {
+        macro_id: String,
+        #[serde(default)]
+        args: HashMap<String, String>,
         #[serde(default)]
         on_error: StepErrorHandling,
     },

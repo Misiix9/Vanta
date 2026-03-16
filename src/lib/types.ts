@@ -180,6 +180,12 @@ export type MacroStep =
         then_steps?: MacroStep[];
         else_steps?: MacroStep[];
         on_error?: StepErrorHandling;
+    }
+    | {
+        kind: "workflow";
+        macro_id: string;
+        args?: Record<string, string>;
+        on_error?: StepErrorHandling;
     };
 
 export interface WorkflowMacro {

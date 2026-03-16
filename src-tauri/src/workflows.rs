@@ -60,6 +60,7 @@ enum ResolvedKind {
     Extension { ext_id: String, command: String },
     System { command: String },
     Condition { label: String },
+    Workflow { macro_id: String },
 }
 
 #[derive(Debug, Clone)]
@@ -78,14 +79,22 @@ pub fn list_macros(state: &State<'_, AppState>) -> Result<Vec<WorkflowMacro>, Va
     Ok(cfg.workflows.macros.clone())
 }
 
+fn build_macro_catalog(macros: Vec<WorkflowMacro>) -> HashMap<String, WorkflowMacro> {
+    macros
+        .into_iter()
+        .map(|m| (m.id.clone(), m))
+        .collect::<HashMap<_, _>>()
+}
+
 pub fn dry_run_macro(
     macro_id: &str,
     provided_args: HashMap<String, String>,
     state: &State<'_, AppState>,
 ) -> Result<MacroDryRunResult, VantaError> {
     let macro_def = fetch_macro(state, macro_id)?;
+    let macro_catalog = build_macro_catalog(list_macros(state)?);
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
-    let resolved_steps = resolve_steps(&macro_def, &arg_map)?;
+    let resolved_steps = resolve_steps(&macro_def, &arg_map, Some(&macro_catalog))?;
 
     let mut steps = Vec::new();
     let mut errors = Vec::new();
@@ -99,6 +108,7 @@ pub fn dry_run_macro(
                 ResolvedKind::Extension { .. } => "extension".to_string(),
                 ResolvedKind::System { .. } => "system".to_string(),
                 ResolvedKind::Condition { .. } => "condition".to_string(),
+                ResolvedKind::Workflow { .. } => "workflow".to_string(),
             },
             command: match &step.kind {
                 ResolvedKind::Extension { ext_id, command } => {
@@ -106,6 +116,7 @@ pub fn dry_run_macro(
                 }
                 ResolvedKind::System { command } => command.clone(),
                 ResolvedKind::Condition { label } => label.clone(),
+                ResolvedKind::Workflow { macro_id } => format!("workflow:{}", macro_id),
             },
             args: step.args.clone(),
             capabilities: step.capabilities.clone(),
@@ -141,13 +152,13 @@ pub fn run_macro(
     app_handle: &tauri::AppHandle,
 ) -> Result<MacroRunResult, VantaError> {
     let macro_def = fetch_macro(state, macro_id)?;
-    if contains_conditional_steps(&macro_def.steps) {
+    if contains_conditional_steps(&macro_def.steps) || contains_workflow_steps(&macro_def.steps) {
         return Err(
-            "Conditional workflow steps require macro job execution (blocking runner).".into(),
+            "Advanced workflow steps require macro job execution (blocking runner).".into(),
         );
     }
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
-    let resolved_steps = resolve_steps(&macro_def, &arg_map)?;
+    let resolved_steps = resolve_steps(&macro_def, &arg_map, None)?;
 
     let mut steps = Vec::new();
 
@@ -228,7 +239,13 @@ pub fn run_macro(
             }
             ResolvedKind::Condition { .. } => {
                 return Err(
-                    "Conditional workflow steps require macro job execution (blocking runner)."
+                    "Advanced workflow steps require macro job execution (blocking runner)."
+                        .into(),
+                );
+            }
+            ResolvedKind::Workflow { .. } => {
+                return Err(
+                    "Advanced workflow steps require macro job execution (blocking runner)."
                         .into(),
                 );
             }
@@ -248,9 +265,11 @@ pub fn run_macro_blocking(
     _app_handle: &tauri::AppHandle,
 ) -> Result<MacroRunResult, VantaError> {
     let macro_def = fetch_macro(state, macro_id)?;
+    let macro_catalog = build_macro_catalog(list_macros(state)?);
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
     let mut value_map = arg_map.clone();
     let started = Instant::now();
+    let mut call_stack = vec![macro_def.id.clone()];
 
     let mut steps = Vec::new();
     execute_steps_blocking(
@@ -262,6 +281,8 @@ pub fn run_macro_blocking(
         started,
         macro_def.timeout_ms,
         &macro_def.timeout_behavior,
+        &macro_catalog,
+        &mut call_stack,
     )?;
 
     Ok(MacroRunResult {
@@ -484,6 +505,25 @@ fn contains_conditional_steps(steps: &[MacroStep]) -> bool {
     false
 }
 
+fn contains_workflow_steps(steps: &[MacroStep]) -> bool {
+    for step in steps {
+        match step {
+            MacroStep::Workflow { .. } => return true,
+            MacroStep::If {
+                then_steps,
+                else_steps,
+                ..
+            } => {
+                if contains_workflow_steps(then_steps) || contains_workflow_steps(else_steps) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
 fn describe_condition(condition: &WorkflowCondition) -> String {
     match condition {
         WorkflowCondition::StepOutputContains { step, value } => {
@@ -567,7 +607,8 @@ fn step_error_policy(step: &MacroStep) -> &StepErrorHandling {
     match step {
         MacroStep::Extension { on_error, .. }
         | MacroStep::System { on_error, .. }
-        | MacroStep::If { on_error, .. } => on_error,
+        | MacroStep::If { on_error, .. }
+        | MacroStep::Workflow { on_error, .. } => on_error,
     }
 }
 
@@ -608,6 +649,21 @@ fn step_preview(
                 cond_caps,
             ))
         }
+        MacroStep::Workflow { macro_id, args, .. } => {
+            let mut rendered = args
+                .iter()
+                .map(|(k, v)| {
+                    render_token(v, value_map).map(|rv| format!("{}={}", k, rv))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            rendered.sort();
+            Ok((
+                "workflow".to_string(),
+                format!("workflow:{}", macro_id),
+                rendered,
+                Vec::new(),
+            ))
+        }
     }
 }
 
@@ -620,6 +676,8 @@ fn execute_single_step(
     started: Instant,
     workflow_timeout_ms: Option<u64>,
     workflow_timeout_behavior: &TimeoutBehavior,
+    macro_catalog: &HashMap<String, WorkflowMacro>,
+    call_stack: &mut Vec<String>,
 ) -> Result<StepExecutionResult, VantaError> {
     match step {
         MacroStep::Extension {
@@ -700,6 +758,8 @@ fn execute_single_step(
                     started,
                     workflow_timeout_ms,
                     workflow_timeout_behavior,
+                    macro_catalog,
+                    call_stack,
                 )?;
             } else {
                 execute_steps_blocking(
@@ -711,6 +771,8 @@ fn execute_single_step(
                     started,
                     workflow_timeout_ms,
                     workflow_timeout_behavior,
+                    macro_catalog,
+                    call_stack,
                 )?;
             }
 
@@ -731,6 +793,69 @@ fn execute_single_step(
                 },
             })
         }
+        MacroStep::Workflow {
+            macro_id: target_macro_id,
+            args,
+            ..
+        } => {
+            if call_stack.iter().any(|id| id == target_macro_id) {
+                return Err(
+                    format!(
+                        "Workflow composition cycle detected: {} -> {}",
+                        call_stack.join(" -> "),
+                        target_macro_id
+                    )
+                    .into(),
+                );
+            }
+
+            let target = macro_catalog
+                .get(target_macro_id)
+                .ok_or_else(|| format!("Composed workflow '{}' not found", target_macro_id))?;
+
+            if !target.enabled {
+                return Err(format!("Composed workflow '{}' is disabled", target_macro_id).into());
+            }
+
+            let mut provided_args = HashMap::new();
+            for (k, v) in args.iter() {
+                provided_args.insert(k.clone(), render_token(v, value_map)?);
+            }
+
+            let nested_arg_map = resolve_args(&target.args, &provided_args)?;
+            let mut nested_value_map = nested_arg_map;
+
+            call_stack.push(target_macro_id.clone());
+            let nested_result = execute_steps_blocking(
+                &target.id,
+                &target.steps,
+                &format!("{}.workflow.{}", step_path, target.id),
+                &mut nested_value_map,
+                steps,
+                started,
+                workflow_timeout_ms,
+                workflow_timeout_behavior,
+                macro_catalog,
+                call_stack,
+            );
+            let _ = call_stack.pop();
+            nested_result?;
+
+            let mut arg_pairs = provided_args
+                .into_iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>();
+            arg_pairs.sort();
+
+            Ok(StepExecutionResult {
+                kind: "workflow".to_string(),
+                command: format!("workflow:{}", target.id),
+                args: arg_pairs,
+                capabilities: Vec::new(),
+                status: "ok".to_string(),
+                output: target.id.clone(),
+            })
+        }
     }
 }
 
@@ -743,6 +868,8 @@ fn execute_steps_blocking(
     started: Instant,
     workflow_timeout_ms: Option<u64>,
     workflow_timeout_behavior: &TimeoutBehavior,
+    macro_catalog: &HashMap<String, WorkflowMacro>,
+    call_stack: &mut Vec<String>,
 ) -> Result<(), VantaError> {
     for (idx, step) in steps_def.iter().enumerate() {
         if let Some(limit_ms) = workflow_timeout_ms {
@@ -783,6 +910,8 @@ fn execute_steps_blocking(
                 started,
                 workflow_timeout_ms,
                 workflow_timeout_behavior,
+                macro_catalog,
+                call_stack,
             ) {
                 Ok(result) => {
                     success = Some(result);
@@ -848,6 +977,8 @@ fn execute_steps_blocking(
                         started,
                         workflow_timeout_ms,
                         workflow_timeout_behavior,
+                        macro_catalog,
+                        call_stack,
                     )?;
                 }
                 return Err(err);
@@ -864,6 +995,8 @@ fn execute_steps_blocking(
                 started,
                 workflow_timeout_ms,
                 workflow_timeout_behavior,
+                macro_catalog,
+                call_stack,
             )?;
         }
     }
@@ -874,10 +1007,20 @@ fn execute_steps_blocking(
 fn resolve_steps(
     macro_def: &WorkflowMacro,
     arg_map: &HashMap<String, String>,
+    macro_catalog: Option<&HashMap<String, WorkflowMacro>>,
 ) -> Result<Vec<ResolvedStep>, VantaError> {
     let mut steps = Vec::new();
+    let mut call_stack = vec![macro_def.id.clone()];
 
-    resolve_steps_recursive(&macro_def.id, &macro_def.steps, arg_map, "root", &mut steps)?;
+    resolve_steps_recursive(
+        &macro_def.id,
+        &macro_def.steps,
+        arg_map,
+        "root",
+        &mut steps,
+        macro_catalog,
+        &mut call_stack,
+    )?;
 
     Ok(steps)
 }
@@ -888,6 +1031,8 @@ fn resolve_steps_recursive(
     arg_map: &HashMap<String, String>,
     path: &str,
     out: &mut Vec<ResolvedStep>,
+    macro_catalog: Option<&HashMap<String, WorkflowMacro>>,
+    call_stack: &mut Vec<String>,
 ) -> Result<(), VantaError> {
     for (idx, step) in steps_def.iter().enumerate() {
         let step_path = format!("{}.{}", path, idx);
@@ -916,6 +1061,8 @@ fn resolve_steps_recursive(
                     arg_map,
                     &format!("{}.finally", step_path),
                     out,
+                    macro_catalog,
+                    call_stack,
                 )?;
             }
             MacroStep::System {
@@ -941,6 +1088,8 @@ fn resolve_steps_recursive(
                     arg_map,
                     &format!("{}.finally", step_path),
                     out,
+                    macro_catalog,
+                    call_stack,
                 )?;
             }
             MacroStep::If {
@@ -964,6 +1113,8 @@ fn resolve_steps_recursive(
                     arg_map,
                     &format!("{}.then", step_path),
                     out,
+                    macro_catalog,
+                    call_stack,
                 )?;
                 resolve_steps_recursive(
                     macro_id,
@@ -971,6 +1122,8 @@ fn resolve_steps_recursive(
                     arg_map,
                     &format!("{}.else", step_path),
                     out,
+                    macro_catalog,
+                    call_stack,
                 )?;
                 resolve_steps_recursive(
                     macro_id,
@@ -978,6 +1131,72 @@ fn resolve_steps_recursive(
                     arg_map,
                     &format!("{}.finally", step_path),
                     out,
+                    macro_catalog,
+                    call_stack,
+                )?;
+            }
+            MacroStep::Workflow {
+                macro_id: target_macro_id,
+                args,
+                on_error,
+            } => {
+                let mut rendered_args = args
+                    .iter()
+                    .map(|(k, v)| render_token(v, arg_map).map(|rv| format!("{}={}", k, rv)))
+                    .collect::<Result<Vec<_>, _>>()?;
+                rendered_args.sort();
+
+                out.push(ResolvedStep {
+                    id: format!("macro:{}:workflow:{}", macro_id, step_path),
+                    kind: ResolvedKind::Workflow {
+                        macro_id: target_macro_id.clone(),
+                    },
+                    args: rendered_args,
+                    capabilities: Vec::new(),
+                });
+
+                if let Some(catalog) = macro_catalog {
+                    if call_stack.iter().any(|id| id == target_macro_id) {
+                        return Err(
+                            format!(
+                                "Workflow composition cycle detected in dry-run: {} -> {}",
+                                call_stack.join(" -> "),
+                                target_macro_id
+                            )
+                            .into(),
+                        );
+                    }
+
+                    if let Some(target) = catalog.get(target_macro_id) {
+                        let mut provided_args = HashMap::new();
+                        for (k, v) in args.iter() {
+                            provided_args.insert(k.clone(), render_token(v, arg_map)?);
+                        }
+                        let nested_arg_map = resolve_args(&target.args, &provided_args)?;
+
+                        call_stack.push(target_macro_id.clone());
+                        let nested_result = resolve_steps_recursive(
+                            &target.id,
+                            &target.steps,
+                            &nested_arg_map,
+                            &format!("{}.workflow.{}", step_path, target.id),
+                            out,
+                            macro_catalog,
+                            call_stack,
+                        );
+                        let _ = call_stack.pop();
+                        nested_result?;
+                    }
+                }
+
+                resolve_steps_recursive(
+                    macro_id,
+                    &on_error.finally_steps,
+                    arg_map,
+                    &format!("{}.finally", step_path),
+                    out,
+                    macro_catalog,
+                    call_stack,
                 )?;
             }
         }
@@ -1123,7 +1342,74 @@ mod tests {
         };
 
         let arg_map = HashMap::new();
-        let resolved = resolve_steps(&macro_def, &arg_map).unwrap();
+        let resolved = resolve_steps(&macro_def, &arg_map, None).unwrap();
         assert_eq!(resolved.len(), 2);
+    }
+
+    #[test]
+    fn resolve_steps_expands_composed_workflow() {
+        let child = WorkflowMacro {
+            id: "child".to_string(),
+            name: "Child".to_string(),
+            description: None,
+            args: Vec::new(),
+            steps: vec![MacroStep::System {
+                command: "echo".to_string(),
+                args: vec!["child".to_string()],
+                capabilities: vec![Capability::Shell],
+                on_error: StepErrorHandling::default(),
+                timeout_ms: None,
+                timeout_behavior: TimeoutBehavior::Abort,
+            }],
+            enabled: true,
+            timeout_ms: None,
+            timeout_behavior: TimeoutBehavior::Abort,
+        };
+
+        let parent = WorkflowMacro {
+            id: "parent".to_string(),
+            name: "Parent".to_string(),
+            description: None,
+            args: Vec::new(),
+            steps: vec![MacroStep::Workflow {
+                macro_id: "child".to_string(),
+                args: HashMap::new(),
+                on_error: StepErrorHandling::default(),
+            }],
+            enabled: true,
+            timeout_ms: None,
+            timeout_behavior: TimeoutBehavior::Abort,
+        };
+
+        let catalog = HashMap::from([
+            (parent.id.clone(), parent.clone()),
+            (child.id.clone(), child.clone()),
+        ]);
+
+        let resolved = resolve_steps(&parent, &HashMap::new(), Some(&catalog)).unwrap();
+        assert_eq!(resolved.len(), 2);
+        assert!(matches!(resolved[0].kind, ResolvedKind::Workflow { .. }));
+        assert!(matches!(resolved[1].kind, ResolvedKind::System { .. }));
+    }
+
+    #[test]
+    fn resolve_steps_detects_composition_cycle() {
+        let cyc = WorkflowMacro {
+            id: "cyc".to_string(),
+            name: "Cycle".to_string(),
+            description: None,
+            args: Vec::new(),
+            steps: vec![MacroStep::Workflow {
+                macro_id: "cyc".to_string(),
+                args: HashMap::new(),
+                on_error: StepErrorHandling::default(),
+            }],
+            enabled: true,
+            timeout_ms: None,
+            timeout_behavior: TimeoutBehavior::Abort,
+        };
+
+        let catalog = HashMap::from([(cyc.id.clone(), cyc.clone())]);
+        assert!(resolve_steps(&cyc, &HashMap::new(), Some(&catalog)).is_err());
     }
 }

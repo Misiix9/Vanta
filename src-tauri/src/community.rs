@@ -169,6 +169,7 @@ fn workflow_has_risky_caps(workflow: &WorkflowMacro) -> bool {
                 };
                 cond_risky || steps_have_risky_caps(then_steps) || steps_have_risky_caps(else_steps)
             }
+            crate::config::MacroStep::Workflow { .. } => true,
         })
     }
 
