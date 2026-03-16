@@ -728,3 +728,5 @@ Implementation notes (March 2026):
 - Phase 42: Added quick note capture/search flow using `note:` prefix, with persistent notes stored in config and retrievable/copyable note results.
 - Phase 42: Added persistent file bookmarks with context-menu starring, `bookmark:`/`bm:` retrieval, remove actions, and bookmark suggestions for instant recall.
 - Phase 42: Added local-only usage analytics dashboard data (most-used apps, peak usage hours, query patterns) and surfaced it in Diagnostics.
+- Phase 43: Pinned `svelte` to exact version `5.51.3` in `package.json`/lockfile to prevent silent semver drift across 5.x updates.
+- Phase 43: Confirmed `rusqlite` is currently used by clipboard storage (`src-tauri/src/clipboard.rs`), so dependency removal is deferred.
