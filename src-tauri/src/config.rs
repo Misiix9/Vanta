@@ -432,6 +432,8 @@ fn default_workflow_macros() -> Vec<WorkflowMacro> {
                 args: vec!["{project_path}".to_string()],
                 capabilities: vec![Capability::Filesystem],
                 on_error: StepErrorHandling::default(),
+                timeout_ms: None,
+                timeout_behavior: TimeoutBehavior::Abort,
             },
             MacroStep::Extension {
                 ext_id: "sync-project".to_string(),
@@ -439,8 +441,12 @@ fn default_workflow_macros() -> Vec<WorkflowMacro> {
                 args: vec!["--branch".to_string(), "{branch}".to_string()],
                 capabilities: vec![Capability::Shell],
                 on_error: StepErrorHandling::default(),
+                timeout_ms: None,
+                timeout_behavior: TimeoutBehavior::Abort,
             },
         ],
+        timeout_ms: None,
+        timeout_behavior: TimeoutBehavior::Abort,
     }]
 }
 
@@ -456,10 +462,25 @@ pub struct WorkflowMacro {
     pub steps: Vec<MacroStep>,
     #[serde(default = "default_macro_enabled")]
     pub enabled: bool,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
+    #[serde(default = "default_timeout_behavior")]
+    pub timeout_behavior: TimeoutBehavior,
 }
 
 fn default_macro_enabled() -> bool {
     true
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum TimeoutBehavior {
+    Abort,
+    Skip,
+}
+
+fn default_timeout_behavior() -> TimeoutBehavior {
+    TimeoutBehavior::Abort
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -526,6 +547,10 @@ pub enum MacroStep {
         capabilities: Vec<Capability>,
         #[serde(default)]
         on_error: StepErrorHandling,
+        #[serde(default)]
+        timeout_ms: Option<u64>,
+        #[serde(default = "default_timeout_behavior")]
+        timeout_behavior: TimeoutBehavior,
     },
     System {
         command: String,
@@ -535,6 +560,10 @@ pub enum MacroStep {
         capabilities: Vec<Capability>,
         #[serde(default)]
         on_error: StepErrorHandling,
+        #[serde(default)]
+        timeout_ms: Option<u64>,
+        #[serde(default = "default_timeout_behavior")]
+        timeout_behavior: TimeoutBehavior,
     },
     If {
         condition: WorkflowCondition,
@@ -1149,6 +1178,8 @@ mod tests {
                         args: vec!["{project_path}".to_string()],
                         capabilities: vec![Capability::Filesystem],
                         on_error: StepErrorHandling::default(),
+                        timeout_ms: None,
+                        timeout_behavior: TimeoutBehavior::Abort,
                     },
                     MacroStep::Extension {
                         ext_id: "sync-project".to_string(),
@@ -1156,8 +1187,12 @@ mod tests {
                         args: vec!["--branch".to_string(), "{branch}".to_string()],
                         capabilities: vec![Capability::Shell],
                         on_error: StepErrorHandling::default(),
+                        timeout_ms: None,
+                        timeout_behavior: TimeoutBehavior::Abort,
                     },
                 ],
+                timeout_ms: None,
+                timeout_behavior: TimeoutBehavior::Abort,
             }],
         };
 

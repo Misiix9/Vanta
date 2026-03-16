@@ -195,6 +195,8 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
                 name: "Workspace Sync Quickstart".to_string(),
                 description: Some("Open workspace and run sync extension".to_string()),
                 enabled: true,
+                timeout_ms: None,
+                timeout_behavior: crate::config::TimeoutBehavior::Abort,
                 args: vec![
                     crate::config::MacroArg {
                         name: "project_path".to_string(),
@@ -215,6 +217,8 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
                         args: vec!["{project_path}".to_string()],
                         capabilities: vec![Capability::Filesystem],
                         on_error: crate::config::StepErrorHandling::default(),
+                        timeout_ms: None,
+                        timeout_behavior: crate::config::TimeoutBehavior::Abort,
                     },
                     crate::config::MacroStep::Extension {
                         ext_id: "sync-project".to_string(),
@@ -222,6 +226,8 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
                         args: vec!["--branch".to_string(), "{branch}".to_string()],
                         capabilities: vec![Capability::Shell],
                         on_error: crate::config::StepErrorHandling::default(),
+                        timeout_ms: None,
+                        timeout_behavior: crate::config::TimeoutBehavior::Abort,
                     },
                 ],
             },
@@ -243,6 +249,8 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
                 name: "Focus Mode Clean Start".to_string(),
                 description: Some("Quickly open an app and clear distractions".to_string()),
                 enabled: true,
+                timeout_ms: None,
+                timeout_behavior: crate::config::TimeoutBehavior::Abort,
                 args: vec![crate::config::MacroArg {
                     name: "app_exec".to_string(),
                     description: Some("Executable to open".to_string()),
@@ -254,6 +262,8 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
                     args: Vec::new(),
                     capabilities: Vec::new(),
                     on_error: crate::config::StepErrorHandling::default(),
+                    timeout_ms: None,
+                    timeout_behavior: crate::config::TimeoutBehavior::Abort,
                 }],
             },
         },
@@ -608,12 +618,16 @@ mod tests {
             name: "Test".to_string(),
             description: None,
             enabled: true,
+            timeout_ms: None,
+            timeout_behavior: crate::config::TimeoutBehavior::Abort,
             args: Vec::new(),
             steps: vec![crate::config::MacroStep::System {
                 command: "echo".to_string(),
                 args: vec!["hello".to_string()],
                 capabilities: vec![Capability::Shell],
                 on_error: crate::config::StepErrorHandling::default(),
+                timeout_ms: None,
+                timeout_behavior: crate::config::TimeoutBehavior::Abort,
             }],
         };
 

@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 use std::process::Command;
 use std::sync::LazyLock;
+use std::time::{Duration, Instant};
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::State;
 
-use crate::config::{MacroArg, MacroStep, StepErrorHandling, WorkflowCondition, WorkflowMacro};
+use crate::config::{
+    MacroArg, MacroStep, StepErrorHandling, TimeoutBehavior, WorkflowCondition, WorkflowMacro,
+};
 use crate::errors::VantaError;
 use crate::extensions;
 use crate::permissions::{self, Capability, Decision};
@@ -247,9 +250,19 @@ pub fn run_macro_blocking(
     let macro_def = fetch_macro(state, macro_id)?;
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
     let mut value_map = arg_map.clone();
+    let started = Instant::now();
 
     let mut steps = Vec::new();
-    execute_steps_blocking(&macro_def.id, &macro_def.steps, "root", &mut value_map, &mut steps)?;
+    execute_steps_blocking(
+        &macro_def.id,
+        &macro_def.steps,
+        "root",
+        &mut value_map,
+        &mut steps,
+        started,
+        macro_def.timeout_ms,
+        &macro_def.timeout_behavior,
+    )?;
 
     Ok(MacroRunResult {
         macro_id: macro_def.id,
@@ -338,16 +351,52 @@ fn step_output_placeholder(index: usize) -> String {
     format!("step.{}.output", index + 1)
 }
 
-fn execute_system_blocking_capture(command: &str, args: &[String]) -> Result<String, VantaError> {
-    let output = Command::new(command)
+enum CommandRunResult<T> {
+    Completed(T),
+    TimedOut,
+}
+
+fn execute_system_blocking_capture(
+    command: &str,
+    args: &[String],
+    timeout_ms: Option<u64>,
+) -> Result<CommandRunResult<String>, VantaError> {
+    let mut child = Command::new(command)
         .args(args)
         .stdin(std::process::Stdio::null())
-        .output()
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
         .map_err(|e| format!("Failed to run '{}' in blocking mode: {}", command, e))?;
+
+    if let Some(ms) = timeout_ms {
+        let deadline = Instant::now() + Duration::from_millis(ms);
+        loop {
+            if child
+                .try_wait()
+                .map_err(|e| format!("Failed waiting for '{}' in blocking mode: {}", command, e))?
+                .is_some()
+            {
+                break;
+            }
+
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Ok(CommandRunResult::TimedOut);
+            }
+
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Failed collecting output for '{}': {}", command, e))?;
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        Ok(stdout)
+        Ok(CommandRunResult::Completed(stdout))
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!(
@@ -360,13 +409,41 @@ fn execute_system_blocking_capture(command: &str, args: &[String]) -> Result<Str
     }
 }
 
-fn execute_system_blocking_exit_code(command: &str, args: &[String]) -> Result<i32, VantaError> {
-    let status = Command::new(command)
+fn execute_system_blocking_exit_code(
+    command: &str,
+    args: &[String],
+    timeout_ms: Option<u64>,
+) -> Result<CommandRunResult<i32>, VantaError> {
+    let mut child = Command::new(command)
         .args(args)
         .stdin(std::process::Stdio::null())
-        .status()
+        .spawn()
         .map_err(|e| format!("Failed to run '{}' in blocking mode: {}", command, e))?;
-    Ok(status.code().unwrap_or(-1))
+
+    if let Some(ms) = timeout_ms {
+        let deadline = Instant::now() + Duration::from_millis(ms);
+        loop {
+            if let Some(status) = child
+                .try_wait()
+                .map_err(|e| format!("Failed waiting for '{}' in blocking mode: {}", command, e))?
+            {
+                return Ok(CommandRunResult::Completed(status.code().unwrap_or(-1)));
+            }
+
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Ok(CommandRunResult::TimedOut);
+            }
+
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    let status = child
+        .wait()
+        .map_err(|e| format!("Failed waiting for '{}' in blocking mode: {}", command, e))?;
+    Ok(CommandRunResult::Completed(status.code().unwrap_or(-1)))
 }
 
 fn ensure_permissions(step_id: &str, capabilities: &[Capability]) -> Result<(), VantaError> {
@@ -465,8 +542,14 @@ fn evaluate_condition(
             let rendered_args = render_tokens(args, value_map)?;
             let step_id = format!("macro:{}:if:{}:exit_code", macro_id, path);
             ensure_permissions(&step_id, capabilities)?;
-            let code = execute_system_blocking_exit_code(&rendered_cmd, &rendered_args)?;
-            Ok((code == *equals, rendered_args, capabilities.clone()))
+            match execute_system_blocking_exit_code(&rendered_cmd, &rendered_args, None)? {
+                CommandRunResult::Completed(code) => {
+                    Ok((code == *equals, rendered_args, capabilities.clone()))
+                }
+                CommandRunResult::TimedOut => {
+                    Err(format!("Condition command '{}' timed out", rendered_cmd).into())
+                }
+            }
         }
     }
 }
@@ -534,6 +617,9 @@ fn execute_single_step(
     step_path: &str,
     value_map: &mut HashMap<String, String>,
     steps: &mut Vec<MacroRunStepResult>,
+    started: Instant,
+    workflow_timeout_ms: Option<u64>,
+    workflow_timeout_behavior: &TimeoutBehavior,
 ) -> Result<StepExecutionResult, VantaError> {
     match step {
         MacroStep::Extension {
@@ -559,6 +645,8 @@ fn execute_single_step(
             command,
             args,
             capabilities,
+            timeout_ms,
+            timeout_behavior,
             ..
         } => {
             require_system_capabilities(capabilities)?;
@@ -566,14 +654,31 @@ fn execute_single_step(
             let step_id = format!("macro:{}:system:{}", macro_id, step_path);
             ensure_permissions(&step_id, capabilities)?;
 
-            let captured = execute_system_blocking_capture(command, &rendered_args)?;
+            let captured = execute_system_blocking_capture(command, &rendered_args, *timeout_ms)?;
+            let (status, output) = match captured {
+                CommandRunResult::Completed(stdout) => ("ok".to_string(), stdout),
+                CommandRunResult::TimedOut => {
+                    let ms = timeout_ms.unwrap_or_default();
+                    match timeout_behavior {
+                        TimeoutBehavior::Abort => {
+                            return Err(
+                                format!("System step '{}' timed out after {}ms", command, ms)
+                                    .into(),
+                            );
+                        }
+                        TimeoutBehavior::Skip => {
+                            (format!("timeout_skipped:{}ms", ms), String::new())
+                        }
+                    }
+                }
+            };
             Ok(StepExecutionResult {
                 kind: "system".to_string(),
                 command: command.clone(),
                 args: rendered_args,
                 capabilities: capabilities.clone(),
-                status: "ok".to_string(),
-                output: captured,
+                status,
+                output,
             })
         }
         MacroStep::If {
@@ -592,6 +697,9 @@ fn execute_single_step(
                     &format!("{}.then", step_path),
                     value_map,
                     steps,
+                    started,
+                    workflow_timeout_ms,
+                    workflow_timeout_behavior,
                 )?;
             } else {
                 execute_steps_blocking(
@@ -600,6 +708,9 @@ fn execute_single_step(
                     &format!("{}.else", step_path),
                     value_map,
                     steps,
+                    started,
+                    workflow_timeout_ms,
+                    workflow_timeout_behavior,
                 )?;
             }
 
@@ -629,8 +740,32 @@ fn execute_steps_blocking(
     path: &str,
     value_map: &mut HashMap<String, String>,
     steps: &mut Vec<MacroRunStepResult>,
+    started: Instant,
+    workflow_timeout_ms: Option<u64>,
+    workflow_timeout_behavior: &TimeoutBehavior,
 ) -> Result<(), VantaError> {
     for (idx, step) in steps_def.iter().enumerate() {
+        if let Some(limit_ms) = workflow_timeout_ms {
+            if started.elapsed() >= Duration::from_millis(limit_ms) {
+                match workflow_timeout_behavior {
+                    TimeoutBehavior::Abort => {
+                        return Err(format!("Workflow timed out after {}ms", limit_ms).into());
+                    }
+                    TimeoutBehavior::Skip => {
+                        steps.push(MacroRunStepResult {
+                            index: steps.len(),
+                            kind: "workflow".to_string(),
+                            command: "workflow-timeout".to_string(),
+                            args: Vec::new(),
+                            capabilities: Vec::new(),
+                            status: format!("timeout_skipped_remaining:{}ms", limit_ms),
+                        });
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
         let step_path = format!("{}.{}", path, idx);
         let policy = step_error_policy(step).clone();
 
@@ -639,7 +774,16 @@ fn execute_steps_blocking(
         let mut last_err: Option<VantaError> = None;
 
         while attempt <= policy.retry_count as usize {
-            match execute_single_step(macro_id, step, &step_path, value_map, steps) {
+            match execute_single_step(
+                macro_id,
+                step,
+                &step_path,
+                value_map,
+                steps,
+                started,
+                workflow_timeout_ms,
+                workflow_timeout_behavior,
+            ) {
                 Ok(result) => {
                     success = Some(result);
                     break;
@@ -701,6 +845,9 @@ fn execute_steps_blocking(
                         &format!("{}.finally", step_path),
                         value_map,
                         steps,
+                        started,
+                        workflow_timeout_ms,
+                        workflow_timeout_behavior,
                     )?;
                 }
                 return Err(err);
@@ -714,6 +861,9 @@ fn execute_steps_blocking(
                 &format!("{}.finally", step_path),
                 value_map,
                 steps,
+                started,
+                workflow_timeout_ms,
+                workflow_timeout_behavior,
             )?;
         }
     }
@@ -748,6 +898,7 @@ fn resolve_steps_recursive(
                 args,
                 capabilities,
                 on_error,
+                ..
             } => {
                 let rendered_args = render_tokens(args, arg_map)?;
                 out.push(ResolvedStep {
@@ -772,6 +923,7 @@ fn resolve_steps_recursive(
                 args,
                 capabilities,
                 on_error,
+                ..
             } => {
                 require_system_capabilities(capabilities)?;
                 let rendered_args = render_tokens(args, arg_map)?;
@@ -915,6 +1067,8 @@ mod tests {
                 args: vec!["yes".to_string()],
                 capabilities: vec![Capability::Shell],
                 on_error: StepErrorHandling::default(),
+                timeout_ms: None,
+                timeout_behavior: TimeoutBehavior::Abort,
             }],
             else_steps: Vec::new(),
             on_error: StepErrorHandling::default(),
@@ -945,6 +1099,8 @@ mod tests {
             description: None,
             args: Vec::new(),
             enabled: true,
+            timeout_ms: None,
+            timeout_behavior: TimeoutBehavior::Abort,
             steps: vec![MacroStep::System {
                 command: "echo".to_string(),
                 args: vec!["one".to_string()],
@@ -957,8 +1113,12 @@ mod tests {
                         args: vec!["cleanup".to_string()],
                         capabilities: vec![Capability::Shell],
                         on_error: StepErrorHandling::default(),
+                        timeout_ms: None,
+                        timeout_behavior: TimeoutBehavior::Abort,
                     }],
                 },
+                timeout_ms: None,
+                timeout_behavior: TimeoutBehavior::Abort,
             }],
         };
 

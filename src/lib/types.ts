@@ -152,6 +152,8 @@ export interface StepErrorHandling {
     finally_steps?: MacroStep[];
 }
 
+export type TimeoutBehavior = "abort" | "skip";
+
 export type MacroStep =
     | {
         kind: "extension";
@@ -160,6 +162,8 @@ export type MacroStep =
         args?: string[];
         capabilities?: Capability[];
         on_error?: StepErrorHandling;
+        timeout_ms?: number | null;
+        timeout_behavior?: TimeoutBehavior;
     }
     | {
         kind: "system";
@@ -167,6 +171,8 @@ export type MacroStep =
         args?: string[];
         capabilities?: Capability[];
         on_error?: StepErrorHandling;
+        timeout_ms?: number | null;
+        timeout_behavior?: TimeoutBehavior;
     }
     | {
         kind: "if";
@@ -183,6 +189,8 @@ export interface WorkflowMacro {
     enabled?: boolean;
     args?: MacroArg[];
     steps: MacroStep[];
+    timeout_ms?: number | null;
+    timeout_behavior?: TimeoutBehavior;
 }
 
 export interface WorkflowsConfig {

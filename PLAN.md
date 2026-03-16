@@ -525,6 +525,7 @@ Implementation notes (March 2026):
 - Extended dry-run preflight to traverse conditional branches for capability visibility so permission prompts happen before job execution.
 - Non-blocking `run_macro` now returns a clear error for conditional workflows and routes users toward macro job execution path.
 - Added per-step error policy (`on_error`) with retry count, skip-on-failure behavior, and recursive `finally_steps` cleanup execution in the blocking runner.
+- Added timeout controls for workflow and system steps (`timeout_ms`, `timeout_behavior` with `abort|skip`) and enforce timeout behavior during blocking macro execution.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.
