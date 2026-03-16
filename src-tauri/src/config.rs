@@ -50,6 +50,35 @@ pub struct VantaConfig {
     pub policy: PolicyConfig,
     #[serde(default)]
     pub notes: NotesConfig,
+    #[serde(default)]
+    pub bookmarks: BookmarksConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+pub struct FileBookmark {
+    pub path: String,
+    pub created_at_ms: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+pub struct BookmarksConfig {
+    #[serde(default)]
+    pub entries: Vec<FileBookmark>,
+    #[serde(default = "default_bookmarks_max_entries")]
+    pub max_entries: usize,
+}
+
+fn default_bookmarks_max_entries() -> usize {
+    200
+}
+
+impl Default for BookmarksConfig {
+    fn default() -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries: default_bookmarks_max_entries(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -686,6 +715,7 @@ impl Default for VantaConfig {
             profiles: ProfilesConfig::default(),
             policy: PolicyConfig::default(),
             notes: NotesConfig::default(),
+            bookmarks: BookmarksConfig::default(),
         }
     }
 }
@@ -1344,6 +1374,8 @@ mod tests {
                 assert_eq!(cfg.profiles.entries.len(), 1);
                 assert_eq!(cfg.notes.max_entries, 200);
                 assert!(cfg.notes.entries.is_empty());
+                assert_eq!(cfg.bookmarks.max_entries, 200);
+                assert!(cfg.bookmarks.entries.is_empty());
 
                 // Legacy payload without accessibility should still deserialize.
                 let legacy = r##"{
@@ -1393,6 +1425,8 @@ mod tests {
                 assert_eq!(parsed.profiles.entries.len(), 1);
                 assert_eq!(parsed.notes.max_entries, 200);
                 assert!(parsed.notes.entries.is_empty());
+                assert_eq!(parsed.bookmarks.max_entries, 200);
+                assert!(parsed.bookmarks.entries.is_empty());
         }
 
         #[test]
@@ -1608,6 +1642,18 @@ mod tests {
 
         let raw = serde_json::to_string(&cfg).expect("serialize notes config");
         let parsed: NotesConfig = serde_json::from_str(&raw).expect("deserialize notes config");
+
+        assert_eq!(parsed, cfg);
+    }
+
+    #[test]
+    fn bookmarks_config_defaults_and_round_trip() {
+        let cfg = BookmarksConfig::default();
+        assert!(cfg.entries.is_empty());
+        assert_eq!(cfg.max_entries, 200);
+
+        let raw = serde_json::to_string(&cfg).expect("serialize bookmarks config");
+        let parsed: BookmarksConfig = serde_json::from_str(&raw).expect("deserialize bookmarks config");
 
         assert_eq!(parsed, cfg);
     }

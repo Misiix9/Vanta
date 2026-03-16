@@ -889,6 +889,53 @@ fn build_quick_note_results(
     out
 }
 
+fn build_bookmark_results(
+    bookmark_query: &str,
+    bookmarks: &config::BookmarksConfig,
+    weight: u32,
+    max_results: usize,
+) -> Vec<SearchResult> {
+    let needle = bookmark_query.trim().to_lowercase();
+    let mut out = Vec::new();
+
+    for bookmark in bookmarks.entries.iter().rev() {
+        if !needle.is_empty() && !bookmark.path.to_lowercase().contains(&needle) {
+            continue;
+        }
+
+        let title = std::path::Path::new(&bookmark.path)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&bookmark.path)
+            .to_string();
+
+        out.push(SearchResult {
+            title,
+            subtitle: Some(bookmark.path.clone()),
+            icon: Some("fa-solid fa-star".to_string()),
+            exec: bookmark.path.clone(),
+            score: weighted_score(ranking_config::SETTINGS_BASE_SCORE, weight),
+            match_indices: vec![],
+            source: ResultSource::File,
+            actions: Some(vec![matcher::ActionHint {
+                label: "Remove Bookmark".to_string(),
+                exec: format!("bookmark-remove:{}", bookmark.path),
+                shortcut: None,
+            }]),
+            id: Some(format!("bookmark:{}", bookmark.path)),
+            group: None,
+            section: Some("Bookmarks".to_string()),
+        });
+
+        if out.len() >= max_results {
+            break;
+        }
+    }
+
+    out
+}
+
 fn query_relevance_bonus(query: &str, result: &SearchResult) -> u32 {
     let q = query.trim().to_lowercase();
     if q.is_empty() {
@@ -1795,6 +1842,55 @@ mod quick_note_tests {
 }
 
 #[cfg(test)]
+mod bookmark_tests {
+    use super::*;
+
+    #[test]
+    fn bookmark_results_filter_and_add_remove_action() {
+        let bookmarks = config::BookmarksConfig {
+            entries: vec![
+                config::FileBookmark {
+                    path: "/tmp/report.md".to_string(),
+                    created_at_ms: 1,
+                },
+                config::FileBookmark {
+                    path: "/home/user/project".to_string(),
+                    created_at_ms: 2,
+                },
+            ],
+            max_entries: 200,
+        };
+
+        let results = build_bookmark_results("report", &bookmarks, 100, 8);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "report.md");
+        let actions = results[0].actions.as_ref().expect("bookmark actions");
+        assert_eq!(actions[0].exec, "bookmark-remove:/tmp/report.md");
+    }
+
+    #[test]
+    fn bookmark_results_return_most_recent_first() {
+        let bookmarks = config::BookmarksConfig {
+            entries: vec![
+                config::FileBookmark {
+                    path: "/tmp/old.txt".to_string(),
+                    created_at_ms: 1,
+                },
+                config::FileBookmark {
+                    path: "/tmp/new.txt".to_string(),
+                    created_at_ms: 2,
+                },
+            ],
+            max_entries: 200,
+        };
+
+        let results = build_bookmark_results("", &bookmarks, 100, 8);
+        assert_eq!(results[0].exec, "/tmp/new.txt");
+        assert_eq!(results[1].exec, "/tmp/old.txt");
+    }
+}
+
+#[cfg(test)]
 mod relevance_ranking_tests {
     use super::*;
 
@@ -2098,6 +2194,30 @@ async fn search(
             &SEARCH_MAX_MS,
         );
         return Ok(note_results);
+    }
+
+    let q_trimmed = query.trim();
+    if let Some(bookmark_query) = q_trimmed
+        .strip_prefix("bookmark:")
+        .or_else(|| q_trimmed.strip_prefix("bm:"))
+    {
+        let config = state
+            .config
+            .read()
+            .map_err(|_| "Failed to access config".to_string())?;
+        let max_results = config.general.max_results;
+        let bookmarks = config.bookmarks.clone();
+        drop(config);
+
+        let bookmark_results = build_bookmark_results(bookmark_query, &bookmarks, 100, max_results);
+        record_latency(
+            "search",
+            search_start.elapsed(),
+            &SEARCH_CALLS,
+            &SEARCH_TOTAL_MS,
+            &SEARCH_MAX_MS,
+        );
+        return Ok(bookmark_results);
     }
 
     // ── Snapshot state under locks, release immediately ──────────────
@@ -2506,6 +2626,66 @@ async fn launch_app(
         return Ok(());
     }
 
+    if let Some(path) = exec.strip_prefix("bookmark-add:") {
+        let trimmed = path.trim();
+        if trimmed.is_empty() {
+            return Err("Bookmark path cannot be empty".into());
+        }
+
+        let mut cfg = state
+            .config
+            .write()
+            .map_err(|_| "Failed to access config".to_string())?;
+        if !cfg.bookmarks.entries.iter().any(|b| b.path == trimmed) {
+            cfg.bookmarks.entries.push(config::FileBookmark {
+                path: trimmed.to_string(),
+                created_at_ms: now_millis().max(0) as u64,
+            });
+
+            let max_entries = cfg.bookmarks.max_entries.max(1);
+            if cfg.bookmarks.entries.len() > max_entries {
+                let overflow = cfg.bookmarks.entries.len() - max_entries;
+                cfg.bookmarks.entries.drain(0..overflow);
+            }
+            cfg.save_with_source("bookmark")?;
+        }
+        drop(cfg);
+
+        let updated = state
+            .config
+            .read()
+            .map_err(|_| "Failed to access config".to_string())?
+            .clone();
+        let _ = app_handle.emit("config-updated", &updated);
+        return Ok(());
+    }
+
+    if let Some(path) = exec.strip_prefix("bookmark-remove:") {
+        let trimmed = path.trim();
+        if trimmed.is_empty() {
+            return Err("Bookmark path cannot be empty".into());
+        }
+
+        let mut cfg = state
+            .config
+            .write()
+            .map_err(|_| "Failed to access config".to_string())?;
+        let before = cfg.bookmarks.entries.len();
+        cfg.bookmarks.entries.retain(|b| b.path != trimmed);
+        if cfg.bookmarks.entries.len() != before {
+            cfg.save_with_source("bookmark")?;
+        }
+        drop(cfg);
+
+        let updated = state
+            .config
+            .read()
+            .map_err(|_| "Failed to access config".to_string())?
+            .clone();
+        let _ = app_handle.emit("config-updated", &updated);
+        return Ok(());
+    }
+
     if let Ok(mut history) = state.history.lock() {
         history.increment(&exec);
     }
@@ -2549,6 +2729,7 @@ async fn get_suggestions(
     let search_config = config.search.clone();
     let max_results = config.general.max_results;
     let profiles_config = config.profiles.clone();
+    let bookmarks_config = config.bookmarks.clone();
 
     let file_index = state
         .file_index
@@ -2573,6 +2754,14 @@ async fn get_suggestions(
         |cap| list_windows_grouped(cap),
     );
     results.extend(window_results);
+
+    let bookmark_results = build_bookmark_results(
+        "",
+        &bookmarks_config,
+        search_config.files.weight,
+        std::cmp::max(3, max_results / 2),
+    );
+    results.extend(bookmark_results);
 
     let mut scored_apps: Vec<(&AppEntry, u32)> = apps
         .iter()

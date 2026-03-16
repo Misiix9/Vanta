@@ -383,6 +383,16 @@
         onToast({ title: "Note Saved", message: command.exec.slice(10), type: "success" });
         onResetAndHide();
       }
+      else if (command.kind === "launch_app" && command.exec.startsWith("bookmark-add:")) {
+        const path = command.exec.slice(13);
+        await invoke("launch_app", { exec: command.exec });
+        onToast({ title: "Bookmarked", message: path, type: "success" });
+      }
+      else if (command.kind === "launch_app" && command.exec.startsWith("bookmark-remove:")) {
+        const path = command.exec.slice(16);
+        await invoke("launch_app", { exec: command.exec });
+        onToast({ title: "Bookmark Removed", message: path, type: "success" });
+      }
       else {
         await invoke("launch_app", { exec: commandToExec(command) });
         onToast({ title: "Launching", message: result.title, type: "success" });

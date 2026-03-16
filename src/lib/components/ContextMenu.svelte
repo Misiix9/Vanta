@@ -48,6 +48,14 @@
       }
     }
 
+    if (result.source === "File") {
+      items.push({
+        label: "Add Bookmark",
+        exec: `bookmark-add:${result.exec}`,
+        divider: items.length === 1,
+      });
+    }
+
     return items;
   });
 
