@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::process::Command;
 use std::sync::LazyLock;
 
 use regex::Regex;
@@ -14,7 +15,7 @@ use crate::{launcher, AppState};
 
 /// Compiled once; matches `{AlphaNumeric_Key}` placeholders in workflow tokens.
 static TOKEN_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\{([A-Za-z0-9_]+)\}").expect("invalid token regex"));
+    LazyLock::new(|| Regex::new(r"\{([A-Za-z0-9_.]+)\}").expect("invalid token regex"));
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MacroDryRunStep {
@@ -227,34 +228,39 @@ pub fn run_macro_blocking(
     macro_id: &str,
     provided_args: HashMap<String, String>,
     state: &State<'_, AppState>,
-    app_handle: &tauri::AppHandle,
+    _app_handle: &tauri::AppHandle,
 ) -> Result<MacroRunResult, VantaError> {
     let macro_def = fetch_macro(state, macro_id)?;
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
-    let resolved_steps = resolve_steps(&macro_def, &arg_map)?;
+    let mut value_map = arg_map.clone();
 
     let mut steps = Vec::new();
 
-    for (idx, step) in resolved_steps.into_iter().enumerate() {
-        match step.kind {
-            ResolvedKind::Extension {
-                ref ext_id,
-                ref command,
+    for (idx, step) in macro_def.steps.iter().enumerate() {
+        match step {
+            MacroStep::Extension {
+                ext_id,
+                command,
+                args,
+                capabilities,
             } => {
-                match extensions::check_extension_permissions(&step.id, &step.capabilities) {
+                let rendered_args = render_tokens(args, &value_map)?;
+                let step_id = format!("macro:{}:ext:{}:{}", macro_def.id, ext_id, command);
+
+                match extensions::check_extension_permissions(&step_id, capabilities) {
                     Ok(()) => {}
                     Err(extensions::PermissionError::NeedsPrompt { missing_caps }) => {
                         let payload = json!({
-                            "script_id": step.id,
+                            "script_id": step_id,
                             "missing_caps": missing_caps,
-                            "requested_caps": step.capabilities,
+                            "requested_caps": capabilities,
                         });
                         return Err(format!("PERMISSION_NEEDED:{}", payload).into());
                     }
                     Err(extensions::PermissionError::Deny) => {
                         let payload = json!({
-                            "script_id": step.id,
-                            "requested_caps": step.capabilities,
+                            "script_id": step_id,
+                            "requested_caps": capabilities,
                         });
                         return Err(format!("PERMISSION_DENIED:{}", payload).into());
                     }
@@ -264,41 +270,53 @@ pub fn run_macro_blocking(
                     index: idx,
                     kind: "extension".to_string(),
                     command: format!("{}:{}", ext_id, command),
-                    args: step.args,
-                    capabilities: step.capabilities,
+                    args: rendered_args,
+                    capabilities: capabilities.clone(),
                     status: "ok".to_string(),
                 });
+
+                value_map.insert(step_output_placeholder(idx), String::new());
             }
-            ResolvedKind::System { ref command } => {
-                match extensions::check_extension_permissions(&step.id, &step.capabilities) {
+            MacroStep::System {
+                command,
+                args,
+                capabilities,
+            } => {
+                require_system_capabilities(capabilities)?;
+                let rendered_args = render_tokens(args, &value_map)?;
+                let step_id = format!("macro:{}:system:{}:{}", macro_def.id, command, idx);
+
+                match extensions::check_extension_permissions(&step_id, capabilities) {
                     Ok(()) => {}
                     Err(extensions::PermissionError::NeedsPrompt { missing_caps }) => {
                         let payload = json!({
-                            "script_id": step.id,
+                            "script_id": step_id,
                             "missing_caps": missing_caps,
-                            "requested_caps": step.capabilities,
+                            "requested_caps": capabilities,
                         });
                         return Err(format!("PERMISSION_NEEDED:{}", payload).into());
                     }
                     Err(extensions::PermissionError::Deny) => {
                         let payload = json!({
-                            "script_id": step.id,
-                            "requested_caps": step.capabilities,
+                            "script_id": step_id,
+                            "requested_caps": capabilities,
                         });
                         return Err(format!("PERMISSION_DENIED:{}", payload).into());
                     }
                 }
 
-                launcher::launch_blocking(command, &step.args, Some(app_handle))?;
+                let captured = execute_system_blocking_capture(command, &rendered_args)?;
 
                 steps.push(MacroRunStepResult {
                     index: idx,
                     kind: "system".to_string(),
                     command: command.clone(),
-                    args: step.args,
-                    capabilities: step.capabilities,
+                    args: rendered_args,
+                    capabilities: capabilities.clone(),
                     status: "ok".to_string(),
                 });
+
+                value_map.insert(step_output_placeholder(idx), captured);
             }
         }
     }
@@ -351,7 +369,7 @@ fn resolve_args(
 
 fn render_tokens(
     tokens: &[String],
-    arg_map: &HashMap<String, String>,
+    value_map: &HashMap<String, String>,
 ) -> Result<Vec<String>, VantaError> {
     let mut rendered = Vec::new();
 
@@ -365,7 +383,7 @@ fn render_tokens(
             let m = caps.get(0).expect("capture group 0 missing in TOKEN_RE");
             output.push_str(&token[last..m.start()]);
             let key = caps.get(1).expect("capture group 1 missing in TOKEN_RE").as_str();
-            let val = arg_map
+            let val = value_map
                 .get(key)
                 .ok_or_else(|| format!("Missing value for placeholder '{}'", key))?;
             output.push_str(val);
@@ -377,6 +395,32 @@ fn render_tokens(
     }
 
     Ok(rendered)
+}
+
+fn step_output_placeholder(index: usize) -> String {
+    format!("step.{}.output", index + 1)
+}
+
+fn execute_system_blocking_capture(command: &str, args: &[String]) -> Result<String, VantaError> {
+    let output = Command::new(command)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map_err(|e| format!("Failed to run '{}' in blocking mode: {}", command, e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        Ok(stdout)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!(
+            "Blocking command '{}' failed with status {:?}: {}",
+            command,
+            output.status.code(),
+            stderr
+        )
+        .into())
+    }
 }
 
 fn resolve_steps(
@@ -450,10 +494,18 @@ mod tests {
     }
 
     #[test]
-    fn render_tokens_missing_placeholder_errors() {
+    fn render_tokens_fails_on_missing_placeholder() {
         let map = HashMap::new();
         let tokens = vec!["{missing}".to_string()];
         assert!(render_tokens(&tokens, &map).is_err());
+    }
+
+    #[test]
+    fn render_tokens_supports_step_output_placeholders() {
+        let map = HashMap::from([("step.1.output".to_string(), "done".to_string())]);
+        let tokens = vec!["status={step.1.output}".to_string()];
+        let rendered = render_tokens(&tokens, &map).unwrap();
+        assert_eq!(rendered, vec!["status=done".to_string()]);
     }
 
     #[test]
