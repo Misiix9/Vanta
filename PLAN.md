@@ -730,3 +730,4 @@ Implementation notes (March 2026):
 - Phase 42: Added local-only usage analytics dashboard data (most-used apps, peak usage hours, query patterns) and surfaced it in Diagnostics.
 - Phase 43: Pinned `svelte` to exact version `5.51.3` in `package.json`/lockfile to prevent silent semver drift across 5.x updates.
 - Phase 43: Confirmed `rusqlite` is currently used by clipboard storage (`src-tauri/src/clipboard.rs`), so dependency removal is deferred.
+- Phase 43: Added icon cache integrity checks and hard cap (`4096` entries) with stale/invalid path pruning plus scanner tests.

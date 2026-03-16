@@ -22,6 +22,8 @@ struct IconCache {
     icons: HashMap<String, String>,
 }
 
+const ICON_CACHE_MAX_ENTRIES: usize = 4096;
+
 impl IconCache {
     fn get_path() -> PathBuf {
         let mut path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("/tmp"));
@@ -35,7 +37,15 @@ impl IconCache {
         let path = Self::get_path();
         if path.exists() {
             if let Ok(content) = fs::read_to_string(&path) {
-                if let Ok(cache) = serde_json::from_str(&content) {
+                if let Ok(mut cache) = serde_json::from_str::<Self>(&content) {
+                    let removed = cache.enforce_bounds_and_integrity();
+                    if removed > 0 {
+                        log::warn!(
+                            "Pruned {} invalid/stale entries from icon cache during load",
+                            removed
+                        );
+                        cache.save();
+                    }
                     return cache;
                 }
             }
@@ -45,9 +55,43 @@ impl IconCache {
 
     fn save(&self) {
         let path = Self::get_path();
-        if let Ok(content) = serde_json::to_string_pretty(self) {
+        let mut cleaned = Self {
+            icons: self.icons.clone(),
+        };
+        let removed = cleaned.enforce_bounds_and_integrity();
+        if removed > 0 {
+            log::warn!(
+                "Pruned {} invalid/stale entries from icon cache before save",
+                removed
+            );
+        }
+
+        if let Ok(content) = serde_json::to_string_pretty(&cleaned) {
             let _ = fs::write(path, content);
         }
+    }
+
+    fn enforce_bounds_and_integrity(&mut self) -> usize {
+        let before = self.icons.len();
+
+        self.icons.retain(|name, path| {
+            if name.trim().is_empty() || path.trim().is_empty() {
+                return false;
+            }
+            Path::new(path).exists()
+        });
+
+        if self.icons.len() > ICON_CACHE_MAX_ENTRIES {
+            let keep = ICON_CACHE_MAX_ENTRIES;
+            let mut keys = self.icons.keys().cloned().collect::<Vec<_>>();
+            keys.sort();
+            let remove_count = self.icons.len().saturating_sub(keep);
+            for key in keys.into_iter().take(remove_count) {
+                self.icons.remove(&key);
+            }
+        }
+
+        before.saturating_sub(self.icons.len())
     }
 }
 
@@ -368,5 +412,51 @@ pub fn watch_desktop_entries(app_handle: tauri::AppHandle) {
                 log::error!("Desktop watcher error: {}", e);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn icon_cache_prunes_invalid_entries() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let valid_file = dir.path().join("icon.png");
+        std::fs::write(&valid_file, b"x").expect("write icon file");
+
+        let mut cache = IconCache {
+            icons: HashMap::from([
+                (
+                    "valid".to_string(),
+                    valid_file.to_string_lossy().to_string(),
+                ),
+                ("".to_string(), valid_file.to_string_lossy().to_string()),
+                ("bad-path".to_string(), "/does/not/exist.png".to_string()),
+            ]),
+        };
+
+        let removed = cache.enforce_bounds_and_integrity();
+        assert_eq!(removed, 2);
+        assert_eq!(cache.icons.len(), 1);
+        assert!(cache.icons.contains_key("valid"));
+    }
+
+    #[test]
+    fn icon_cache_enforces_max_entries() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let valid_file = dir.path().join("icon.png");
+        std::fs::write(&valid_file, b"x").expect("write icon file");
+        let path = valid_file.to_string_lossy().to_string();
+
+        let mut icons = HashMap::new();
+        for i in 0..(ICON_CACHE_MAX_ENTRIES + 128) {
+            icons.insert(format!("icon-{:05}", i), path.clone());
+        }
+        let mut cache = IconCache { icons };
+
+        let removed = cache.enforce_bounds_and_integrity();
+        assert_eq!(removed, 128);
+        assert_eq!(cache.icons.len(), ICON_CACHE_MAX_ENTRIES);
     }
 }
