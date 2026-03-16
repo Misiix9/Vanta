@@ -3065,6 +3065,16 @@ async fn open_path(
 }
 
 #[tauri::command]
+async fn open_external_link(url: String) -> Result<(), VantaError> {
+    let trimmed = url.trim();
+    if !(trimmed.starts_with("http://") || trimmed.starts_with("https://")) {
+        return Err("Only http(s) URLs are allowed".into());
+    }
+    open::that(trimmed).map_err(|e| format!("Failed to open URL: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
 async fn reveal_in_file_manager(
     path: String,
     state: tauri::State<'_, AppState>,
@@ -3502,6 +3512,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             get_clipboard_history,
             delete_clipboard_item,
             toggle_clipboard_pin,
+            open_external_link,
             open_path,
             reveal_in_file_manager,
             open_with_editor,

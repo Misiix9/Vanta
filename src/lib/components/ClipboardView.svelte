@@ -167,6 +167,58 @@
     }
   }
 
+  async function openSelectedUrl(item: ClipboardItem) {
+    try {
+      await invoke("open_external_link", { url: item.content.trim() });
+    } catch (e) {
+      console.error("Open URL failed:", e);
+    }
+  }
+
+  async function openSelectedPath(item: ClipboardItem) {
+    try {
+      await invoke("open_path", { path: item.content.trim() });
+    } catch (e) {
+      console.error("Open path failed:", e);
+    }
+  }
+
+  async function runSelectedCommand(item: ClipboardItem) {
+    try {
+      await invoke("launch_app", { exec: item.content.trim() });
+    } catch (e) {
+      console.error("Run command failed:", e);
+    }
+  }
+
+  function formattedJson(content: string): string | null {
+    try {
+      const parsed = JSON.parse(content);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return null;
+    }
+  }
+
+  async function copyFormattedJson(item: ClipboardItem) {
+    const pretty = formattedJson(item.content);
+    if (!pretty) return;
+    await copyToClipboard(pretty);
+  }
+
+  function canRunAsCommand(item: ClipboardItem): boolean {
+    const trimmed = item.content.trim();
+    if (!trimmed) return false;
+    if (trimmed.includes("\n")) return false;
+    if (item.content_type === "url" || item.content_type === "email" || item.content_type === "json") {
+      return false;
+    }
+    if (/^(sudo|git|npm|pnpm|yarn|cargo|python|node|bash|sh|zsh|make|docker|kubectl|systemctl|journalctl|ls|cd|cp|mv|rm|cat|grep|awk|sed)\b/i.test(trimmed)) {
+      return true;
+    }
+    return false;
+  }
+
   async function deleteItem(id: number) {
     try {
       await invoke("delete_clipboard_item", { id });
@@ -339,6 +391,26 @@
           <button class="cv-action-btn cv-action-copy" onclick={() => copyToClipboard(selected!.content)}>
             Copy
           </button>
+          {#if selected.content_type === "url"}
+            <button class="cv-action-btn" onclick={() => openSelectedUrl(selected!)}>
+              Open URL
+            </button>
+          {/if}
+          {#if selected.content_type === "path"}
+            <button class="cv-action-btn" onclick={() => openSelectedPath(selected!)}>
+              Open Path
+            </button>
+          {/if}
+          {#if selected.content_type === "json" && formattedJson(selected.content)}
+            <button class="cv-action-btn" onclick={() => copyFormattedJson(selected!)}>
+              Copy Formatted JSON
+            </button>
+          {/if}
+          {#if canRunAsCommand(selected)}
+            <button class="cv-action-btn" onclick={() => runSelectedCommand(selected!)}>
+              Run Command
+            </button>
+          {/if}
           <button class="cv-action-btn cv-action-pin" onclick={() => togglePin(selected!.id)}>
             {selected.pinned ? "Unpin" : "Pin"}
           </button>
