@@ -540,6 +540,7 @@ Implementation notes (March 2026):
 - Added unit conversion parsing for calculator queries (`km`↔`mi`, `kg`↔`lb`) with formatted copy-ready outputs and fallback to normal math evaluation.
 - Added timezone lookup calculator queries (for example `time in tokyo` / `tz berlin`) with city alias resolution, IANA fallback parsing, and copyable formatted time output.
 - Added offline currency conversion support in calculator queries (`USD`/`EUR`/`GBP`/`JPY` and more) using bundled rate table parsing with copy-ready formatted outputs.
+- Added smart clipboard contextual actions: URL open, path open, JSON formatting copy action, and command execution shortcut for command-like entries.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.
@@ -721,3 +722,6 @@ Implementation notes (March 2026):
 - Build gate: `tauri build` smoke run
 - Docs gate: update README/config migration notes/changelog
 - Rollback gate: define fallback for partial failures
+
+### Execution Notes
+- Phase 42: Added command palette search mode (`>` prefix) with direct internal command results and v3 typed command mapping for `open-window:*` actions.

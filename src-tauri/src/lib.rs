@@ -460,6 +460,7 @@ enum CommandV1 {
     OpenFile { path: String },
     OpenSettings,
     OpenStore,
+    OpenFeatureWindow { window: String },
     CopyText { value: String },
     CopyPath { value: String },
     RevealPath { path: String },
@@ -802,6 +803,41 @@ fn build_intent_results(query: &str, weight: u32, apps: &[AppEntry]) -> Vec<Sear
     }]
 }
 
+fn build_command_palette_results(query: &str, weight: u32) -> Vec<SearchResult> {
+    let needle = query.trim().to_lowercase();
+    let commands: [(&str, &str, &str, &str); 6] = [
+        ("Open Settings", "Configure Vanta preferences", "open-settings", "Commands"),
+        ("Open Store", "Browse and install extensions", "open-store", "Commands"),
+        ("Open Feature Hub", "Navigate to feature hub", "open-window:featureHub", "Commands"),
+        ("Open Community Hub", "Open community workflows and snippets", "open-window:communityHub", "Commands"),
+        ("Open Theme Studio", "Customize themes and profile visuals", "open-window:themeHub", "Commands"),
+        ("Open Extensions Hub", "Manage extension templates and runtime", "open-window:extensionsHub", "Commands"),
+    ];
+
+    let mut out = Vec::new();
+    for (title, subtitle, exec, section) in commands {
+        let hay = format!("{} {} {}", title.to_lowercase(), subtitle.to_lowercase(), exec.to_lowercase());
+        if !needle.is_empty() && !hay.contains(&needle) {
+            continue;
+        }
+        out.push(SearchResult {
+            title: title.to_string(),
+            subtitle: Some(subtitle.to_string()),
+            icon: Some("fa-solid fa-terminal".to_string()),
+            exec: exec.to_string(),
+            score: weighted_score(ranking_config::STORE_SEARCH_SCORE, weight),
+            match_indices: vec![],
+            source: ResultSource::Application,
+            actions: None,
+            id: Some(format!("cmd:{}", exec)),
+            group: None,
+            section: Some(section.to_string()),
+        });
+    }
+
+    out
+}
+
 fn query_relevance_bonus(query: &str, result: &SearchResult) -> u32 {
     let q = query.trim().to_lowercase();
     if q.is_empty() {
@@ -939,6 +975,11 @@ fn exec_to_command(exec: &str, source: &matcher::ResultSource) -> CommandV1 {
     }
     if exec == "open-store" {
         return CommandV1::OpenStore;
+    }
+    if let Some(v) = exec.strip_prefix("open-window:") {
+        return CommandV1::OpenFeatureWindow {
+            window: v.to_string(),
+        };
     }
     if let Some(v) = exec.strip_prefix("copy:") {
         return CommandV1::CopyText {
@@ -1630,6 +1671,33 @@ mod intent_engine_tests {
 }
 
 #[cfg(test)]
+mod command_palette_tests {
+    use super::*;
+
+    #[test]
+    fn command_palette_filters_by_query() {
+        let settings = build_command_palette_results("settings", 100);
+        assert_eq!(settings.len(), 1);
+        assert_eq!(settings[0].exec, "open-settings");
+
+        let all = build_command_palette_results("", 100);
+        assert_eq!(all.len(), 6);
+        assert!(all
+            .iter()
+            .all(|r| r.id.as_deref().unwrap_or_default().starts_with("cmd:")));
+    }
+
+    #[test]
+    fn exec_to_command_maps_open_window_contract() {
+        let command = exec_to_command("open-window:featureHub", &ResultSource::Application);
+        match command {
+            CommandV1::OpenFeatureWindow { window } => assert_eq!(window, "featureHub"),
+            other => panic!("unexpected command mapping: {:?}", other),
+        }
+    }
+}
+
+#[cfg(test)]
 mod relevance_ranking_tests {
     use super::*;
 
@@ -1901,6 +1969,19 @@ async fn search(
 ) -> Result<Vec<SearchResult>, VantaError> {
     let search_start = Instant::now();
     let generation = SEARCH_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+
+    if let Some(command_query) = query.trim().strip_prefix('>') {
+        let mut command_results = build_command_palette_results(command_query, 100);
+        command_results.sort_by(|a, b| b.score.cmp(&a.score));
+        record_latency(
+            "search",
+            search_start.elapsed(),
+            &SEARCH_CALLS,
+            &SEARCH_TOTAL_MS,
+            &SEARCH_MAX_MS,
+        );
+        return Ok(command_results);
+    }
 
     // ── Snapshot state under locks, release immediately ──────────────
     let apps_snapshot;
