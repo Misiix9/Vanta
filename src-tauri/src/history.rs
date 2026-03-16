@@ -64,6 +64,9 @@ pub struct History {
     /// Recent search queries for recall (most-recent first, capped at 50).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recent_queries: Vec<String>,
+    /// Query frequency for local analytics dashboards.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub query_counts: HashMap<String, u32>,
     #[serde(skip)]
     file_path: Option<PathBuf>,
     #[serde(skip)]
@@ -78,6 +81,7 @@ impl History {
             entries: HashMap::new(),
             usage: HashMap::new(),
             recent_queries: Vec::new(),
+            query_counts: HashMap::new(),
             file_path: None,
             dirty_count: 0,
             last_save_at: Some(Instant::now()),
@@ -158,6 +162,8 @@ impl History {
         if q.is_empty() {
             return;
         }
+        let next = self.query_counts.get(&q).copied().unwrap_or(0).saturating_add(1);
+        self.query_counts.insert(q.clone(), next);
         // Remove duplicate if already present.
         self.recent_queries.retain(|existing| existing != &q);
         self.recent_queries.insert(0, q);

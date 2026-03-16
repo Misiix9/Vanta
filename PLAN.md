@@ -727,3 +727,4 @@ Implementation notes (March 2026):
 - Phase 42: Added command palette search mode (`>` prefix) with direct internal command results and v3 typed command mapping for `open-window:*` actions.
 - Phase 42: Added quick note capture/search flow using `note:` prefix, with persistent notes stored in config and retrievable/copyable note results.
 - Phase 42: Added persistent file bookmarks with context-menu starring, `bookmark:`/`bm:` retrieval, remove actions, and bookmark suggestions for instant recall.
+- Phase 42: Added local-only usage analytics dashboard data (most-used apps, peak usage hours, query patterns) and surfaced it in Diagnostics.

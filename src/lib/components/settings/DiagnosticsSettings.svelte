@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
-    import type { SearchDiagnostics, HealthDashboard, RecoveryHint, SupportBundleReport, ConfigAuditEntry, ConfigSchemaValidationReport } from "$lib/types";
+    import type { SearchDiagnostics, HealthDashboard, RecoveryHint, SupportBundleReport, ConfigAuditEntry, ConfigSchemaValidationReport, UsageAnalyticsReport } from "$lib/types";
     import LoadingSkeleton from "$lib/components/LoadingSkeleton.svelte";
     import ActionConfirmModal from "$lib/components/ActionConfirmModal.svelte";
 
@@ -10,6 +10,7 @@
     let recoveryHints: RecoveryHint[] = $state([]);
     let configAudit: ConfigAuditEntry[] = $state([]);
     let schemaValidation: ConfigSchemaValidationReport | null = $state(null);
+    let usageAnalytics: UsageAnalyticsReport | null = $state(null);
     let supportBundle: SupportBundleReport | null = $state(null);
     let supportBusy = $state(false);
     let resetBusy = $state(false);
@@ -41,11 +42,16 @@
         catch (e) { console.error("Failed to validate config schema:", e); }
     }
 
+    async function loadUsageAnalytics() {
+        try { usageAnalytics = await invoke<UsageAnalyticsReport>("get_usage_analytics"); }
+        catch (e) { console.error("Failed to load usage analytics:", e); }
+    }
+
     async function buildSupportBundle() {
         supportBusy = true;
         try {
             supportBundle = await invoke<SupportBundleReport>("create_support_bundle", { outputPath: null });
-            await Promise.all([loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation()]);
+            await Promise.all([loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation(), loadUsageAnalytics()]);
         } catch (e) { console.error("Failed to create support bundle:", e); }
         finally { supportBusy = false; }
     }
@@ -55,7 +61,7 @@
         try {
             await invoke("factory_reset_config");
             supportBundle = null;
-            await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation()]);
+            await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation(), loadUsageAnalytics()]);
         } catch (e) {
             console.error("Failed to factory reset config:", e);
         } finally {
@@ -65,7 +71,7 @@
     }
 
     onMount(async () => {
-        await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation()]);
+        await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation(), loadUsageAnalytics()]);
         loading = false;
     });
 </script>
@@ -79,6 +85,7 @@
         <button class="close-btn" onclick={loadRecoveryHints}>Refresh Hints</button>
         <button class="close-btn" onclick={loadConfigAudit}>Refresh Config Audit</button>
         <button class="close-btn" onclick={loadSchemaValidation}>Validate Config Schema</button>
+        <button class="close-btn" onclick={loadUsageAnalytics}>Refresh Usage Analytics</button>
         <button class="close-btn" onclick={buildSupportBundle} disabled={supportBusy}>
             {supportBusy ? "Building..." : "Create Support Bundle"}
         </button>
@@ -175,6 +182,53 @@
                     {/if}
                 </ul>
             {/if}
+        </div>
+    {/if}
+
+    {#if usageAnalytics}
+        <div class="control-group control-group-block">
+            <h4>Usage Analytics (Local Only)</h4>
+            <p>Total launch events: <strong>{usageAnalytics.total_launch_events}</strong></p>
+            <p>Generated: {new Date(usageAnalytics.generated_at).toLocaleString()}</p>
+        </div>
+
+        <div class="control-group control-group-block">
+            <h4>Most Used Apps</h4>
+            <ul class="hint-list">
+                {#if usageAnalytics.most_used_apps.length === 0}
+                    <li>No app launch history yet.</li>
+                {:else}
+                    {#each usageAnalytics.most_used_apps as item}
+                        <li><strong>{item.exec}</strong> - launches: {item.launches}, frecency: {item.frecency}</li>
+                    {/each}
+                {/if}
+            </ul>
+        </div>
+
+        <div class="control-group control-group-block">
+            <h4>Peak Usage Hours</h4>
+            <ul class="hint-list">
+                {#if usageAnalytics.peak_usage_hours.length === 0}
+                    <li>No hourly launch data yet.</li>
+                {:else}
+                    {#each usageAnalytics.peak_usage_hours as hour}
+                        <li><strong>{hour.hour.toString().padStart(2, "0")}:00</strong> - {hour.launches} launch event{hour.launches === 1 ? "" : "s"}</li>
+                    {/each}
+                {/if}
+            </ul>
+        </div>
+
+        <div class="control-group control-group-block">
+            <h4>Search Patterns</h4>
+            <ul class="hint-list">
+                {#if usageAnalytics.search_patterns.length === 0}
+                    <li>No query pattern data yet.</li>
+                {:else}
+                    {#each usageAnalytics.search_patterns as pattern}
+                        <li><strong>{pattern.query}</strong> - {pattern.count}</li>
+                    {/each}
+                {/if}
+            </ul>
         </div>
     {/if}
 

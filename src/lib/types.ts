@@ -286,6 +286,29 @@ export interface VantaConfig {
     workflows: WorkflowsConfig;
     profiles?: ProfilesConfig;
     policy?: PolicyConfig;
+    notes?: NotesConfig;
+    bookmarks?: BookmarksConfig;
+}
+
+export interface QuickNote {
+    id: string;
+    text: string;
+    created_at_ms: number;
+}
+
+export interface NotesConfig {
+    entries: QuickNote[];
+    max_entries: number;
+}
+
+export interface FileBookmark {
+    path: string;
+    created_at_ms: number;
+}
+
+export interface BookmarksConfig {
+    entries: FileBookmark[];
+    max_entries: number;
 }
 
 export interface PerfStats {
@@ -344,6 +367,30 @@ export interface ConfigAuditEntry {
 export interface ConfigSchemaValidationReport {
     valid: boolean;
     errors: string[];
+}
+
+export interface UsageAppStat {
+    exec: string;
+    launches: number;
+    frecency: number;
+}
+
+export interface UsageHourStat {
+    hour: number;
+    launches: number;
+}
+
+export interface UsageQueryStat {
+    query: string;
+    count: number;
+}
+
+export interface UsageAnalyticsReport {
+    generated_at: number;
+    total_launch_events: number;
+    most_used_apps: UsageAppStat[];
+    peak_usage_hours: UsageHourStat[];
+    search_patterns: UsageQueryStat[];
 }
 
 export interface ResultAction {

@@ -23,6 +23,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
+use chrono::{Local, TimeZone, Timelike};
 use tauri::{Manager, Emitter};
 use serde::{Deserialize, Serialize};
 use clap::Parser;
@@ -432,6 +433,55 @@ struct HealthDashboard {
     file_index_entries: usize,
     macro_jobs_total: usize,
     checks: Vec<HealthCheck>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct UsageAppStat {
+    exec: String,
+    launches: u32,
+    frecency: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct UsageHourStat {
+    hour: u8,
+    launches: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct UsageQueryStat {
+    query: String,
+    count: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct UsageAnalyticsReport {
+    generated_at: i64,
+    total_launch_events: u32,
+    most_used_apps: Vec<UsageAppStat>,
+    peak_usage_hours: Vec<UsageHourStat>,
+    search_patterns: Vec<UsageQueryStat>,
+}
+
+fn is_internal_exec_for_analytics(exec: &str) -> bool {
+    exec.starts_with("open-")
+        || exec.starts_with("system-action:")
+        || exec.starts_with("copy:")
+        || exec.starts_with("copy-path:")
+        || exec.starts_with("reveal:")
+        || exec.starts_with("open-with:")
+        || exec.starts_with("focus:")
+        || exec.starts_with("close-window:")
+        || exec.starts_with("minimize-window:")
+        || exec.starts_with("move-window-current:")
+        || exec.starts_with("fill:")
+        || exec.starts_with("intent-workflow:")
+        || exec.starts_with("profile-switch:")
+        || exec.starts_with("macro:")
+        || exec.starts_with("ext-view:")
+        || exec.starts_with("ext-no-view:")
+        || exec.starts_with("note-save:")
+        || exec.starts_with("bookmark-")
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -3001,6 +3051,80 @@ async fn get_health_dashboard(
 }
 
 #[tauri::command]
+async fn get_usage_analytics(
+    state: tauri::State<'_, AppState>,
+) -> Result<UsageAnalyticsReport, VantaError> {
+    let history = state
+        .history
+        .lock()
+        .map_err(|_| "Failed to access history".to_string())?;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let mut most_used_apps = history
+        .entries
+        .iter()
+        .filter(|(exec, _)| !is_internal_exec_for_analytics(exec))
+        .map(|(exec, entry)| UsageAppStat {
+            exec: exec.clone(),
+            launches: entry.count,
+            frecency: ((entry.frecency(now) * 1000.0) as u64).min(u32::MAX as u64) as u32,
+        })
+        .collect::<Vec<_>>();
+
+    most_used_apps.sort_by(|a, b| b.launches.cmp(&a.launches).then_with(|| b.frecency.cmp(&a.frecency)));
+    most_used_apps.truncate(12);
+
+    let mut bins = [0u32; 24];
+    for entry in history.entries.values() {
+        for &ts in &entry.timestamps {
+            if let Some(dt) = Local.timestamp_opt(ts as i64, 0).single() {
+                bins[dt.hour() as usize] = bins[dt.hour() as usize].saturating_add(1);
+            }
+        }
+    }
+
+    let mut peak_usage_hours = bins
+        .iter()
+        .enumerate()
+        .filter(|(_, count)| **count > 0)
+        .map(|(hour, count)| UsageHourStat {
+            hour: hour as u8,
+            launches: *count,
+        })
+        .collect::<Vec<_>>();
+    peak_usage_hours.sort_by(|a, b| b.launches.cmp(&a.launches));
+    peak_usage_hours.truncate(6);
+
+    let mut search_patterns = history
+        .query_counts
+        .iter()
+        .map(|(query, count)| UsageQueryStat {
+            query: query.clone(),
+            count: *count,
+        })
+        .collect::<Vec<_>>();
+    search_patterns.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.query.cmp(&b.query)));
+    search_patterns.truncate(12);
+
+    let total_launch_events = history
+        .entries
+        .values()
+        .fold(0u32, |acc, e| acc.saturating_add(e.count));
+
+    Ok(UsageAnalyticsReport {
+        generated_at: now_millis(),
+        total_launch_events,
+        most_used_apps,
+        peak_usage_hours,
+        search_patterns,
+    })
+}
+
+#[tauri::command]
 async fn create_support_bundle(
     output_path: Option<String>,
     state: tauri::State<'_, AppState>,
@@ -3939,6 +4063,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             run_contract_migration,
             get_search_diagnostics,
             get_health_dashboard,
+            get_usage_analytics,
             create_support_bundle,
             get_recovery_hints,
             get_clipboard_history,
