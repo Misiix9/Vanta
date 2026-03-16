@@ -341,6 +341,11 @@ export interface ConfigAuditEntry {
     diff: ConfigDiffEntry[];
 }
 
+export interface ConfigSchemaValidationReport {
+    valid: boolean;
+    errors: string[];
+}
+
 export interface ResultAction {
     label: string;
     exec?: string;

@@ -1,5 +1,6 @@
 use crate::config;
 use crate::errors::VantaError;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -10,7 +11,7 @@ use tauri::Emitter;
 const MAX_BLOCK_EVENTS: usize = 200;
 const MAX_AUDIT_EVENTS: usize = 500;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
 pub enum Capability {
     Network,
     Shell,

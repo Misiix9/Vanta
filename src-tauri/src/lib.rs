@@ -1857,6 +1857,11 @@ async fn get_config_audit(limit: Option<usize>) -> Result<Vec<config::ConfigAudi
 }
 
 #[tauri::command]
+async fn validate_config_schema() -> Result<config::ConfigSchemaValidationReport, VantaError> {
+    Ok(config::validate_config_file_against_schema())
+}
+
+#[tauri::command]
 async fn factory_reset_config(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
@@ -3424,6 +3429,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
         .invoke_handler(tauri::generate_handler![
             get_config,
             get_config_audit,
+            validate_config_schema,
             factory_reset_config,
             save_config,
             get_profiles,

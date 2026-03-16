@@ -1,3 +1,5 @@
+use jsonschema::JSONSchema;
+use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -25,7 +27,7 @@ pub struct ConfigMigrationReport {
 }
 
 //
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct VantaConfig {
     #[serde(default = "default_config_schema_version")]
     pub schema_version: u32,
@@ -48,7 +50,7 @@ pub struct VantaConfig {
     pub policy: PolicyConfig,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct PolicyConfig {
     #[serde(default = "default_policy_restricted_mode")]
     pub restricted_mode: bool,
@@ -75,7 +77,7 @@ impl Default for PolicyConfig {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct ProfileConfig {
     pub id: String,
     pub name: String,
@@ -84,7 +86,7 @@ pub struct ProfileConfig {
     pub search: SearchConfig,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct ProfilesConfig {
     #[serde(default = "default_profiles_schema_version")]
     pub schema_version: u32,
@@ -134,7 +136,7 @@ impl Default for ProfilesConfig {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct SearchConfig {
     #[serde(default)]
     pub applications: SourcePreference,
@@ -150,7 +152,7 @@ pub struct SearchConfig {
     pub show_explain_panel: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct SourcePreference {
     #[serde(default = "default_source_enabled")]
     pub enabled: bool,
@@ -196,7 +198,7 @@ fn default_show_explain_panel() -> bool {
     true
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct FilesConfig {
     #[serde(default)]
     pub include_hidden: bool,
@@ -253,7 +255,7 @@ impl Default for FilesConfig {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct GeneralConfig {
     pub hotkey: String,
     pub max_results: usize,
@@ -262,13 +264,13 @@ pub struct GeneralConfig {
     pub community_feed_opt_in: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct WindowConfig {
     pub width: f64,
     pub height: f64,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct AccessibilityConfig {
     #[serde(default)]
     pub reduced_motion: bool,
@@ -341,7 +343,7 @@ pub fn clamp_window_size(cfg: &mut WindowConfig) -> bool {
     changed
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct AppearanceConfig {
     pub blur_radius: u32,
     pub opacity: f64,
@@ -351,7 +353,7 @@ pub struct AppearanceConfig {
     pub colors: ColorsConfig,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ColorsConfig {
     pub background: String,
     pub surface: String,
@@ -362,7 +364,7 @@ pub struct ColorsConfig {
     pub border: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ExtensionsConfig {
     #[serde(default = "default_extensions_dir")]
     pub directory: String,
@@ -383,7 +385,7 @@ impl Default for ExtensionsConfig {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct WorkflowsConfig {
     #[serde(default = "default_workflows_schema_version")]
     pub schema_version: u32,
@@ -453,7 +455,7 @@ fn default_workflow_macros() -> Vec<WorkflowMacro> {
     }]
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct WorkflowMacro {
     pub id: String,
     pub name: String,
@@ -477,7 +479,7 @@ fn default_macro_enabled() -> bool {
     true
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum TimeoutBehavior {
     Abort,
@@ -488,14 +490,14 @@ fn default_timeout_behavior() -> TimeoutBehavior {
     TimeoutBehavior::Abort
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkflowScheduleEvent {
     Startup,
     NetworkConnected,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct WorkflowSchedule {
     #[serde(default)]
     pub enabled: bool,
@@ -506,7 +508,7 @@ pub struct WorkflowSchedule {
     pub on_events: Vec<WorkflowScheduleEvent>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct MacroArg {
     pub name: String,
     #[serde(default)]
@@ -517,7 +519,7 @@ pub struct MacroArg {
     pub default_value: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum WorkflowCondition {
     StepOutputContains {
@@ -538,7 +540,7 @@ pub enum WorkflowCondition {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 pub struct StepErrorHandling {
     #[serde(default)]
     pub retry_count: u8,
@@ -558,7 +560,7 @@ impl Default for StepErrorHandling {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum MacroStep {
     Extension {
@@ -845,6 +847,81 @@ pub fn config_audit_path() -> PathBuf {
     config_dir().join("config-audit.jsonl")
 }
 
+pub fn config_schema_path() -> PathBuf {
+    config_dir().join("config.schema.json")
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConfigSchemaValidationReport {
+    pub valid: bool,
+    pub errors: Vec<String>,
+}
+
+pub fn generated_config_schema() -> Value {
+    serde_json::to_value(schema_for!(VantaConfig)).unwrap_or_else(|_| Value::Null)
+}
+
+pub fn write_config_schema_file() -> Result<(), VantaError> {
+    let schema = generated_config_schema();
+    let path = config_schema_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create schema directory {}: {}", parent.display(), e))?;
+    }
+    let raw = serde_json::to_string_pretty(&schema)
+        .map_err(|e| format!("Failed to serialize config schema: {}", e))?;
+    fs::write(&path, raw)
+        .map_err(|e| format!("Failed to write config schema to {}: {}", path.display(), e))?;
+    Ok(())
+}
+
+fn validate_config_json_against_schema(json: &Value) -> ConfigSchemaValidationReport {
+    let schema = generated_config_schema();
+    match JSONSchema::compile(&schema) {
+        Ok(compiled) => {
+            let mut errors = Vec::new();
+            if let Err(iter) = compiled.validate(json) {
+                for err in iter {
+                    errors.push(err.to_string());
+                }
+            }
+            ConfigSchemaValidationReport {
+                valid: errors.is_empty(),
+                errors,
+            }
+        }
+        Err(err) => ConfigSchemaValidationReport {
+            valid: false,
+            errors: vec![format!("Failed to compile generated schema: {}", err)],
+        },
+    }
+}
+
+pub fn validate_config_file_against_schema() -> ConfigSchemaValidationReport {
+    let path = config_path();
+    let raw = match fs::read_to_string(&path) {
+        Ok(raw) => raw,
+        Err(err) => {
+            return ConfigSchemaValidationReport {
+                valid: false,
+                errors: vec![format!("Failed to read {}: {}", path.display(), err)],
+            };
+        }
+    };
+
+    let parsed: Value = match serde_json::from_str(&raw) {
+        Ok(v) => v,
+        Err(err) => {
+            return ConfigSchemaValidationReport {
+                valid: false,
+                errors: vec![format!("Invalid JSON in {}: {}", path.display(), err)],
+            };
+        }
+    };
+
+    validate_config_json_against_schema(&parsed)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConfigDiffEntry {
     pub path: String,
@@ -951,10 +1028,23 @@ pub fn read_config_audit(limit: usize) -> Vec<ConfigAuditEntry> {
 /// Load config from disk or create the default config file.
 pub fn load_or_create_default() -> VantaConfig {
     let path = config_path();
+    let _ = write_config_schema_file();
 
     if path.exists() {
         match fs::read_to_string(&path) {
-            Ok(contents) => match serde_json::from_str::<VantaConfig>(&contents) {
+            Ok(contents) => {
+                if let Ok(raw_json) = serde_json::from_str::<Value>(&contents) {
+                    let report = validate_config_json_against_schema(&raw_json);
+                    if !report.valid {
+                        log::warn!(
+                            "Config schema validation found {} issue(s) for {}",
+                            report.errors.len(),
+                            path.display()
+                        );
+                    }
+                }
+
+                match serde_json::from_str::<VantaConfig>(&contents) {
                 Ok(mut config) => {
                     log::info!("Loaded config from {}", path.display());
                     // Clamp window bounds eagerly and persist if adjusted.
@@ -991,7 +1081,8 @@ pub fn load_or_create_default() -> VantaConfig {
                     log::warn!("Invalid config.json, rewriting defaults: {}", e);
                     return rewrite_default_config();
                 }
-            },
+                }
+            }
             Err(e) => {
                 log::warn!("Could not read config.json, rewriting defaults: {}", e);
                 return rewrite_default_config();
@@ -1014,6 +1105,7 @@ pub fn load_or_create_default() -> VantaConfig {
 }
 
 pub fn migrate_config_on_disk() -> Result<ConfigMigrationReport, VantaError> {
+    let _ = write_config_schema_file();
     let path = config_path();
     if !path.exists() {
         return Ok(ConfigMigrationReport {

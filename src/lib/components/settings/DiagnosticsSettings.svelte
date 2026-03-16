@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
-    import type { SearchDiagnostics, HealthDashboard, RecoveryHint, SupportBundleReport, ConfigAuditEntry } from "$lib/types";
+    import type { SearchDiagnostics, HealthDashboard, RecoveryHint, SupportBundleReport, ConfigAuditEntry, ConfigSchemaValidationReport } from "$lib/types";
     import LoadingSkeleton from "$lib/components/LoadingSkeleton.svelte";
     import ActionConfirmModal from "$lib/components/ActionConfirmModal.svelte";
 
@@ -9,6 +9,7 @@
     let healthDashboard: HealthDashboard | null = $state(null);
     let recoveryHints: RecoveryHint[] = $state([]);
     let configAudit: ConfigAuditEntry[] = $state([]);
+    let schemaValidation: ConfigSchemaValidationReport | null = $state(null);
     let supportBundle: SupportBundleReport | null = $state(null);
     let supportBusy = $state(false);
     let resetBusy = $state(false);
@@ -35,11 +36,16 @@
         catch (e) { console.error("Failed to load config audit:", e); }
     }
 
+    async function loadSchemaValidation() {
+        try { schemaValidation = await invoke<ConfigSchemaValidationReport>("validate_config_schema"); }
+        catch (e) { console.error("Failed to validate config schema:", e); }
+    }
+
     async function buildSupportBundle() {
         supportBusy = true;
         try {
             supportBundle = await invoke<SupportBundleReport>("create_support_bundle", { outputPath: null });
-            await Promise.all([loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit()]);
+            await Promise.all([loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation()]);
         } catch (e) { console.error("Failed to create support bundle:", e); }
         finally { supportBusy = false; }
     }
@@ -49,7 +55,7 @@
         try {
             await invoke("factory_reset_config");
             supportBundle = null;
-            await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit()]);
+            await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation()]);
         } catch (e) {
             console.error("Failed to factory reset config:", e);
         } finally {
@@ -59,7 +65,7 @@
     }
 
     onMount(async () => {
-        await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit()]);
+        await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation()]);
         loading = false;
     });
 </script>
@@ -72,6 +78,7 @@
         <button class="close-btn" onclick={loadHealthDashboard}>Refresh Health</button>
         <button class="close-btn" onclick={loadRecoveryHints}>Refresh Hints</button>
         <button class="close-btn" onclick={loadConfigAudit}>Refresh Config Audit</button>
+        <button class="close-btn" onclick={loadSchemaValidation}>Validate Config Schema</button>
         <button class="close-btn" onclick={buildSupportBundle} disabled={supportBusy}>
             {supportBusy ? "Building..." : "Create Support Bundle"}
         </button>
@@ -149,6 +156,28 @@
         </ul>
     </div>
 
+    {#if schemaValidation}
+        <div class="control-group control-group-block">
+            <h4>Schema Validation</h4>
+            <p>
+                Status:
+                <strong class:schema-ok={schemaValidation.valid} class:schema-bad={!schemaValidation.valid}>
+                    {schemaValidation.valid ? "Valid" : "Invalid"}
+                </strong>
+            </p>
+            {#if !schemaValidation.valid && schemaValidation.errors.length > 0}
+                <ul class="hint-list">
+                    {#each schemaValidation.errors.slice(0, 12) as err}
+                        <li>{err}</li>
+                    {/each}
+                    {#if schemaValidation.errors.length > 12}
+                        <li>+{schemaValidation.errors.length - 12} more error(s)</li>
+                    {/if}
+                </ul>
+            {/if}
+        </div>
+    {/if}
+
     {#if supportBundle}
         <div class="control-group control-group-block">
             <label>Latest Support Bundle <input type="text" value={supportBundle.path} readonly /></label>
@@ -188,5 +217,13 @@
         border-radius: 6px;
         background: color-mix(in srgb, var(--ds-surface, #1b1b1f) 80%, black 20%);
         border: 1px solid color-mix(in srgb, var(--ds-border, rgba(255,255,255,0.16)) 70%, transparent);
+    }
+
+    .schema-ok {
+        color: #36a269;
+    }
+
+    .schema-bad {
+        color: var(--ds-danger, #d44);
     }
 </style>
