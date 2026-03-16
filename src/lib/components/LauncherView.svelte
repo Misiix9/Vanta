@@ -378,6 +378,11 @@
         onToast({ title: "Opening File", message: command.path, type: "success" });
         onResetAndHide();
       }
+      else if (command.kind === "launch_app" && command.exec.startsWith("note-save:")) {
+        await invoke("launch_app", { exec: command.exec });
+        onToast({ title: "Note Saved", message: command.exec.slice(10), type: "success" });
+        onResetAndHide();
+      }
       else {
         await invoke("launch_app", { exec: commandToExec(command) });
         onToast({ title: "Launching", message: result.title, type: "success" });

@@ -48,6 +48,36 @@ pub struct VantaConfig {
     pub profiles: ProfilesConfig,
     #[serde(default)]
     pub policy: PolicyConfig,
+    #[serde(default)]
+    pub notes: NotesConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+pub struct QuickNote {
+    pub id: String,
+    pub text: String,
+    pub created_at_ms: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+pub struct NotesConfig {
+    #[serde(default)]
+    pub entries: Vec<QuickNote>,
+    #[serde(default = "default_notes_max_entries")]
+    pub max_entries: usize,
+}
+
+fn default_notes_max_entries() -> usize {
+    200
+}
+
+impl Default for NotesConfig {
+    fn default() -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries: default_notes_max_entries(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -655,6 +685,7 @@ impl Default for VantaConfig {
             workflows: WorkflowsConfig::default(),
             profiles: ProfilesConfig::default(),
             policy: PolicyConfig::default(),
+            notes: NotesConfig::default(),
         }
     }
 }
@@ -1311,6 +1342,8 @@ mod tests {
                 assert_eq!(cfg.profiles.schema_version, PROFILES_SCHEMA_VERSION);
                 assert_eq!(cfg.profiles.active_profile_id, "default");
                 assert_eq!(cfg.profiles.entries.len(), 1);
+                assert_eq!(cfg.notes.max_entries, 200);
+                assert!(cfg.notes.entries.is_empty());
 
                 // Legacy payload without accessibility should still deserialize.
                 let legacy = r##"{
@@ -1358,6 +1391,8 @@ mod tests {
                 assert_eq!(parsed.workflows.schema_version, WORKFLOWS_SCHEMA_VERSION);
                 assert_eq!(parsed.profiles.active_profile_id, "default");
                 assert_eq!(parsed.profiles.entries.len(), 1);
+                assert_eq!(parsed.notes.max_entries, 200);
+                assert!(parsed.notes.entries.is_empty());
         }
 
         #[test]
@@ -1563,5 +1598,17 @@ mod tests {
         before.profiles.active_profile_id = "work".to_string();
         let no_diff = diff_configs(Some(&before), &after);
         assert!(no_diff.is_empty());
+    }
+
+    #[test]
+    fn notes_config_defaults_and_round_trip() {
+        let cfg = NotesConfig::default();
+        assert!(cfg.entries.is_empty());
+        assert_eq!(cfg.max_entries, 200);
+
+        let raw = serde_json::to_string(&cfg).expect("serialize notes config");
+        let parsed: NotesConfig = serde_json::from_str(&raw).expect("deserialize notes config");
+
+        assert_eq!(parsed, cfg);
     }
 }

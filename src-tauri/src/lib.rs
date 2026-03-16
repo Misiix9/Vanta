@@ -838,6 +838,57 @@ fn build_command_palette_results(query: &str, weight: u32) -> Vec<SearchResult> 
     out
 }
 
+fn build_quick_note_results(
+    note_query: &str,
+    notes: &config::NotesConfig,
+    weight: u32,
+    max_results: usize,
+) -> Vec<SearchResult> {
+    let trimmed = note_query.trim();
+    let needle = trimmed.to_lowercase();
+    let mut out = Vec::new();
+
+    if !trimmed.is_empty() {
+        out.push(SearchResult {
+            title: format!("Save Note: {}", trimmed),
+            subtitle: Some("Store quick note in Vanta".to_string()),
+            icon: Some("fa-solid fa-note-sticky".to_string()),
+            exec: format!("note-save:{}", trimmed),
+            score: weighted_score(ranking_config::SETTINGS_BASE_SCORE, weight),
+            match_indices: vec![],
+            source: ResultSource::Application,
+            actions: None,
+            id: Some("note:save".to_string()),
+            group: None,
+            section: Some("Notes".to_string()),
+        });
+    }
+
+    for note in notes.entries.iter().rev() {
+        if !needle.is_empty() && !note.text.to_lowercase().contains(&needle) {
+            continue;
+        }
+        out.push(SearchResult {
+            title: note.text.clone(),
+            subtitle: Some("Quick note".to_string()),
+            icon: Some("fa-solid fa-note-sticky".to_string()),
+            exec: format!("copy:{}", note.text),
+            score: weighted_score(ranking_config::CALCULATOR_BASE_SCORE, weight),
+            match_indices: vec![],
+            source: ResultSource::Application,
+            actions: None,
+            id: Some(format!("note:{}", note.id)),
+            group: None,
+            section: Some("Notes".to_string()),
+        });
+        if out.len() >= max_results {
+            break;
+        }
+    }
+
+    out
+}
+
 fn query_relevance_bonus(query: &str, result: &SearchResult) -> u32 {
     let q = query.trim().to_lowercase();
     if q.is_empty() {
@@ -1698,6 +1749,52 @@ mod command_palette_tests {
 }
 
 #[cfg(test)]
+mod quick_note_tests {
+    use super::*;
+
+    #[test]
+    fn quick_note_results_include_save_for_non_empty_query() {
+        let notes = config::NotesConfig {
+            entries: vec![config::QuickNote {
+                id: "1".to_string(),
+                text: "buy groceries".to_string(),
+                created_at_ms: 1,
+            }],
+            max_entries: 200,
+        };
+
+        let results = build_quick_note_results("buy", &notes, 100, 8);
+        assert_eq!(results[0].id.as_deref(), Some("note:save"));
+        assert_eq!(results[0].exec, "note-save:buy");
+        assert!(results.iter().any(|r| r.id.as_deref() == Some("note:1")));
+    }
+
+    #[test]
+    fn quick_note_results_show_recent_notes_for_empty_query() {
+        let notes = config::NotesConfig {
+            entries: vec![
+                config::QuickNote {
+                    id: "a".to_string(),
+                    text: "older".to_string(),
+                    created_at_ms: 1,
+                },
+                config::QuickNote {
+                    id: "b".to_string(),
+                    text: "newer".to_string(),
+                    created_at_ms: 2,
+                },
+            ],
+            max_entries: 200,
+        };
+
+        let results = build_quick_note_results("", &notes, 100, 8);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].title, "newer");
+        assert_eq!(results[0].exec, "copy:newer");
+    }
+}
+
+#[cfg(test)]
 mod relevance_ranking_tests {
     use super::*;
 
@@ -1981,6 +2078,26 @@ async fn search(
             &SEARCH_MAX_MS,
         );
         return Ok(command_results);
+    }
+
+    if let Some(note_query) = query.trim().strip_prefix("note:") {
+        let config = state
+            .config
+            .read()
+            .map_err(|_| "Failed to access config".to_string())?;
+        let max_results = config.general.max_results;
+        let notes = config.notes.clone();
+        drop(config);
+
+        let note_results = build_quick_note_results(note_query, &notes, 100, max_results);
+        record_latency(
+            "search",
+            search_start.elapsed(),
+            &SEARCH_CALLS,
+            &SEARCH_TOTAL_MS,
+            &SEARCH_MAX_MS,
+        );
+        return Ok(note_results);
     }
 
     // ── Snapshot state under locks, release immediately ──────────────
@@ -2344,6 +2461,51 @@ async fn launch_app(
     app_handle: tauri::AppHandle,
 ) -> Result<(), VantaError> {
     let launch_start = Instant::now();
+
+    if let Some(note_text) = exec.strip_prefix("note-save:") {
+        let trimmed = note_text.trim();
+        if trimmed.is_empty() {
+            return Err("Note cannot be empty".into());
+        }
+
+        let mut cfg = state
+            .config
+            .write()
+            .map_err(|_| "Failed to access config".to_string())?;
+
+        let note = config::QuickNote {
+            id: format!("{}", now_millis()),
+            text: trimmed.to_string(),
+            created_at_ms: now_millis().max(0) as u64,
+        };
+        cfg.notes.entries.push(note);
+
+        let max_entries = cfg.notes.max_entries.max(1);
+        if cfg.notes.entries.len() > max_entries {
+            let overflow = cfg.notes.entries.len() - max_entries;
+            cfg.notes.entries.drain(0..overflow);
+        }
+
+        cfg.save_with_source("quick-note")?;
+        drop(cfg);
+
+        let updated = state
+            .config
+            .read()
+            .map_err(|_| "Failed to access config".to_string())?
+            .clone();
+        let _ = app_handle.emit("config-updated", &updated);
+
+        record_latency(
+            "launch",
+            launch_start.elapsed(),
+            &LAUNCH_CALLS,
+            &LAUNCH_TOTAL_MS,
+            &LAUNCH_MAX_MS,
+        );
+        return Ok(());
+    }
+
     if let Ok(mut history) = state.history.lock() {
         history.increment(&exec);
     }
