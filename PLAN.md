@@ -536,6 +536,7 @@ Implementation notes (March 2026):
 - Added config diff visualization in Settings > Diagnostics by exposing recent audit entries and changed JSON paths per mutation source.
 - Added generated external config schema (`config.schema.json`) from Rust types plus runtime schema validation command and diagnostics status/errors view.
 - Replaced shared runtime config access in app state from `Mutex<VantaConfig>` to `RwLock<VantaConfig>` and updated read/write callsites across launcher, workflows, and community paths.
+- Started Phase 42 calculator enhancements by adding `0x`/`0b`/`0o` base literal support (including underscore separators) in expression evaluation with dedicated tests.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.
