@@ -16,12 +16,8 @@
   import { applyTheme, validateThemeTokens } from "$lib/theme";
   import SettingsView from "$lib/components/SettingsView.svelte";
   import PermissionModal from "$lib/components/PermissionModal.svelte";
-  import StoreView from "$lib/components/StoreView.svelte";
   import ClipboardView from "$lib/components/ClipboardView.svelte";
   import FeatureHubWindow from "$lib/components/FeatureHubWindow.svelte";
-  import CommunityHubWindow from "$lib/components/CommunityHubWindow.svelte";
-  import ThemeStudioWindow from "$lib/components/ThemeStudioWindow.svelte";
-  import ExtensionsHubWindow from "$lib/components/ExtensionsHubWindow.svelte";
   import SpotifyMiniPlayer from "$lib/components/SpotifyMiniPlayer.svelte";
   import ExtensionHost from "$lib/components/ExtensionHost.svelte";
   import LauncherView from "$lib/components/LauncherView.svelte";
@@ -52,6 +48,10 @@
   let availableThemes: ThemeMeta[] = $state([]);
   let clipboardHistory: any[] = $state([]);
   let launcherRef: LauncherView | undefined = $state();
+  let StoreViewLazy = $state<any>(null);
+  let CommunityHubWindowLazy = $state<any>(null);
+  let ThemeStudioWindowLazy = $state<any>(null);
+  let ExtensionsHubWindowLazy = $state<any>(null);
 
   const viewLabels: Record<ViewId, string> = {
     launcher: "Search",
@@ -86,6 +86,24 @@
 
   function notify(options: ToastOptions) {
     addToast(options);
+  }
+
+  async function ensureLazyView(viewId: ViewId) {
+    if (viewId === "store" && !StoreViewLazy) {
+      StoreViewLazy = (await import("$lib/components/StoreView.svelte")).default;
+      return;
+    }
+    if (viewId === "communityHub" && !CommunityHubWindowLazy) {
+      CommunityHubWindowLazy = (await import("$lib/components/CommunityHubWindow.svelte")).default;
+      return;
+    }
+    if (viewId === "themeHub" && !ThemeStudioWindowLazy) {
+      ThemeStudioWindowLazy = (await import("$lib/components/ThemeStudioWindow.svelte")).default;
+      return;
+    }
+    if (viewId === "extensionsHub" && !ExtensionsHubWindowLazy) {
+      ExtensionsHubWindowLazy = (await import("$lib/components/ExtensionsHubWindow.svelte")).default;
+    }
   }
 
   async function maybeRescanApps(force = false) {
@@ -212,6 +230,7 @@
   $effect(() => {
     if (isMiniPlayer) return;
     const current = view;
+    void ensureLazyView(current);
     void invoke("set_ui_last_view", { view: current }).catch((e) => {
       console.error("Failed to persist active view", e);
     });
@@ -339,7 +358,11 @@
 
     {#if view === "store"}
       <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
-        <StoreView onClose={() => (view = "launcher")} onToast={notify} />
+        {#if StoreViewLazy}
+          <StoreViewLazy onClose={() => (view = "launcher")} onToast={notify} />
+        {:else}
+          <div class="loading-view">Loading Store...</div>
+        {/if}
       </div>
     {:else if view === "featureHub"}
       <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
@@ -354,27 +377,39 @@
       </div>
     {:else if view === "communityHub" && vantaConfig}
       <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
-        <CommunityHubWindow
-          communityFeedOptIn={vantaConfig.general.community_feed_opt_in ?? false}
-          onToggleFeedOptIn={async (next) => {
-            if (!vantaConfig) return;
-            vantaConfig.general.community_feed_opt_in = next;
-            try { await invoke("save_config", { newConfig: vantaConfig }); }
-            catch (e) {
-              console.error("Failed to save community feed opt-in", e);
-              notify({ title: "Save Failed", message: String(e), type: "error" });
-            }
-          }}
-          onClose={() => (view = "featureHub")}
-        />
+        {#if CommunityHubWindowLazy}
+          <CommunityHubWindowLazy
+            communityFeedOptIn={vantaConfig.general.community_feed_opt_in ?? false}
+            onToggleFeedOptIn={async (next: boolean) => {
+              if (!vantaConfig) return;
+              vantaConfig.general.community_feed_opt_in = next;
+              try { await invoke("save_config", { newConfig: vantaConfig }); }
+              catch (e) {
+                console.error("Failed to save community feed opt-in", e);
+                notify({ title: "Save Failed", message: String(e), type: "error" });
+              }
+            }}
+            onClose={() => (view = "featureHub")}
+          />
+        {:else}
+          <div class="loading-view">Loading Community Hub...</div>
+        {/if}
       </div>
     {:else if view === "themeHub" && vantaConfig}
       <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
-        <ThemeStudioWindow bind:config={vantaConfig} {availableThemes} onClose={() => (view = "featureHub")} />
+        {#if ThemeStudioWindowLazy}
+          <ThemeStudioWindowLazy bind:config={vantaConfig} {availableThemes} onClose={() => (view = "featureHub")} />
+        {:else}
+          <div class="loading-view">Loading Theme Studio...</div>
+        {/if}
       </div>
     {:else if view === "extensionsHub"}
       <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
-        <ExtensionsHubWindow onClose={() => (view = "featureHub")} onOpenStore={() => (view = "store")} />
+        {#if ExtensionsHubWindowLazy}
+          <ExtensionsHubWindowLazy onClose={() => (view = "featureHub")} onOpenStore={() => (view = "store")} />
+        {:else}
+          <div class="loading-view">Loading Extensions Hub...</div>
+        {/if}
       </div>
     {:else if view === "settings" && vantaConfig}
       <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
@@ -437,3 +472,14 @@
     {/if}
   </div>
 {/if}
+
+<style>
+  .loading-view {
+    height: 100%;
+    width: 100%;
+    display: grid;
+    place-items: center;
+    color: var(--text-secondary, #9aa0aa);
+    font-size: 0.95rem;
+  }
+</style>
