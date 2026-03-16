@@ -329,6 +329,18 @@ export interface RecoveryHint {
     detail: string;
 }
 
+export interface ConfigDiffEntry {
+    path: string;
+    before?: unknown;
+    after?: unknown;
+}
+
+export interface ConfigAuditEntry {
+    timestamp_ms: number;
+    source: string;
+    diff: ConfigDiffEntry[];
+}
+
 export interface ResultAction {
     label: string;
     exec?: string;

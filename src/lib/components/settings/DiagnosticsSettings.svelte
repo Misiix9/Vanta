@@ -1,13 +1,14 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
-    import type { SearchDiagnostics, HealthDashboard, RecoveryHint, SupportBundleReport } from "$lib/types";
+    import type { SearchDiagnostics, HealthDashboard, RecoveryHint, SupportBundleReport, ConfigAuditEntry } from "$lib/types";
     import LoadingSkeleton from "$lib/components/LoadingSkeleton.svelte";
     import ActionConfirmModal from "$lib/components/ActionConfirmModal.svelte";
 
     let diagnostics: SearchDiagnostics | null = $state(null);
     let healthDashboard: HealthDashboard | null = $state(null);
     let recoveryHints: RecoveryHint[] = $state([]);
+    let configAudit: ConfigAuditEntry[] = $state([]);
     let supportBundle: SupportBundleReport | null = $state(null);
     let supportBusy = $state(false);
     let resetBusy = $state(false);
@@ -29,12 +30,16 @@
         catch (e) { console.error("Failed to load recovery hints:", e); }
     }
 
+    async function loadConfigAudit() {
+        try { configAudit = await invoke<ConfigAuditEntry[]>("get_config_audit", { limit: 40 }); }
+        catch (e) { console.error("Failed to load config audit:", e); }
+    }
+
     async function buildSupportBundle() {
         supportBusy = true;
         try {
             supportBundle = await invoke<SupportBundleReport>("create_support_bundle", { outputPath: null });
-            await loadHealthDashboard();
-            await loadRecoveryHints();
+            await Promise.all([loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit()]);
         } catch (e) { console.error("Failed to create support bundle:", e); }
         finally { supportBusy = false; }
     }
@@ -44,7 +49,7 @@
         try {
             await invoke("factory_reset_config");
             supportBundle = null;
-            await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints()]);
+            await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit()]);
         } catch (e) {
             console.error("Failed to factory reset config:", e);
         } finally {
@@ -54,7 +59,7 @@
     }
 
     onMount(async () => {
-        await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints()]);
+        await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit()]);
         loading = false;
     });
 </script>
@@ -66,6 +71,7 @@
         <button class="close-btn" onclick={loadDiagnostics}>Refresh Metrics</button>
         <button class="close-btn" onclick={loadHealthDashboard}>Refresh Health</button>
         <button class="close-btn" onclick={loadRecoveryHints}>Refresh Hints</button>
+        <button class="close-btn" onclick={loadConfigAudit}>Refresh Config Audit</button>
         <button class="close-btn" onclick={buildSupportBundle} disabled={supportBusy}>
             {supportBusy ? "Building..." : "Create Support Bundle"}
         </button>
@@ -117,6 +123,32 @@
         </ul>
     </div>
 
+    <div class="control-group control-group-block">
+        <h4>Config Audit (Recent)</h4>
+        <ul class="hint-list">
+            {#if configAudit.length === 0}
+                <li>No config mutations recorded yet.</li>
+            {:else}
+                {#each [...configAudit].reverse() as entry}
+                    <li>
+                        <strong>{new Date(entry.timestamp_ms).toLocaleString()}</strong>
+                        [{entry.source}] - {entry.diff.length} change{entry.diff.length === 1 ? "" : "s"}
+                        {#if entry.diff.length > 0}
+                            <div class="audit-diff-paths">
+                                {#each entry.diff.slice(0, 8) as item}
+                                    <code>{item.path || "(root)"}</code>
+                                {/each}
+                                {#if entry.diff.length > 8}
+                                    <span>+{entry.diff.length - 8} more</span>
+                                {/if}
+                            </div>
+                        {/if}
+                    </li>
+                {/each}
+            {/if}
+        </ul>
+    </div>
+
     {#if supportBundle}
         <div class="control-group control-group-block">
             <label>Latest Support Bundle <input type="text" value={supportBundle.path} readonly /></label>
@@ -141,5 +173,20 @@
     .danger-outline {
         border-color: color-mix(in srgb, var(--ds-danger, #d44) 45%, transparent);
         color: var(--ds-danger, #d44);
+    }
+
+    .audit-diff-paths {
+        margin-top: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .audit-diff-paths code {
+        font-size: 0.78rem;
+        padding: 2px 6px;
+        border-radius: 6px;
+        background: color-mix(in srgb, var(--ds-surface, #1b1b1f) 80%, black 20%);
+        border: 1px solid color-mix(in srgb, var(--ds-border, rgba(255,255,255,0.16)) 70%, transparent);
     }
 </style>

@@ -533,6 +533,7 @@ Implementation notes (March 2026):
 - Added startup-safe UI/window state persistence via `ui-state.json`, restoring launcher size/position and last active view across restarts while continuously saving move/resize/view updates.
 - Added centralized config audit trail (`config-audit.jsonl`) with timestamp/source (`user`, `migration`, `community`, `indexer`, etc.) and recursive JSON-path diffs for every config mutation.
 - Added one-click factory reset command and Settings > Diagnostics confirmation flow to restore full config defaults and broadcast refreshed state immediately.
+- Added config diff visualization in Settings > Diagnostics by exposing recent audit entries and changed JSON paths per mutation source.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.
