@@ -539,6 +539,7 @@ Implementation notes (March 2026):
 - Started Phase 42 calculator enhancements by adding `0x`/`0b`/`0o` base literal support (including underscore separators) in expression evaluation with dedicated tests.
 - Added unit conversion parsing for calculator queries (`km`↔`mi`, `kg`↔`lb`) with formatted copy-ready outputs and fallback to normal math evaluation.
 - Added timezone lookup calculator queries (for example `time in tokyo` / `tz berlin`) with city alias resolution, IANA fallback parsing, and copyable formatted time output.
+- Added offline currency conversion support in calculator queries (`USD`/`EUR`/`GBP`/`JPY` and more) using bundled rate table parsing with copy-ready formatted outputs.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.

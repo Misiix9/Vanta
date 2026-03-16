@@ -14,6 +14,11 @@ static UNIT_CONVERSION_RE: LazyLock<Regex> = LazyLock::new(|| {
         .expect("unit conversion regex must be valid")
 });
 
+static CURRENCY_CONVERSION_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^\s*([-+]?[0-9]*\.?[0-9]+)\s*([a-z]{3})\s*(?:to|in)?\s*([a-z]{3})\s*$")
+        .expect("currency conversion regex must be valid")
+});
+
 static TIMEZONE_QUERY_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^\s*(?:time(?:zone)?(?:\s+in)?|tz)\s+([a-zA-Z0-9_./\- ]+)\s*$")
         .expect("timezone regex must be valid")
@@ -27,6 +32,31 @@ fn convert_units(value: f64, from: &str, to: &str) -> Option<f64> {
         ("lb", "kg") => Some(value / 2.204_622_621_8),
         _ => None,
     }
+}
+
+fn usd_per_unit(currency: &str) -> Option<f64> {
+    match currency {
+        "USD" => Some(1.0),
+        "EUR" => Some(1.09),
+        "GBP" => Some(1.28),
+        "JPY" => Some(0.0067),
+        "INR" => Some(0.012),
+        "CNY" => Some(0.14),
+        "CAD" => Some(0.74),
+        "AUD" => Some(0.66),
+        "CHF" => Some(1.11),
+        "SEK" => Some(0.096),
+        "NOK" => Some(0.094),
+        "SGD" => Some(0.74),
+        "AED" => Some(0.272),
+        _ => None,
+    }
+}
+
+fn convert_currency(value: f64, from: &str, to: &str) -> Option<f64> {
+    let from_usd = usd_per_unit(from)?;
+    let to_usd = usd_per_unit(to)?;
+    Some(value * from_usd / to_usd)
 }
 
 fn format_number(value: f64) -> String {
@@ -95,6 +125,15 @@ pub fn evaluate_display(expression: &str) -> Option<(String, String)> {
         let from = caps.get(2)?.as_str().to_ascii_lowercase();
         let to = caps.get(3)?.as_str().to_ascii_lowercase();
         let converted = convert_units(raw_value, &from, &to)?;
+        let display = format!("{} {}", format_number(converted), to);
+        return Some((display.clone(), display));
+    }
+
+    if let Some(caps) = CURRENCY_CONVERSION_RE.captures(trimmed) {
+        let raw_value = caps.get(1)?.as_str().parse::<f64>().ok()?;
+        let from = caps.get(2)?.as_str().to_ascii_uppercase();
+        let to = caps.get(3)?.as_str().to_ascii_uppercase();
+        let converted = convert_currency(raw_value, &from, &to)?;
         let display = format!("{} {}", format_number(converted), to);
         return Some((display.clone(), display));
     }
@@ -185,7 +224,9 @@ pub fn evaluate(expression: &str) -> Option<f64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{evaluate, evaluate_display, evaluate_timezone_display, resolve_timezone};
+    use super::{
+        evaluate, evaluate_display, evaluate_timezone_display, resolve_timezone,
+    };
 
     #[test]
     fn evaluates_hex_literal() {
@@ -242,5 +283,22 @@ mod tests {
         let out = evaluate_timezone_display("time in tokyo").expect("timezone output");
         assert!(out.0.contains("Asia/Tokyo"));
         assert!(!out.1.is_empty());
+    }
+
+    #[test]
+    fn converts_usd_to_eur() {
+        let out = evaluate_display("10 usd to eur").expect("currency output");
+        assert_eq!(out.0, "9.174312 EUR");
+    }
+
+    #[test]
+    fn converts_currency_without_to_keyword() {
+        let out = evaluate_display("2500 jpy usd").expect("currency output");
+        assert_eq!(out.0, "16.75 USD");
+    }
+
+    #[test]
+    fn rejects_unknown_currency() {
+        assert_eq!(evaluate_display("10 aaa usd"), None);
     }
 }
