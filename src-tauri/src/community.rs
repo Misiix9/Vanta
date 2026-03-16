@@ -146,12 +146,32 @@ fn community_default_trust(verified: bool) -> CommunityTrustMetadata {
 }
 
 fn workflow_has_risky_caps(workflow: &WorkflowMacro) -> bool {
-    workflow.steps.iter().any(|step| match step {
-        crate::config::MacroStep::Extension { capabilities, .. }
-        | crate::config::MacroStep::System { capabilities, .. } => capabilities.iter().any(|cap| {
-            matches!(cap, Capability::Shell | Capability::Filesystem | Capability::Network)
-        }),
-    })
+    fn steps_have_risky_caps(steps: &[crate::config::MacroStep]) -> bool {
+        steps.iter().any(|step| match step {
+            crate::config::MacroStep::Extension { capabilities, .. }
+            | crate::config::MacroStep::System { capabilities, .. } => capabilities.iter().any(
+                |cap| matches!(cap, Capability::Shell | Capability::Filesystem | Capability::Network),
+            ),
+            crate::config::MacroStep::If {
+                condition,
+                then_steps,
+                else_steps,
+            } => {
+                let cond_risky = match condition {
+                    crate::config::WorkflowCondition::SystemCommandExitCode {
+                        capabilities,
+                        ..
+                    } => capabilities.iter().any(|cap| {
+                        matches!(cap, Capability::Shell | Capability::Filesystem | Capability::Network)
+                    }),
+                    _ => false,
+                };
+                cond_risky || steps_have_risky_caps(then_steps) || steps_have_risky_caps(else_steps)
+            }
+        })
+    }
+
+    steps_have_risky_caps(&workflow.steps)
 }
 
 fn is_valid_identifier(id: &str) -> bool {

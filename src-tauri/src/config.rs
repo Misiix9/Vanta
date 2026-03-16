@@ -473,6 +473,27 @@ pub struct MacroArg {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
+pub enum WorkflowCondition {
+    StepOutputContains {
+        step: usize,
+        value: String,
+    },
+    StepOutputEquals {
+        step: usize,
+        value: String,
+    },
+    SystemCommandExitCode {
+        command: String,
+        #[serde(default)]
+        args: Vec<String>,
+        equals: i32,
+        #[serde(default)]
+        capabilities: Vec<Capability>,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum MacroStep {
     Extension {
         ext_id: String,
@@ -488,6 +509,13 @@ pub enum MacroStep {
         args: Vec<String>,
         #[serde(default)]
         capabilities: Vec<Capability>,
+    },
+    If {
+        condition: WorkflowCondition,
+        #[serde(default)]
+        then_steps: Vec<MacroStep>,
+        #[serde(default)]
+        else_steps: Vec<MacroStep>,
     },
 }
 

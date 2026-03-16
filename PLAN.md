@@ -519,6 +519,12 @@ Implementation notes (March 2026):
   - Workflows can nest and schedule.
   - Sensitive data is encrypted.
 
+Implementation notes (March 2026):
+- Added step-output chaining support in blocking workflow execution: successful system-step stdout is now exposed as `{step.N.output}` for downstream steps.
+- Introduced conditional workflow steps with `if` branches and `else` fallback (`kind: "if"`) and condition expressions for step-output checks and command exit-code checks.
+- Extended dry-run preflight to traverse conditional branches for capability visibility so permission prompts happen before job execution.
+- Non-blocking `run_macro` now returns a clear error for conditional workflows and routes users toward macro job execution path.
+
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.
 - **Prerequisites:** Phase 40.

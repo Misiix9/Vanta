@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::State;
 
-use crate::config::{MacroArg, MacroStep, WorkflowMacro};
+use crate::config::{MacroArg, MacroStep, WorkflowCondition, WorkflowMacro};
 use crate::errors::VantaError;
 use crate::extensions;
 use crate::permissions::{self, Capability, Decision};
@@ -56,6 +56,7 @@ pub struct MacroRunResult {
 enum ResolvedKind {
     Extension { ext_id: String, command: String },
     System { command: String },
+    Condition { label: String },
 }
 
 #[derive(Debug, Clone)]
@@ -94,12 +95,14 @@ pub fn dry_run_macro(
             kind: match step.kind {
                 ResolvedKind::Extension { .. } => "extension".to_string(),
                 ResolvedKind::System { .. } => "system".to_string(),
+                ResolvedKind::Condition { .. } => "condition".to_string(),
             },
             command: match &step.kind {
                 ResolvedKind::Extension { ext_id, command } => {
                     format!("{}:{}", ext_id, command)
                 }
                 ResolvedKind::System { command } => command.clone(),
+                ResolvedKind::Condition { label } => label.clone(),
             },
             args: step.args.clone(),
             capabilities: step.capabilities.clone(),
@@ -135,6 +138,11 @@ pub fn run_macro(
     app_handle: &tauri::AppHandle,
 ) -> Result<MacroRunResult, VantaError> {
     let macro_def = fetch_macro(state, macro_id)?;
+    if contains_conditional_steps(&macro_def.steps) {
+        return Err(
+            "Conditional workflow steps require macro job execution (blocking runner).".into(),
+        );
+    }
     let arg_map = resolve_args(&macro_def.args, &provided_args)?;
     let resolved_steps = resolve_steps(&macro_def, &arg_map)?;
 
@@ -215,6 +223,12 @@ pub fn run_macro(
                     status: "ok".to_string(),
                 });
             }
+            ResolvedKind::Condition { .. } => {
+                return Err(
+                    "Conditional workflow steps require macro job execution (blocking runner)."
+                        .into(),
+                );
+            }
         }
     }
 
@@ -235,91 +249,7 @@ pub fn run_macro_blocking(
     let mut value_map = arg_map.clone();
 
     let mut steps = Vec::new();
-
-    for (idx, step) in macro_def.steps.iter().enumerate() {
-        match step {
-            MacroStep::Extension {
-                ext_id,
-                command,
-                args,
-                capabilities,
-            } => {
-                let rendered_args = render_tokens(args, &value_map)?;
-                let step_id = format!("macro:{}:ext:{}:{}", macro_def.id, ext_id, command);
-
-                match extensions::check_extension_permissions(&step_id, capabilities) {
-                    Ok(()) => {}
-                    Err(extensions::PermissionError::NeedsPrompt { missing_caps }) => {
-                        let payload = json!({
-                            "script_id": step_id,
-                            "missing_caps": missing_caps,
-                            "requested_caps": capabilities,
-                        });
-                        return Err(format!("PERMISSION_NEEDED:{}", payload).into());
-                    }
-                    Err(extensions::PermissionError::Deny) => {
-                        let payload = json!({
-                            "script_id": step_id,
-                            "requested_caps": capabilities,
-                        });
-                        return Err(format!("PERMISSION_DENIED:{}", payload).into());
-                    }
-                }
-
-                steps.push(MacroRunStepResult {
-                    index: idx,
-                    kind: "extension".to_string(),
-                    command: format!("{}:{}", ext_id, command),
-                    args: rendered_args,
-                    capabilities: capabilities.clone(),
-                    status: "ok".to_string(),
-                });
-
-                value_map.insert(step_output_placeholder(idx), String::new());
-            }
-            MacroStep::System {
-                command,
-                args,
-                capabilities,
-            } => {
-                require_system_capabilities(capabilities)?;
-                let rendered_args = render_tokens(args, &value_map)?;
-                let step_id = format!("macro:{}:system:{}:{}", macro_def.id, command, idx);
-
-                match extensions::check_extension_permissions(&step_id, capabilities) {
-                    Ok(()) => {}
-                    Err(extensions::PermissionError::NeedsPrompt { missing_caps }) => {
-                        let payload = json!({
-                            "script_id": step_id,
-                            "missing_caps": missing_caps,
-                            "requested_caps": capabilities,
-                        });
-                        return Err(format!("PERMISSION_NEEDED:{}", payload).into());
-                    }
-                    Err(extensions::PermissionError::Deny) => {
-                        let payload = json!({
-                            "script_id": step_id,
-                            "requested_caps": capabilities,
-                        });
-                        return Err(format!("PERMISSION_DENIED:{}", payload).into());
-                    }
-                }
-
-                let captured = execute_system_blocking_capture(command, &rendered_args)?;
-
-                steps.push(MacroRunStepResult {
-                    index: idx,
-                    kind: "system".to_string(),
-                    command: command.clone(),
-                    args: rendered_args,
-                    capabilities: capabilities.clone(),
-                    status: "ok".to_string(),
-                });
-
-                value_map.insert(step_output_placeholder(idx), captured);
-            }
-        }
-    }
+    execute_steps_blocking(&macro_def.id, &macro_def.steps, "root", &mut value_map, &mut steps)?;
 
     Ok(MacroRunResult {
         macro_id: macro_def.id,
@@ -397,6 +327,13 @@ fn render_tokens(
     Ok(rendered)
 }
 
+fn render_token(token: &str, value_map: &HashMap<String, String>) -> Result<String, VantaError> {
+    Ok(render_tokens(&[token.to_string()], value_map)?
+        .into_iter()
+        .next()
+        .unwrap_or_default())
+}
+
 fn step_output_placeholder(index: usize) -> String {
     format!("step.{}.output", index + 1)
 }
@@ -423,13 +360,239 @@ fn execute_system_blocking_capture(command: &str, args: &[String]) -> Result<Str
     }
 }
 
+fn execute_system_blocking_exit_code(command: &str, args: &[String]) -> Result<i32, VantaError> {
+    let status = Command::new(command)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .status()
+        .map_err(|e| format!("Failed to run '{}' in blocking mode: {}", command, e))?;
+    Ok(status.code().unwrap_or(-1))
+}
+
+fn ensure_permissions(step_id: &str, capabilities: &[Capability]) -> Result<(), VantaError> {
+    match extensions::check_extension_permissions(step_id, capabilities) {
+        Ok(()) => Ok(()),
+        Err(extensions::PermissionError::NeedsPrompt { missing_caps }) => {
+            let payload = json!({
+                "script_id": step_id,
+                "missing_caps": missing_caps,
+                "requested_caps": capabilities,
+            });
+            Err(format!("PERMISSION_NEEDED:{}", payload).into())
+        }
+        Err(extensions::PermissionError::Deny) => {
+            let payload = json!({
+                "script_id": step_id,
+                "requested_caps": capabilities,
+            });
+            Err(format!("PERMISSION_DENIED:{}", payload).into())
+        }
+    }
+}
+
+fn contains_conditional_steps(steps: &[MacroStep]) -> bool {
+    for step in steps {
+        if let MacroStep::If {
+            then_steps,
+            else_steps,
+            ..
+        } = step
+        {
+            if contains_conditional_steps(then_steps) || contains_conditional_steps(else_steps) {
+                return true;
+            }
+            return true;
+        }
+    }
+    false
+}
+
+fn describe_condition(condition: &WorkflowCondition) -> String {
+    match condition {
+        WorkflowCondition::StepOutputContains { step, value } => {
+            format!("step.{}.output contains '{}'", step, value)
+        }
+        WorkflowCondition::StepOutputEquals { step, value } => {
+            format!("step.{}.output == '{}'", step, value)
+        }
+        WorkflowCondition::SystemCommandExitCode {
+            command,
+            equals,
+            ..
+        } => format!("{} exit_code == {}", command, equals),
+    }
+}
+
+fn evaluate_condition(
+    macro_id: &str,
+    path: &str,
+    condition: &WorkflowCondition,
+    value_map: &HashMap<String, String>,
+) -> Result<(bool, Vec<String>, Vec<Capability>), VantaError> {
+    match condition {
+        WorkflowCondition::StepOutputContains { step, value } => {
+            if *step == 0 {
+                return Err("Condition step index must be 1-based".into());
+            }
+            let needle = render_token(value, value_map)?;
+            let key = step_output_placeholder(step - 1);
+            let haystack = value_map
+                .get(&key)
+                .ok_or_else(|| format!("Condition references missing {}", key))?
+                .clone();
+            Ok((haystack.contains(&needle), vec![needle], Vec::new()))
+        }
+        WorkflowCondition::StepOutputEquals { step, value } => {
+            if *step == 0 {
+                return Err("Condition step index must be 1-based".into());
+            }
+            let expected = render_token(value, value_map)?;
+            let key = step_output_placeholder(step - 1);
+            let actual = value_map
+                .get(&key)
+                .ok_or_else(|| format!("Condition references missing {}", key))?
+                .clone();
+            Ok((actual == expected, vec![expected], Vec::new()))
+        }
+        WorkflowCondition::SystemCommandExitCode {
+            command,
+            args,
+            equals,
+            capabilities,
+        } => {
+            require_system_capabilities(capabilities)?;
+            let rendered_cmd = render_token(command, value_map)?;
+            let rendered_args = render_tokens(args, value_map)?;
+            let step_id = format!("macro:{}:if:{}:exit_code", macro_id, path);
+            ensure_permissions(&step_id, capabilities)?;
+            let code = execute_system_blocking_exit_code(&rendered_cmd, &rendered_args)?;
+            Ok((code == *equals, rendered_args, capabilities.clone()))
+        }
+    }
+}
+
+fn execute_steps_blocking(
+    macro_id: &str,
+    steps_def: &[MacroStep],
+    path: &str,
+    value_map: &mut HashMap<String, String>,
+    steps: &mut Vec<MacroRunStepResult>,
+) -> Result<(), VantaError> {
+    for (idx, step) in steps_def.iter().enumerate() {
+        let step_path = format!("{}.{}", path, idx);
+        match step {
+            MacroStep::Extension {
+                ext_id,
+                command,
+                args,
+                capabilities,
+            } => {
+                let rendered_args = render_tokens(args, value_map)?;
+                let step_id = format!("macro:{}:ext:{}", macro_id, step_path);
+                ensure_permissions(&step_id, capabilities)?;
+
+                let step_index = steps.len();
+                steps.push(MacroRunStepResult {
+                    index: step_index,
+                    kind: "extension".to_string(),
+                    command: format!("{}:{}", ext_id, command),
+                    args: rendered_args,
+                    capabilities: capabilities.clone(),
+                    status: "ok".to_string(),
+                });
+                value_map.insert(step_output_placeholder(step_index), String::new());
+            }
+            MacroStep::System {
+                command,
+                args,
+                capabilities,
+            } => {
+                require_system_capabilities(capabilities)?;
+                let rendered_args = render_tokens(args, value_map)?;
+                let step_id = format!("macro:{}:system:{}", macro_id, step_path);
+                ensure_permissions(&step_id, capabilities)?;
+
+                let captured = execute_system_blocking_capture(command, &rendered_args)?;
+                let step_index = steps.len();
+                steps.push(MacroRunStepResult {
+                    index: step_index,
+                    kind: "system".to_string(),
+                    command: command.clone(),
+                    args: rendered_args,
+                    capabilities: capabilities.clone(),
+                    status: "ok".to_string(),
+                });
+                value_map.insert(step_output_placeholder(step_index), captured);
+            }
+            MacroStep::If {
+                condition,
+                then_steps,
+                else_steps,
+            } => {
+                let (matched, cond_args, cond_caps) =
+                    evaluate_condition(macro_id, &step_path, condition, value_map)?;
+                let step_index = steps.len();
+                steps.push(MacroRunStepResult {
+                    index: step_index,
+                    kind: "condition".to_string(),
+                    command: describe_condition(condition),
+                    args: cond_args,
+                    capabilities: cond_caps,
+                    status: if matched {
+                        "true".to_string()
+                    } else {
+                        "false".to_string()
+                    },
+                });
+                value_map.insert(
+                    step_output_placeholder(step_index),
+                    if matched { "true" } else { "false" }.to_string(),
+                );
+
+                if matched {
+                    execute_steps_blocking(
+                        macro_id,
+                        then_steps,
+                        &format!("{}.then", step_path),
+                        value_map,
+                        steps,
+                    )?;
+                } else {
+                    execute_steps_blocking(
+                        macro_id,
+                        else_steps,
+                        &format!("{}.else", step_path),
+                        value_map,
+                        steps,
+                    )?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn resolve_steps(
     macro_def: &WorkflowMacro,
     arg_map: &HashMap<String, String>,
 ) -> Result<Vec<ResolvedStep>, VantaError> {
     let mut steps = Vec::new();
 
-    for (idx, step) in macro_def.steps.iter().enumerate() {
+    resolve_steps_recursive(&macro_def.id, &macro_def.steps, arg_map, "root", &mut steps)?;
+
+    Ok(steps)
+}
+
+fn resolve_steps_recursive(
+    macro_id: &str,
+    steps_def: &[MacroStep],
+    arg_map: &HashMap<String, String>,
+    path: &str,
+    out: &mut Vec<ResolvedStep>,
+) -> Result<(), VantaError> {
+    for (idx, step) in steps_def.iter().enumerate() {
+        let step_path = format!("{}.{}", path, idx);
         match step {
             MacroStep::Extension {
                 ext_id,
@@ -438,8 +601,8 @@ fn resolve_steps(
                 capabilities,
             } => {
                 let rendered_args = render_tokens(args, arg_map)?;
-                steps.push(ResolvedStep {
-                    id: format!("macro:{}:ext:{}:{}", macro_def.id, ext_id, command),
+                out.push(ResolvedStep {
+                    id: format!("macro:{}:ext:{}", macro_id, step_path),
                     kind: ResolvedKind::Extension {
                         ext_id: ext_id.clone(),
                         command: command.clone(),
@@ -455,8 +618,8 @@ fn resolve_steps(
             } => {
                 require_system_capabilities(capabilities)?;
                 let rendered_args = render_tokens(args, arg_map)?;
-                steps.push(ResolvedStep {
-                    id: format!("macro:{}:system:{}:{}", macro_def.id, command, idx),
+                out.push(ResolvedStep {
+                    id: format!("macro:{}:system:{}", macro_id, step_path),
                     kind: ResolvedKind::System {
                         command: command.clone(),
                     },
@@ -464,10 +627,64 @@ fn resolve_steps(
                     capabilities: capabilities.clone(),
                 });
             }
+            MacroStep::If {
+                condition,
+                then_steps,
+                else_steps,
+            } => {
+                let (args, capabilities) = resolve_condition_preview(condition, arg_map)?;
+                out.push(ResolvedStep {
+                    id: format!("macro:{}:if:{}", macro_id, step_path),
+                    kind: ResolvedKind::Condition {
+                        label: describe_condition(condition),
+                    },
+                    args,
+                    capabilities,
+                });
+                resolve_steps_recursive(
+                    macro_id,
+                    then_steps,
+                    arg_map,
+                    &format!("{}.then", step_path),
+                    out,
+                )?;
+                resolve_steps_recursive(
+                    macro_id,
+                    else_steps,
+                    arg_map,
+                    &format!("{}.else", step_path),
+                    out,
+                )?;
+            }
         }
     }
 
-    Ok(steps)
+    Ok(())
+}
+
+fn resolve_condition_preview(
+    condition: &WorkflowCondition,
+    arg_map: &HashMap<String, String>,
+) -> Result<(Vec<String>, Vec<Capability>), VantaError> {
+    match condition {
+        WorkflowCondition::StepOutputContains { value, .. }
+        | WorkflowCondition::StepOutputEquals { value, .. } => {
+            let rendered_value = render_token(value, arg_map)?;
+            Ok((vec![rendered_value], Vec::new()))
+        }
+        WorkflowCondition::SystemCommandExitCode {
+            command,
+            args,
+            capabilities,
+            ..
+        } => {
+            require_system_capabilities(capabilities)?;
+            let mut rendered = Vec::new();
+            rendered.push(render_token(command, arg_map)?);
+            rendered.extend(render_tokens(args, arg_map)?);
+            Ok((rendered, capabilities.clone()))
+        }
+    }
 }
 
 fn require_system_capabilities(caps: &[Capability]) -> Result<(), VantaError> {
@@ -512,5 +729,37 @@ mod tests {
     fn system_steps_require_capabilities() {
         let caps: Vec<Capability> = Vec::new();
         assert!(require_system_capabilities(&caps).is_err());
+    }
+
+    #[test]
+    fn detects_conditional_steps_recursively() {
+        let steps = vec![MacroStep::If {
+            condition: WorkflowCondition::StepOutputEquals {
+                step: 1,
+                value: "ok".to_string(),
+            },
+            then_steps: vec![MacroStep::System {
+                command: "echo".to_string(),
+                args: vec!["yes".to_string()],
+                capabilities: vec![Capability::Shell],
+            }],
+            else_steps: Vec::new(),
+        }];
+
+        assert!(contains_conditional_steps(&steps));
+    }
+
+    #[test]
+    fn evaluates_step_output_contains_condition() {
+        let mut map = HashMap::new();
+        map.insert("step.1.output".to_string(), "hello world".to_string());
+
+        let condition = WorkflowCondition::StepOutputContains {
+            step: 1,
+            value: "world".to_string(),
+        };
+
+        let (matched, _args, _caps) = evaluate_condition("m", "root.0", &condition, &map).unwrap();
+        assert!(matched);
     }
 }

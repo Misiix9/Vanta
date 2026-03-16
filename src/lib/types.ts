@@ -135,9 +135,21 @@ export interface MacroArg {
     default_value?: string | null;
 }
 
+export type WorkflowCondition =
+    | { kind: "step_output_contains"; step: number; value: string }
+    | { kind: "step_output_equals"; step: number; value: string }
+    | {
+        kind: "system_command_exit_code";
+        command: string;
+        args?: string[];
+        equals: number;
+        capabilities?: Capability[];
+    };
+
 export type MacroStep =
     | { kind: "extension"; ext_id: string; command: string; args?: string[]; capabilities?: Capability[] }
-    | { kind: "system"; command: string; args?: string[]; capabilities?: Capability[] };
+    | { kind: "system"; command: string; args?: string[]; capabilities?: Capability[] }
+    | { kind: "if"; condition: WorkflowCondition; then_steps?: MacroStep[]; else_steps?: MacroStep[] };
 
 export interface WorkflowMacro {
     id: string;
