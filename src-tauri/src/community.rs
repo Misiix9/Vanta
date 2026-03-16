@@ -156,6 +156,7 @@ fn workflow_has_risky_caps(workflow: &WorkflowMacro) -> bool {
                 condition,
                 then_steps,
                 else_steps,
+                ..
             } => {
                 let cond_risky = match condition {
                     crate::config::WorkflowCondition::SystemCommandExitCode {
@@ -213,12 +214,14 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
                         command: "xdg-open".to_string(),
                         args: vec!["{project_path}".to_string()],
                         capabilities: vec![Capability::Filesystem],
+                        on_error: crate::config::StepErrorHandling::default(),
                     },
                     crate::config::MacroStep::Extension {
                         ext_id: "sync-project".to_string(),
                         command: "sync".to_string(),
                         args: vec!["--branch".to_string(), "{branch}".to_string()],
                         capabilities: vec![Capability::Shell],
+                        on_error: crate::config::StepErrorHandling::default(),
                     },
                 ],
             },
@@ -250,6 +253,7 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
                     command: "{app_exec}".to_string(),
                     args: Vec::new(),
                     capabilities: Vec::new(),
+                    on_error: crate::config::StepErrorHandling::default(),
                 }],
             },
         },
@@ -609,6 +613,7 @@ mod tests {
                 command: "echo".to_string(),
                 args: vec!["hello".to_string()],
                 capabilities: vec![Capability::Shell],
+                on_error: crate::config::StepErrorHandling::default(),
             }],
         };
 

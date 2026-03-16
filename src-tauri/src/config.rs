@@ -431,12 +431,14 @@ fn default_workflow_macros() -> Vec<WorkflowMacro> {
                 command: "xdg-open".to_string(),
                 args: vec!["{project_path}".to_string()],
                 capabilities: vec![Capability::Filesystem],
+                on_error: StepErrorHandling::default(),
             },
             MacroStep::Extension {
                 ext_id: "sync-project".to_string(),
                 command: "sync".to_string(),
                 args: vec!["--branch".to_string(), "{branch}".to_string()],
                 capabilities: vec![Capability::Shell],
+                on_error: StepErrorHandling::default(),
             },
         ],
     }]
@@ -493,6 +495,26 @@ pub enum WorkflowCondition {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct StepErrorHandling {
+    #[serde(default)]
+    pub retry_count: u8,
+    #[serde(default)]
+    pub skip_on_failure: bool,
+    #[serde(default)]
+    pub finally_steps: Vec<MacroStep>,
+}
+
+impl Default for StepErrorHandling {
+    fn default() -> Self {
+        Self {
+            retry_count: 0,
+            skip_on_failure: false,
+            finally_steps: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum MacroStep {
     Extension {
@@ -502,6 +524,8 @@ pub enum MacroStep {
         args: Vec<String>,
         #[serde(default)]
         capabilities: Vec<Capability>,
+        #[serde(default)]
+        on_error: StepErrorHandling,
     },
     System {
         command: String,
@@ -509,6 +533,8 @@ pub enum MacroStep {
         args: Vec<String>,
         #[serde(default)]
         capabilities: Vec<Capability>,
+        #[serde(default)]
+        on_error: StepErrorHandling,
     },
     If {
         condition: WorkflowCondition,
@@ -516,6 +542,8 @@ pub enum MacroStep {
         then_steps: Vec<MacroStep>,
         #[serde(default)]
         else_steps: Vec<MacroStep>,
+        #[serde(default)]
+        on_error: StepErrorHandling,
     },
 }
 
@@ -1120,12 +1148,14 @@ mod tests {
                         command: "xdg-open".to_string(),
                         args: vec!["{project_path}".to_string()],
                         capabilities: vec![Capability::Filesystem],
+                        on_error: StepErrorHandling::default(),
                     },
                     MacroStep::Extension {
                         ext_id: "sync-project".to_string(),
                         command: "sync".to_string(),
                         args: vec!["--branch".to_string(), "{branch}".to_string()],
                         capabilities: vec![Capability::Shell],
+                        on_error: StepErrorHandling::default(),
                     },
                 ],
             }],
@@ -1147,6 +1177,7 @@ mod tests {
                 command,
                 args,
                 capabilities,
+                ..
             } => {
                 assert_eq!(command, "xdg-open");
                 assert_eq!(args, &vec!["{project_path}".to_string()]);
@@ -1161,6 +1192,7 @@ mod tests {
                 command,
                 args,
                 capabilities,
+                ..
             } => {
                 assert_eq!(ext_id, "sync-project");
                 assert_eq!(command, "sync");

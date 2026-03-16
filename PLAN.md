@@ -524,6 +524,7 @@ Implementation notes (March 2026):
 - Introduced conditional workflow steps with `if` branches and `else` fallback (`kind: "if"`) and condition expressions for step-output checks and command exit-code checks.
 - Extended dry-run preflight to traverse conditional branches for capability visibility so permission prompts happen before job execution.
 - Non-blocking `run_macro` now returns a clear error for conditional workflows and routes users toward macro job execution path.
+- Added per-step error policy (`on_error`) with retry count, skip-on-failure behavior, and recursive `finally_steps` cleanup execution in the blocking runner.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.

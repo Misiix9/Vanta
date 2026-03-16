@@ -146,10 +146,35 @@ export type WorkflowCondition =
         capabilities?: Capability[];
     };
 
+export interface StepErrorHandling {
+    retry_count?: number;
+    skip_on_failure?: boolean;
+    finally_steps?: MacroStep[];
+}
+
 export type MacroStep =
-    | { kind: "extension"; ext_id: string; command: string; args?: string[]; capabilities?: Capability[] }
-    | { kind: "system"; command: string; args?: string[]; capabilities?: Capability[] }
-    | { kind: "if"; condition: WorkflowCondition; then_steps?: MacroStep[]; else_steps?: MacroStep[] };
+    | {
+        kind: "extension";
+        ext_id: string;
+        command: string;
+        args?: string[];
+        capabilities?: Capability[];
+        on_error?: StepErrorHandling;
+    }
+    | {
+        kind: "system";
+        command: string;
+        args?: string[];
+        capabilities?: Capability[];
+        on_error?: StepErrorHandling;
+    }
+    | {
+        kind: "if";
+        condition: WorkflowCondition;
+        then_steps?: MacroStep[];
+        else_steps?: MacroStep[];
+        on_error?: StepErrorHandling;
+    };
 
 export interface WorkflowMacro {
     id: string;

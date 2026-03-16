@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::State;
 
-use crate::config::{MacroArg, MacroStep, WorkflowCondition, WorkflowMacro};
+use crate::config::{MacroArg, MacroStep, StepErrorHandling, WorkflowCondition, WorkflowMacro};
 use crate::errors::VantaError;
 use crate::extensions;
 use crate::permissions::{self, Capability, Decision};
@@ -471,6 +471,158 @@ fn evaluate_condition(
     }
 }
 
+struct StepExecutionResult {
+    kind: String,
+    command: String,
+    args: Vec<String>,
+    capabilities: Vec<Capability>,
+    status: String,
+    output: String,
+}
+
+fn step_error_policy(step: &MacroStep) -> &StepErrorHandling {
+    match step {
+        MacroStep::Extension { on_error, .. }
+        | MacroStep::System { on_error, .. }
+        | MacroStep::If { on_error, .. } => on_error,
+    }
+}
+
+fn step_preview(
+    step: &MacroStep,
+    value_map: &HashMap<String, String>,
+) -> Result<(String, String, Vec<String>, Vec<Capability>), VantaError> {
+    match step {
+        MacroStep::Extension {
+            ext_id,
+            command,
+            args,
+            capabilities,
+            ..
+        } => Ok((
+            "extension".to_string(),
+            format!("{}:{}", ext_id, command),
+            render_tokens(args, value_map)?,
+            capabilities.clone(),
+        )),
+        MacroStep::System {
+            command,
+            args,
+            capabilities,
+            ..
+        } => Ok((
+            "system".to_string(),
+            command.clone(),
+            render_tokens(args, value_map)?,
+            capabilities.clone(),
+        )),
+        MacroStep::If { condition, .. } => {
+            let (cond_args, cond_caps) = resolve_condition_preview(condition, value_map)?;
+            Ok((
+                "condition".to_string(),
+                describe_condition(condition),
+                cond_args,
+                cond_caps,
+            ))
+        }
+    }
+}
+
+fn execute_single_step(
+    macro_id: &str,
+    step: &MacroStep,
+    step_path: &str,
+    value_map: &mut HashMap<String, String>,
+    steps: &mut Vec<MacroRunStepResult>,
+) -> Result<StepExecutionResult, VantaError> {
+    match step {
+        MacroStep::Extension {
+            ext_id,
+            command,
+            args,
+            capabilities,
+            ..
+        } => {
+            let rendered_args = render_tokens(args, value_map)?;
+            let step_id = format!("macro:{}:ext:{}", macro_id, step_path);
+            ensure_permissions(&step_id, capabilities)?;
+            Ok(StepExecutionResult {
+                kind: "extension".to_string(),
+                command: format!("{}:{}", ext_id, command),
+                args: rendered_args,
+                capabilities: capabilities.clone(),
+                status: "ok".to_string(),
+                output: String::new(),
+            })
+        }
+        MacroStep::System {
+            command,
+            args,
+            capabilities,
+            ..
+        } => {
+            require_system_capabilities(capabilities)?;
+            let rendered_args = render_tokens(args, value_map)?;
+            let step_id = format!("macro:{}:system:{}", macro_id, step_path);
+            ensure_permissions(&step_id, capabilities)?;
+
+            let captured = execute_system_blocking_capture(command, &rendered_args)?;
+            Ok(StepExecutionResult {
+                kind: "system".to_string(),
+                command: command.clone(),
+                args: rendered_args,
+                capabilities: capabilities.clone(),
+                status: "ok".to_string(),
+                output: captured,
+            })
+        }
+        MacroStep::If {
+            condition,
+            then_steps,
+            else_steps,
+            ..
+        } => {
+            let (matched, cond_args, cond_caps) =
+                evaluate_condition(macro_id, step_path, condition, value_map)?;
+
+            if matched {
+                execute_steps_blocking(
+                    macro_id,
+                    then_steps,
+                    &format!("{}.then", step_path),
+                    value_map,
+                    steps,
+                )?;
+            } else {
+                execute_steps_blocking(
+                    macro_id,
+                    else_steps,
+                    &format!("{}.else", step_path),
+                    value_map,
+                    steps,
+                )?;
+            }
+
+            Ok(StepExecutionResult {
+                kind: "condition".to_string(),
+                command: describe_condition(condition),
+                args: cond_args,
+                capabilities: cond_caps,
+                status: if matched {
+                    "true".to_string()
+                } else {
+                    "false".to_string()
+                },
+                output: if matched {
+                    "true".to_string()
+                } else {
+                    "false".to_string()
+                },
+            })
+        }
+    }
+}
+
 fn execute_steps_blocking(
     macro_id: &str,
     steps_def: &[MacroStep],
@@ -480,93 +632,89 @@ fn execute_steps_blocking(
 ) -> Result<(), VantaError> {
     for (idx, step) in steps_def.iter().enumerate() {
         let step_path = format!("{}.{}", path, idx);
-        match step {
-            MacroStep::Extension {
-                ext_id,
-                command,
-                args,
-                capabilities,
-            } => {
-                let rendered_args = render_tokens(args, value_map)?;
-                let step_id = format!("macro:{}:ext:{}", macro_id, step_path);
-                ensure_permissions(&step_id, capabilities)?;
+        let policy = step_error_policy(step).clone();
 
+        let mut attempt = 0usize;
+        let mut success: Option<StepExecutionResult> = None;
+        let mut last_err: Option<VantaError> = None;
+
+        while attempt <= policy.retry_count as usize {
+            match execute_single_step(macro_id, step, &step_path, value_map, steps) {
+                Ok(result) => {
+                    success = Some(result);
+                    break;
+                }
+                Err(err) => {
+                    last_err = Some(err);
+                    if attempt == policy.retry_count as usize {
+                        break;
+                    }
+                    attempt += 1;
+                    continue;
+                }
+            }
+        }
+
+        if let Some(result) = success {
+            let step_index = steps.len();
+            let status = if attempt > 0 && result.status == "ok" {
+                format!("ok:retry-{}", attempt)
+            } else {
+                result.status
+            };
+            steps.push(MacroRunStepResult {
+                index: step_index,
+                kind: result.kind,
+                command: result.command,
+                args: result.args,
+                capabilities: result.capabilities,
+                status,
+            });
+            value_map.insert(step_output_placeholder(step_index), result.output);
+        } else {
+            let err = last_err.unwrap_or_else(|| "Workflow step failed".into());
+            if policy.skip_on_failure {
+                let (kind, command, args, capabilities) =
+                    step_preview(step, value_map).unwrap_or_else(|_| {
+                        (
+                            "unknown".to_string(),
+                            step_path.clone(),
+                            Vec::new(),
+                            Vec::new(),
+                        )
+                    });
                 let step_index = steps.len();
                 steps.push(MacroRunStepResult {
                     index: step_index,
-                    kind: "extension".to_string(),
-                    command: format!("{}:{}", ext_id, command),
-                    args: rendered_args,
-                    capabilities: capabilities.clone(),
-                    status: "ok".to_string(),
+                    kind,
+                    command,
+                    args,
+                    capabilities,
+                    status: format!("skipped_on_failure: {}", err),
                 });
                 value_map.insert(step_output_placeholder(step_index), String::new());
-            }
-            MacroStep::System {
-                command,
-                args,
-                capabilities,
-            } => {
-                require_system_capabilities(capabilities)?;
-                let rendered_args = render_tokens(args, value_map)?;
-                let step_id = format!("macro:{}:system:{}", macro_id, step_path);
-                ensure_permissions(&step_id, capabilities)?;
-
-                let captured = execute_system_blocking_capture(command, &rendered_args)?;
-                let step_index = steps.len();
-                steps.push(MacroRunStepResult {
-                    index: step_index,
-                    kind: "system".to_string(),
-                    command: command.clone(),
-                    args: rendered_args,
-                    capabilities: capabilities.clone(),
-                    status: "ok".to_string(),
-                });
-                value_map.insert(step_output_placeholder(step_index), captured);
-            }
-            MacroStep::If {
-                condition,
-                then_steps,
-                else_steps,
-            } => {
-                let (matched, cond_args, cond_caps) =
-                    evaluate_condition(macro_id, &step_path, condition, value_map)?;
-                let step_index = steps.len();
-                steps.push(MacroRunStepResult {
-                    index: step_index,
-                    kind: "condition".to_string(),
-                    command: describe_condition(condition),
-                    args: cond_args,
-                    capabilities: cond_caps,
-                    status: if matched {
-                        "true".to_string()
-                    } else {
-                        "false".to_string()
-                    },
-                });
-                value_map.insert(
-                    step_output_placeholder(step_index),
-                    if matched { "true" } else { "false" }.to_string(),
-                );
-
-                if matched {
+            } else {
+                if !policy.finally_steps.is_empty() {
                     execute_steps_blocking(
                         macro_id,
-                        then_steps,
-                        &format!("{}.then", step_path),
-                        value_map,
-                        steps,
-                    )?;
-                } else {
-                    execute_steps_blocking(
-                        macro_id,
-                        else_steps,
-                        &format!("{}.else", step_path),
+                        &policy.finally_steps,
+                        &format!("{}.finally", step_path),
                         value_map,
                         steps,
                     )?;
                 }
+                return Err(err);
             }
+        }
+
+        if !policy.finally_steps.is_empty() {
+            execute_steps_blocking(
+                macro_id,
+                &policy.finally_steps,
+                &format!("{}.finally", step_path),
+                value_map,
+                steps,
+            )?;
         }
     }
 
@@ -599,6 +747,7 @@ fn resolve_steps_recursive(
                 command,
                 args,
                 capabilities,
+                on_error,
             } => {
                 let rendered_args = render_tokens(args, arg_map)?;
                 out.push(ResolvedStep {
@@ -610,11 +759,19 @@ fn resolve_steps_recursive(
                     args: rendered_args,
                     capabilities: capabilities.clone(),
                 });
+                resolve_steps_recursive(
+                    macro_id,
+                    &on_error.finally_steps,
+                    arg_map,
+                    &format!("{}.finally", step_path),
+                    out,
+                )?;
             }
             MacroStep::System {
                 command,
                 args,
                 capabilities,
+                on_error,
             } => {
                 require_system_capabilities(capabilities)?;
                 let rendered_args = render_tokens(args, arg_map)?;
@@ -626,11 +783,19 @@ fn resolve_steps_recursive(
                     args: rendered_args,
                     capabilities: capabilities.clone(),
                 });
+                resolve_steps_recursive(
+                    macro_id,
+                    &on_error.finally_steps,
+                    arg_map,
+                    &format!("{}.finally", step_path),
+                    out,
+                )?;
             }
             MacroStep::If {
                 condition,
                 then_steps,
                 else_steps,
+                on_error,
             } => {
                 let (args, capabilities) = resolve_condition_preview(condition, arg_map)?;
                 out.push(ResolvedStep {
@@ -653,6 +818,13 @@ fn resolve_steps_recursive(
                     else_steps,
                     arg_map,
                     &format!("{}.else", step_path),
+                    out,
+                )?;
+                resolve_steps_recursive(
+                    macro_id,
+                    &on_error.finally_steps,
+                    arg_map,
+                    &format!("{}.finally", step_path),
                     out,
                 )?;
             }
@@ -742,8 +914,10 @@ mod tests {
                 command: "echo".to_string(),
                 args: vec!["yes".to_string()],
                 capabilities: vec![Capability::Shell],
+                on_error: StepErrorHandling::default(),
             }],
             else_steps: Vec::new(),
+            on_error: StepErrorHandling::default(),
         }];
 
         assert!(contains_conditional_steps(&steps));
@@ -761,5 +935,35 @@ mod tests {
 
         let (matched, _args, _caps) = evaluate_condition("m", "root.0", &condition, &map).unwrap();
         assert!(matched);
+    }
+
+    #[test]
+    fn resolve_steps_includes_finally_cleanup_steps() {
+        let macro_def = WorkflowMacro {
+            id: "m".to_string(),
+            name: "Macro".to_string(),
+            description: None,
+            args: Vec::new(),
+            enabled: true,
+            steps: vec![MacroStep::System {
+                command: "echo".to_string(),
+                args: vec!["one".to_string()],
+                capabilities: vec![Capability::Shell],
+                on_error: StepErrorHandling {
+                    retry_count: 0,
+                    skip_on_failure: false,
+                    finally_steps: vec![MacroStep::System {
+                        command: "echo".to_string(),
+                        args: vec!["cleanup".to_string()],
+                        capabilities: vec![Capability::Shell],
+                        on_error: StepErrorHandling::default(),
+                    }],
+                },
+            }],
+        };
+
+        let arg_map = HashMap::new();
+        let resolved = resolve_steps(&macro_def, &arg_map).unwrap();
+        assert_eq!(resolved.len(), 2);
     }
 }
