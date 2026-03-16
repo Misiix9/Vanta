@@ -418,7 +418,7 @@ pub async fn get_popular_workflows_feed(
 ) -> Result<Vec<PopularWorkflowFeedEntry>, VantaError> {
     let cfg = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config".to_string())?;
 
     if !cfg.general.community_feed_opt_in {
@@ -441,7 +441,7 @@ pub async fn install_popular_workflow(
 
     let mut cfg = state
         .config
-        .lock()
+        .write()
         .map_err(|_| "Failed to access config".to_string())?;
 
     if !cfg.general.community_feed_opt_in {
@@ -471,7 +471,7 @@ pub async fn export_community_snippet(
 ) -> Result<String, VantaError> {
     let cfg = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config".to_string())?;
 
     let kind = kind.trim().to_ascii_lowercase();
@@ -540,7 +540,7 @@ pub async fn import_community_snippet(
 
     let mut cfg = state
         .config
-        .lock()
+        .write()
         .map_err(|_| "Failed to access config".to_string())?;
 
     let kind = snippet.kind.trim().to_ascii_lowercase();

@@ -77,7 +77,7 @@ struct ResolvedStep {
 pub fn list_macros(state: &State<'_, AppState>) -> Result<Vec<WorkflowMacro>, VantaError> {
     let cfg = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config".to_string())?;
     Ok(cfg.workflows.macros.clone())
 }
@@ -309,7 +309,7 @@ pub fn run_macro_blocking(
 fn fetch_macro(state: &State<'_, AppState>, macro_id: &str) -> Result<WorkflowMacro, VantaError> {
     let cfg = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config".to_string())?;
 
     Ok(cfg.workflows

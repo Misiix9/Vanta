@@ -535,6 +535,7 @@ Implementation notes (March 2026):
 - Added one-click factory reset command and Settings > Diagnostics confirmation flow to restore full config defaults and broadcast refreshed state immediately.
 - Added config diff visualization in Settings > Diagnostics by exposing recent audit entries and changed JSON paths per mutation source.
 - Added generated external config schema (`config.schema.json`) from Rust types plus runtime schema validation command and diagnostics status/errors view.
+- Replaced shared runtime config access in app state from `Mutex<VantaConfig>` to `RwLock<VantaConfig>` and updated read/write callsites across launcher, workflows, and community paths.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.

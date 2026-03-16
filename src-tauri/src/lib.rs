@@ -21,6 +21,7 @@ pub mod secrets;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::RwLock;
 use std::time::{Duration, Instant};
 use tauri::{Manager, Emitter};
 use serde::{Deserialize, Serialize};
@@ -46,7 +47,7 @@ use tauri::{LogicalPosition, LogicalSize};
 
 pub struct AppState {
     pub apps: Mutex<Vec<AppEntry>>,
-    pub config: Mutex<VantaConfig>,
+    pub config: RwLock<VantaConfig>,
     pub extensions_cache: Mutex<Vec<ExtensionEntry>>,
     pub history: Mutex<History>,
     pub file_index: FileIndex,
@@ -110,7 +111,7 @@ async fn run_scheduled_workflows_loop(app_handle: tauri::AppHandle) {
 
         let macros = {
             let state = app_handle.state::<AppState>();
-            let macros_result = match state.config.lock() {
+            let macros_result = match state.config.read() {
                 Ok(cfg) => cfg.workflows.macros.clone(),
                 Err(_) => continue,
             };
@@ -227,7 +228,7 @@ async fn has_network_connectivity() -> bool {
 
 fn current_window_dims(app: &tauri::AppHandle) -> (f64, f64) {
     let state = app.state::<AppState>();
-    let (w, h) = match state.config.lock() {
+    let (w, h) = match state.config.read() {
         Ok(cfg) => (cfg.window.width, cfg.window.height),
         Err(_) => (680.0, 420.0),
     };
@@ -1713,7 +1714,7 @@ async fn get_config(
 ) -> Result<VantaConfig, VantaError> {
     let config = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config state".to_string())?;
     Ok(config.clone())
 }
@@ -1731,7 +1732,7 @@ async fn save_config(
     {
         let mut config = state
             .config
-            .lock()
+            .write()
             .map_err(|_| "Failed to access config state".to_string())?;
         *config = new_config;
         config.save_with_source("user")?;
@@ -1754,7 +1755,7 @@ async fn get_profiles(
 ) -> Result<ProfilesConfig, VantaError> {
     let config = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config state".to_string())?;
     Ok(config::list_profiles(&config))
 }
@@ -1768,7 +1769,7 @@ async fn switch_profile(
     let updated = {
         let mut config = state
             .config
-            .lock()
+            .write()
             .map_err(|_| "Failed to access config state".to_string())?;
         config::switch_profile_in_config(&mut config, &profile_id)?;
         config.save_with_source("user")?;
@@ -1787,7 +1788,7 @@ async fn export_profile(
 ) -> Result<(), VantaError> {
     let config = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config state".to_string())?;
     config::export_profile_to_path(&config, &profile_id, &output_path)
 }
@@ -1803,7 +1804,7 @@ async fn import_profile(
     let (imported, updated_cfg) = {
         let mut config = state
             .config
-            .lock()
+            .write()
             .map_err(|_| "Failed to access config state".to_string())?;
         let imported = config::import_profile_from_path(&mut config, &input_path, replace_existing)?;
         if activate {
@@ -1824,7 +1825,7 @@ async fn rebuild_file_index(
     let files_config = {
         let cfg = state
             .config
-            .lock()
+            .read()
             .map_err(|_| "Failed to access config state".to_string())?;
         cfg.files.clone()
     };
@@ -1842,7 +1843,7 @@ async fn rebuild_file_index(
     {
         let mut cfg = state
             .config
-            .lock()
+            .write()
             .map_err(|_| "Failed to update config freshness".to_string())?;
         cfg.files.indexed_at = index_state.indexed_at;
         cfg.save_with_source("indexer")?;
@@ -1871,7 +1872,7 @@ async fn factory_reset_config(
     {
         let mut current = state
             .config
-            .lock()
+            .write()
             .map_err(|_| "Failed to access config state".to_string())?;
         *current = cfg.clone();
     }
@@ -1917,7 +1918,7 @@ async fn search(
             .clone();
         let config = state
             .config
-            .lock()
+            .read()
             .map_err(|_| "Failed to access config".to_string())?;
         max_results = config.general.max_results;
         search_config = config.search.clone();
@@ -2286,7 +2287,7 @@ async fn get_suggestions(
 
     let config = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config".to_string())?;
 
     let search_config = config.search.clone();
@@ -2447,7 +2448,7 @@ async fn run_contract_migration(
     {
         let mut cfg = state
             .config
-            .lock()
+            .write()
             .map_err(|_| "Failed to access config state".to_string())?;
         *cfg = refreshed.clone();
     }
@@ -2485,7 +2486,7 @@ async fn get_health_dashboard(
 ) -> Result<HealthDashboard, VantaError> {
     let cfg = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config".to_string())?
         .clone();
     let apps_cached = state
@@ -2563,7 +2564,7 @@ async fn create_support_bundle(
     let perf = get_search_diagnostics().await?;
     let cfg = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config".to_string())?
         .clone();
 
@@ -2616,7 +2617,7 @@ async fn get_recovery_hints(
 ) -> Result<Vec<RecoveryHint>, VantaError> {
     let cfg = state
         .config
-        .lock()
+        .read()
         .map_err(|_| "Failed to access config".to_string())?
         .clone();
     let unclean = *state
@@ -3007,7 +3008,7 @@ async fn open_path(
     let is_dir = path_obj.is_dir();
 
     let config = {
-        state.config.lock()
+        state.config.read()
             .map_err(|_| "Failed to access config".to_string())?
             .files.clone()
     };
@@ -3073,7 +3074,7 @@ async fn reveal_in_file_manager(
     let config = {
         state
             .config
-            .lock()
+            .read()
             .map_err(|_| "Failed to access config".to_string())?
             .files
             .clone()
@@ -3137,7 +3138,7 @@ async fn open_with_editor(
     let editor_id = {
         state
             .config
-            .lock()
+            .read()
             .map_err(|_| "Failed to access config".to_string())?
             .files
             .file_editor
@@ -3377,7 +3378,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
 
     let app_state = AppState {
         apps: Mutex::new(apps),
-        config: Mutex::new(vanta_config),
+        config: RwLock::new(vanta_config),
         extensions_cache: Mutex::new(discovered_extensions),
         history: Mutex::new(history),
         file_index: file_index.clone(),
@@ -3696,7 +3697,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                 let handle_for_index = app_handle.clone();
                 let files_config = {
                     let state = app_handle.state::<AppState>();
-                    let cfg = match state.config.lock() {
+                    let cfg = match state.config.read() {
                         Ok(cfg) => cfg.files.clone(),
                         Err(_) => crate::config::FilesConfig::default(),
                     };
@@ -3710,7 +3711,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                         *guard = index_state.clone();
                     }
                     if let Some(state) = handle_for_index.try_state::<AppState>() {
-                        if let Ok(mut cfg) = state.config.lock() {
+                        if let Ok(mut cfg) = state.config.write() {
                             cfg.files.indexed_at = index_state.indexed_at;
                             let _ = cfg.save_with_source("indexer");
                         }
