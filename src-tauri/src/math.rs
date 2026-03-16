@@ -1,3 +1,5 @@
+use chrono::Utc;
+use chrono_tz::Tz;
 use meval;
 use regex::Regex;
 use std::sync::LazyLock;
@@ -10,6 +12,11 @@ static BASE_LITERAL_RE: LazyLock<Regex> = LazyLock::new(|| {
 static UNIT_CONVERSION_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^\s*([-+]?[0-9]*\.?[0-9]+)\s*(km|mi|kg|lb)\s*(?:to|in)?\s*(km|mi|kg|lb)\s*$")
         .expect("unit conversion regex must be valid")
+});
+
+static TIMEZONE_QUERY_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^\s*(?:time(?:zone)?(?:\s+in)?|tz)\s+([a-zA-Z0-9_./\- ]+)\s*$")
+        .expect("timezone regex must be valid")
 });
 
 fn convert_units(value: f64, from: &str, to: &str) -> Option<f64> {
@@ -31,6 +38,50 @@ fn format_number(value: f64) -> String {
             .trim_end_matches('.')
             .to_string()
     }
+}
+
+fn resolve_timezone_alias(raw: &str) -> Option<Tz> {
+    let key = raw.trim().to_ascii_lowercase();
+    let alias = match key.as_str() {
+        "utc" | "gmt" => "UTC",
+        "london" => "Europe/London",
+        "new york" | "nyc" => "America/New_York",
+        "los angeles" | "la" => "America/Los_Angeles",
+        "san francisco" | "sf" => "America/Los_Angeles",
+        "chicago" => "America/Chicago",
+        "tokyo" => "Asia/Tokyo",
+        "seoul" => "Asia/Seoul",
+        "singapore" => "Asia/Singapore",
+        "shanghai" => "Asia/Shanghai",
+        "hong kong" => "Asia/Hong_Kong",
+        "delhi" | "india" | "ist" => "Asia/Kolkata",
+        "dubai" => "Asia/Dubai",
+        "berlin" => "Europe/Berlin",
+        "paris" => "Europe/Paris",
+        "sydney" => "Australia/Sydney",
+        _ => return None,
+    };
+    alias.parse::<Tz>().ok()
+}
+
+fn resolve_timezone(raw: &str) -> Option<Tz> {
+    if let Some(tz) = resolve_timezone_alias(raw) {
+        return Some(tz);
+    }
+
+    let cleaned = raw.trim().replace(' ', "_");
+    cleaned.parse::<Tz>().ok()
+}
+
+pub fn evaluate_timezone_display(query: &str) -> Option<(String, String)> {
+    let caps = TIMEZONE_QUERY_RE.captures(query.trim())?;
+    let target = caps.get(1)?.as_str().trim();
+    let tz = resolve_timezone(target)?;
+
+    let now = Utc::now().with_timezone(&tz);
+    let value = now.format("%Y-%m-%d %H:%M %Z").to_string();
+    let display = format!("{} ({})", value, tz.name());
+    Some((display.clone(), value))
 }
 
 pub fn evaluate_display(expression: &str) -> Option<(String, String)> {
@@ -134,7 +185,7 @@ pub fn evaluate(expression: &str) -> Option<f64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{evaluate, evaluate_display};
+    use super::{evaluate, evaluate_display, evaluate_timezone_display, resolve_timezone};
 
     #[test]
     fn evaluates_hex_literal() {
@@ -172,5 +223,24 @@ mod tests {
     fn evaluate_display_falls_back_to_math() {
         let out = evaluate_display("2 + 2").expect("math result");
         assert_eq!(out.0, "4");
+    }
+
+    #[test]
+    fn resolves_timezone_alias() {
+        let tz = resolve_timezone("tokyo").expect("timezone alias");
+        assert_eq!(tz.name(), "Asia/Tokyo");
+    }
+
+    #[test]
+    fn resolves_timezone_iana_with_spaces() {
+        let tz = resolve_timezone("America/New York").expect("timezone id");
+        assert_eq!(tz.name(), "America/New_York");
+    }
+
+    #[test]
+    fn evaluates_timezone_display_query() {
+        let out = evaluate_timezone_display("time in tokyo").expect("timezone output");
+        assert!(out.0.contains("Asia/Tokyo"));
+        assert!(!out.1.is_empty());
     }
 }

@@ -538,6 +538,7 @@ Implementation notes (March 2026):
 - Replaced shared runtime config access in app state from `Mutex<VantaConfig>` to `RwLock<VantaConfig>` and updated read/write callsites across launcher, workflows, and community paths.
 - Started Phase 42 calculator enhancements by adding `0x`/`0b`/`0o` base literal support (including underscore separators) in expression evaluation with dedicated tests.
 - Added unit conversion parsing for calculator queries (`km`↔`mi`, `kg`↔`lb`) with formatted copy-ready outputs and fallback to normal math evaluation.
+- Added timezone lookup calculator queries (for example `time in tokyo` / `tz berlin`) with city alias resolution, IANA fallback parsing, and copyable formatted time output.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.

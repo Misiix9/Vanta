@@ -2085,7 +2085,21 @@ async fn search(
 
     // Calculator (fast, synchronous)
     if search_config.calculator.enabled && !has_filter {
-        if let Some((display, copy_value)) = math::evaluate_display(&effective_query) {
+        if let Some((display, copy_value)) = math::evaluate_timezone_display(&effective_query) {
+            results.push(SearchResult {
+                title: format!("= {}", display),
+                subtitle: Some("Click to Copy".to_string()),
+                icon: Some("calculator".to_string()),
+                exec: format!("copy:{}", copy_value),
+                score: weighted_score(ranking_config::CALCULATOR_BASE_SCORE, search_config.calculator.weight),
+                match_indices: vec![],
+                source: matcher::ResultSource::Calculator,
+                actions: None,
+                id: None,
+                group: None,
+                section: Some("Calculator".to_string()),
+            });
+        } else if let Some((display, copy_value)) = math::evaluate_display(&effective_query) {
             results.push(SearchResult {
                 title: format!("= {}", display),
                 subtitle: Some("Click to Copy".to_string()),
