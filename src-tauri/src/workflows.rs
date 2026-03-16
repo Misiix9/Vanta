@@ -1320,6 +1320,7 @@ mod tests {
             enabled: true,
             timeout_ms: None,
             timeout_behavior: TimeoutBehavior::Abort,
+            schedule: None,
             steps: vec![MacroStep::System {
                 command: "echo".to_string(),
                 args: vec!["one".to_string()],
@@ -1364,6 +1365,7 @@ mod tests {
             enabled: true,
             timeout_ms: None,
             timeout_behavior: TimeoutBehavior::Abort,
+            schedule: None,
         };
 
         let parent = WorkflowMacro {
@@ -1379,6 +1381,7 @@ mod tests {
             enabled: true,
             timeout_ms: None,
             timeout_behavior: TimeoutBehavior::Abort,
+            schedule: None,
         };
 
         let catalog = HashMap::from([
@@ -1407,6 +1410,7 @@ mod tests {
             enabled: true,
             timeout_ms: None,
             timeout_behavior: TimeoutBehavior::Abort,
+            schedule: None,
         };
 
         let catalog = HashMap::from([(cyc.id.clone(), cyc.clone())]);

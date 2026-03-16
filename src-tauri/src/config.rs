@@ -448,6 +448,7 @@ fn default_workflow_macros() -> Vec<WorkflowMacro> {
         ],
         timeout_ms: None,
         timeout_behavior: TimeoutBehavior::Abort,
+        schedule: None,
     }]
 }
 
@@ -467,6 +468,8 @@ pub struct WorkflowMacro {
     pub timeout_ms: Option<u64>,
     #[serde(default = "default_timeout_behavior")]
     pub timeout_behavior: TimeoutBehavior,
+    #[serde(default)]
+    pub schedule: Option<WorkflowSchedule>,
 }
 
 fn default_macro_enabled() -> bool {
@@ -482,6 +485,15 @@ pub enum TimeoutBehavior {
 
 fn default_timeout_behavior() -> TimeoutBehavior {
     TimeoutBehavior::Abort
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct WorkflowSchedule {
+    #[serde(default)]
+    pub enabled: bool,
+    pub interval_minutes: u64,
+    #[serde(default)]
+    pub run_on_startup: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -1201,6 +1213,7 @@ mod tests {
                 ],
                 timeout_ms: None,
                 timeout_behavior: TimeoutBehavior::Abort,
+                schedule: None,
             }],
         };
 

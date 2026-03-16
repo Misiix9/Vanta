@@ -154,6 +154,12 @@ export interface StepErrorHandling {
 
 export type TimeoutBehavior = "abort" | "skip";
 
+export interface WorkflowSchedule {
+    enabled?: boolean;
+    interval_minutes: number;
+    run_on_startup?: boolean;
+}
+
 export type MacroStep =
     | {
         kind: "extension";
@@ -197,6 +203,7 @@ export interface WorkflowMacro {
     steps: MacroStep[];
     timeout_ms?: number | null;
     timeout_behavior?: TimeoutBehavior;
+    schedule?: WorkflowSchedule | null;
 }
 
 export interface WorkflowsConfig {

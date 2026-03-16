@@ -86,6 +86,118 @@ static LAUNCH_CALLS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_TOTAL_MS: AtomicU64 = AtomicU64::new(0);
 static LAUNCH_MAX_MS: AtomicU64 = AtomicU64::new(0);
 
+#[derive(Clone, Debug, Serialize)]
+struct ScheduledWorkflowEvent {
+    macro_id: String,
+    status: String,
+    error: Option<String>,
+    ran_at: i64,
+}
+
+async fn run_scheduled_workflows_loop(app_handle: tauri::AppHandle) {
+    use std::sync::Arc;
+
+    let mut last_run: HashMap<String, Instant> = HashMap::new();
+    let running: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
+
+    loop {
+        sleep(Duration::from_secs(30)).await;
+
+        let macros = {
+            let state = app_handle.state::<AppState>();
+            let macros_result = match state.config.lock() {
+                Ok(cfg) => cfg.workflows.macros.clone(),
+                Err(_) => continue,
+            };
+            macros_result
+        };
+
+        let now_instant = Instant::now();
+
+        for macro_def in macros {
+            if !macro_def.enabled {
+                continue;
+            }
+
+            let Some(schedule) = macro_def.schedule.clone() else {
+                continue;
+            };
+
+            if !schedule.enabled {
+                continue;
+            }
+
+            let interval = Duration::from_secs(schedule.interval_minutes.max(1) * 60);
+            let should_run = match last_run.get(&macro_def.id) {
+                None => schedule.run_on_startup,
+                Some(prev) => now_instant.duration_since(*prev) >= interval,
+            };
+
+            if !should_run {
+                continue;
+            }
+
+            {
+                let mut running_guard = match running.lock() {
+                    Ok(guard) => guard,
+                    Err(_) => continue,
+                };
+                if running_guard.contains(&macro_def.id) {
+                    continue;
+                }
+                running_guard.insert(macro_def.id.clone());
+            }
+
+            last_run.insert(macro_def.id.clone(), now_instant);
+
+            let app_for_task = app_handle.clone();
+            let running_for_task = running.clone();
+            let macro_id = macro_def.id.clone();
+            tauri::async_runtime::spawn(async move {
+                let macro_id_for_block = macro_id.clone();
+                let app_for_block = app_for_task.clone();
+                let run_result = tauri::async_runtime::spawn_blocking(move || {
+                    let state = app_for_block.state::<AppState>();
+                    workflows::run_macro_blocking(
+                        &macro_id_for_block,
+                        HashMap::new(),
+                        &state,
+                        &app_for_block,
+                    )
+                })
+                .await;
+
+                let event = match run_result {
+                    Ok(Ok(_)) => ScheduledWorkflowEvent {
+                        macro_id: macro_id.clone(),
+                        status: "ok".to_string(),
+                        error: None,
+                        ran_at: now_millis(),
+                    },
+                    Ok(Err(err)) => ScheduledWorkflowEvent {
+                        macro_id: macro_id.clone(),
+                        status: "failed".to_string(),
+                        error: Some(err.to_string()),
+                        ran_at: now_millis(),
+                    },
+                    Err(join_err) => ScheduledWorkflowEvent {
+                        macro_id: macro_id.clone(),
+                        status: "failed".to_string(),
+                        error: Some(format!("Scheduled workflow join error: {}", join_err)),
+                        ran_at: now_millis(),
+                    },
+                };
+
+                let _ = app_for_task.emit("scheduled-workflow-run", event);
+
+                if let Ok(mut running_guard) = running_for_task.lock() {
+                    running_guard.remove(&macro_id);
+                }
+            });
+        }
+    }
+}
+
 fn current_window_dims(app: &tauri::AppHandle) -> (f64, f64) {
     let state = app.state::<AppState>();
     let (w, h) = match state.config.lock() {
@@ -3271,6 +3383,13 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             }
 
             themes::seed_default_theme(&app_handle);
+
+            {
+                let scheduler_handle = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    run_scheduled_workflows_loop(scheduler_handle).await;
+                });
+            }
 
             #[cfg(desktop)]
             {

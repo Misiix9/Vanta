@@ -198,6 +198,7 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
                 enabled: true,
                 timeout_ms: None,
                 timeout_behavior: crate::config::TimeoutBehavior::Abort,
+                schedule: None,
                 args: vec![
                     crate::config::MacroArg {
                         name: "project_path".to_string(),
@@ -252,6 +253,7 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
                 enabled: true,
                 timeout_ms: None,
                 timeout_behavior: crate::config::TimeoutBehavior::Abort,
+                schedule: None,
                 args: vec![crate::config::MacroArg {
                     name: "app_exec".to_string(),
                     description: Some("Executable to open".to_string()),
@@ -621,6 +623,7 @@ mod tests {
             enabled: true,
             timeout_ms: None,
             timeout_behavior: crate::config::TimeoutBehavior::Abort,
+            schedule: None,
             args: Vec::new(),
             steps: vec![crate::config::MacroStep::System {
                 command: "echo".to_string(),
