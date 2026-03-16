@@ -1734,7 +1734,7 @@ async fn save_config(
             .lock()
             .map_err(|_| "Failed to access config state".to_string())?;
         *config = new_config;
-        config.save()?;
+        config.save_with_source("user")?;
     }
 
     let index_clone = state.file_index.clone();
@@ -1771,7 +1771,7 @@ async fn switch_profile(
             .lock()
             .map_err(|_| "Failed to access config state".to_string())?;
         config::switch_profile_in_config(&mut config, &profile_id)?;
-        config.save()?;
+        config.save_with_source("user")?;
         config.clone()
     };
 
@@ -1809,7 +1809,7 @@ async fn import_profile(
         if activate {
             config::switch_profile_in_config(&mut config, &imported.id)?;
         }
-        config.save()?;
+        config.save_with_source("user")?;
         (imported, config.clone())
     };
 
@@ -1845,10 +1845,15 @@ async fn rebuild_file_index(
             .lock()
             .map_err(|_| "Failed to update config freshness".to_string())?;
         cfg.files.indexed_at = index_state.indexed_at;
-        cfg.save()?;
+        cfg.save_with_source("indexer")?;
     }
 
     Ok(index_state.indexed_at)
+}
+
+#[tauri::command]
+async fn get_config_audit(limit: Option<usize>) -> Result<Vec<config::ConfigAuditEntry>, VantaError> {
+    Ok(config::read_config_audit(limit.unwrap_or(200)))
 }
 
 /// Monotonically increasing search generation counter for cancellation.
@@ -3305,11 +3310,11 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
     {
         vanta_config.window.width = 680.0;
         vanta_config.window.height = 420.0;
-        let _ = vanta_config.save();
+        let _ = vanta_config.save_with_source("migration");
     }
 
     if clamp_window_size(&mut vanta_config.window) {
-        let _ = vanta_config.save();
+        let _ = vanta_config.save_with_source("migration");
     }
 
     log::info!(
@@ -3390,6 +3395,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             get_config,
+            get_config_audit,
             save_config,
             get_profiles,
             switch_profile,
@@ -3671,7 +3677,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
                     if let Some(state) = handle_for_index.try_state::<AppState>() {
                         if let Ok(mut cfg) = state.config.lock() {
                             cfg.files.indexed_at = index_state.indexed_at;
-                            let _ = cfg.save();
+                            let _ = cfg.save_with_source("indexer");
                         }
                     }
                 });

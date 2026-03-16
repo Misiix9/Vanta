@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -840,6 +841,113 @@ pub fn config_path() -> PathBuf {
     config_dir().join("config.json")
 }
 
+pub fn config_audit_path() -> PathBuf {
+    config_dir().join("config-audit.jsonl")
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConfigDiffEntry {
+    pub path: String,
+    pub before: Option<Value>,
+    pub after: Option<Value>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ConfigAuditEntry {
+    pub timestamp_ms: i64,
+    pub source: String,
+    pub diff: Vec<ConfigDiffEntry>,
+}
+
+fn now_millis() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+fn join_diff_path(base: &str, next: &str) -> String {
+    if base.is_empty() {
+        next.to_string()
+    } else {
+        format!("{}.{}", base, next)
+    }
+}
+
+fn collect_config_diff(path: &str, before: Option<&Value>, after: Option<&Value>, out: &mut Vec<ConfigDiffEntry>) {
+    match (before, after) {
+        (Some(Value::Object(a)), Some(Value::Object(b))) => {
+            let mut keys: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+            keys.extend(a.keys().cloned());
+            keys.extend(b.keys().cloned());
+            for key in keys {
+                collect_config_diff(
+                    &join_diff_path(path, &key),
+                    a.get(&key),
+                    b.get(&key),
+                    out,
+                );
+            }
+        }
+        (Some(Value::Array(a)), Some(Value::Array(b))) => {
+            if a != b {
+                out.push(ConfigDiffEntry {
+                    path: path.to_string(),
+                    before: Some(Value::Array(a.clone())),
+                    after: Some(Value::Array(b.clone())),
+                });
+            }
+        }
+        (a, b) => {
+            if a != b {
+                out.push(ConfigDiffEntry {
+                    path: path.to_string(),
+                    before: a.cloned(),
+                    after: b.cloned(),
+                });
+            }
+        }
+    }
+}
+
+fn diff_configs(before: Option<&VantaConfig>, after: &VantaConfig) -> Vec<ConfigDiffEntry> {
+    let before_json = before.and_then(|v| serde_json::to_value(v).ok());
+    let after_json = serde_json::to_value(after).unwrap_or(Value::Null);
+    let mut diff = Vec::new();
+    collect_config_diff("", before_json.as_ref(), Some(&after_json), &mut diff);
+    diff
+}
+
+fn append_config_audit_entry(entry: &ConfigAuditEntry) {
+    let path = config_audit_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(line) = serde_json::to_string(entry) {
+        use std::io::Write;
+        if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = writeln!(file, "{}", line);
+        }
+    }
+}
+
+pub fn read_config_audit(limit: usize) -> Vec<ConfigAuditEntry> {
+    let path = config_audit_path();
+    let Ok(raw) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+
+    let mut entries: Vec<ConfigAuditEntry> = raw
+        .lines()
+        .filter_map(|line| serde_json::from_str::<ConfigAuditEntry>(line).ok())
+        .collect();
+
+    if limit > 0 && entries.len() > limit {
+        entries = entries.split_off(entries.len() - limit);
+    }
+    entries
+}
+
 /// Load config from disk or create the default config file.
 pub fn load_or_create_default() -> VantaConfig {
     let path = config_path();
@@ -869,7 +977,7 @@ pub fn load_or_create_default() -> VantaConfig {
                         changed = true;
                     }
                     if changed {
-                        let _ = write_config(&config);
+                        let _ = write_config_with_source(&config, "migration");
                     }
                     println!(
                         "[vanta][config] loaded {:?} window={}x{}",
@@ -945,7 +1053,7 @@ pub fn migrate_config_on_disk() -> Result<ConfigMigrationReport, VantaError> {
     }
 
     if changed {
-        write_config(&cfg)?;
+        write_config_with_source(&cfg, "migration")?;
     }
 
     Ok(ConfigMigrationReport {
@@ -960,13 +1068,21 @@ pub fn migrate_config_on_disk() -> Result<ConfigMigrationReport, VantaError> {
 impl VantaConfig {
     /// Save the current configuration to disk.
     pub fn save(&self) -> Result<(), VantaError> {
-        write_config(self)
+        self.save_with_source("system")
+    }
+
+    pub fn save_with_source(&self, source: &str) -> Result<(), VantaError> {
+        write_config_with_source(self, source)
     }
 }
 
-fn write_config(cfg: &VantaConfig) -> Result<(), VantaError> {
+fn write_config_with_source(cfg: &VantaConfig, source: &str) -> Result<(), VantaError> {
     let mut cfg = cfg.clone();
     let _ = ensure_profiles(&mut cfg);
+
+    let old_cfg: Option<VantaConfig> = fs::read_to_string(config_path())
+        .ok()
+        .and_then(|raw| serde_json::from_str::<VantaConfig>(&raw).ok());
 
     let path = config_path();
     let json = serde_json::to_string_pretty(&cfg)
@@ -974,6 +1090,15 @@ fn write_config(cfg: &VantaConfig) -> Result<(), VantaError> {
 
     fs::write(&path, json)
         .map_err(|e| format!("Failed to write config to {}: {}", path.display(), e))?;
+
+    let diff = diff_configs(old_cfg.as_ref(), &cfg);
+    if !diff.is_empty() {
+        append_config_audit_entry(&ConfigAuditEntry {
+            timestamp_ms: now_millis(),
+            source: source.to_string(),
+            diff,
+        });
+    }
 
     Ok(())
 }
@@ -988,7 +1113,7 @@ fn rewrite_default_config() -> VantaConfig {
     let _ = clamp_accessibility(&mut default_config.accessibility);
 
     // First try normal serialization+write.
-    if let Err(write_err) = write_config(&default_config) {
+    if let Err(write_err) = write_config_with_source(&default_config, "factory-default") {
         log::warn!("Primary default write failed: {}. Trying embedded copy...", write_err);
         // Fallback: write embedded JSON blob.
         let path = config_path();
@@ -1318,5 +1443,25 @@ mod tests {
         let err = import_profile_from_path(&mut cfg, path.to_str().unwrap(), false)
             .expect_err("should reject future schema");
         assert!(err.to_string().contains("newer than supported"));
+    }
+
+    #[test]
+    fn config_diff_tracks_nested_changes() {
+        let mut before = VantaConfig::default();
+        let mut after = before.clone();
+        after.window.width = 777.0;
+        after.search.windows_max_results = 9;
+        after.profiles.active_profile_id = "work".to_string();
+
+        let diff = diff_configs(Some(&before), &after);
+        assert!(diff.iter().any(|d| d.path == "window.width"));
+        assert!(diff.iter().any(|d| d.path == "search.windows_max_results"));
+        assert!(diff.iter().any(|d| d.path == "profiles.active_profile_id"));
+
+        before.window.width = 777.0;
+        before.search.windows_max_results = 9;
+        before.profiles.active_profile_id = "work".to_string();
+        let no_diff = diff_configs(Some(&before), &after);
+        assert!(no_diff.is_empty());
     }
 }

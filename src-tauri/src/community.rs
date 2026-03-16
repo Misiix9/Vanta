@@ -458,7 +458,7 @@ pub async fn install_popular_workflow(
     } else {
         cfg.workflows.macros.push(selected.workflow.clone());
     }
-    cfg.save()?;
+    cfg.save_with_source("community")?;
 
     Ok(selected.workflow)
 }
@@ -589,7 +589,7 @@ pub async fn import_community_snippet(
         }
     }
 
-    cfg.save()?;
+    cfg.save_with_source("community")?;
     let _ = app_handle.emit("config-updated", &cfg.clone());
 
     Ok(format!("Imported {} snippet '{}'", kind, imported_name))

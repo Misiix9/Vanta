@@ -531,6 +531,7 @@ Implementation notes (March 2026):
 - Added encrypted workflow secrets store (AES-GCM, encrypted at rest) with management commands and `secret.<name>` placeholder support in workflows, including runtime redaction in step result args.
 - Extended scheduled workflows with event triggers (`startup`, `network_connected`) in addition to interval polling, with online-edge detection to avoid continuous re-runs while already connected.
 - Added startup-safe UI/window state persistence via `ui-state.json`, restoring launcher size/position and last active view across restarts while continuously saving move/resize/view updates.
+- Added centralized config audit trail (`config-audit.jsonl`) with timestamp/source (`user`, `migration`, `community`, `indexer`, etc.) and recursive JSON-path diffs for every config mutation.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.
