@@ -530,6 +530,7 @@ Implementation notes (March 2026):
 - Added periodic scheduled workflow execution support via optional macro `schedule` config (enabled, interval_minutes, run_on_startup) with background runner emitting `scheduled-workflow-run` events.
 - Added encrypted workflow secrets store (AES-GCM, encrypted at rest) with management commands and `secret.<name>` placeholder support in workflows, including runtime redaction in step result args.
 - Extended scheduled workflows with event triggers (`startup`, `network_connected`) in addition to interval polling, with online-edge detection to avoid continuous re-runs while already connected.
+- Added startup-safe UI/window state persistence via `ui-state.json`, restoring launcher size/position and last active view across restarts while continuously saving move/resize/view updates.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.

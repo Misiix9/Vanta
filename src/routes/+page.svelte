@@ -29,6 +29,9 @@
   import { addToast } from "$lib/stores/toastStore";
 
   type ViewId = "launcher" | "settings" | "store" | "featureHub" | "communityHub" | "themeHub" | "extensionsHub";
+  interface UiStateSnapshot {
+    last_view?: string | null;
+  }
 
   let isMiniPlayer = $state(false);
   let vantaConfig: VantaConfig | undefined = $state();
@@ -65,6 +68,21 @@
   let lastAppRescan = $state(0);
   const unlisteners: Array<() => void> = [];
   let fadeDuration = $derived(vantaConfig?.accessibility?.reduced_motion ? 0 : 150);
+
+  const validViews = new Set<ViewId>([
+    "launcher",
+    "settings",
+    "store",
+    "featureHub",
+    "communityHub",
+    "themeHub",
+    "extensionsHub",
+  ]);
+
+  function asViewId(value: string | null | undefined): ViewId | null {
+    if (!value) return null;
+    return validViews.has(value as ViewId) ? (value as ViewId) : null;
+  }
 
   function notify(options: ToastOptions) {
     addToast(options);
@@ -191,6 +209,14 @@
     for (const u of unlisteners) { try { u(); } catch {} }
   });
 
+  $effect(() => {
+    if (isMiniPlayer) return;
+    const current = view;
+    void invoke("set_ui_last_view", { view: current }).catch((e) => {
+      console.error("Failed to persist active view", e);
+    });
+  });
+
   onMount(async () => {
     isMiniPlayer =
       getCurrentWebviewWindow().label === "spotify-mini" ||
@@ -217,6 +243,16 @@
     catch (e) {
       console.error("Failed to load themes:", e);
       notify({ title: "Theme Load Failed", message: String(e), type: "error" });
+    }
+
+    try {
+      const uiState = await invoke<UiStateSnapshot>("get_ui_state");
+      const restoredView = asViewId(uiState?.last_view);
+      if (restoredView) {
+        view = restoredView;
+      }
+    } catch (e) {
+      console.error("Failed to load UI state", e);
     }
 
     try {

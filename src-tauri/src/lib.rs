@@ -42,6 +42,7 @@ use config::{clamp_accessibility, clamp_window_size};
 use files::FileIndex;
 use tokio::time::sleep;
 use tauri::WebviewWindow;
+use tauri::{LogicalPosition, LogicalSize};
 
 pub struct AppState {
     pub apps: Mutex<Vec<AppEntry>>,
@@ -260,6 +261,61 @@ fn jobs_path() -> std::path::PathBuf {
 
 fn startup_state_path() -> std::path::PathBuf {
     config::config_dir().join("startup-state.json")
+}
+
+fn ui_state_path() -> std::path::PathBuf {
+    config::config_dir().join("ui-state.json")
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+struct UiState {
+    #[serde(default)]
+    window_width: Option<f64>,
+    #[serde(default)]
+    window_height: Option<f64>,
+    #[serde(default)]
+    window_x: Option<f64>,
+    #[serde(default)]
+    window_y: Option<f64>,
+    #[serde(default)]
+    last_view: Option<String>,
+}
+
+fn load_ui_state() -> UiState {
+    let path = ui_state_path();
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<UiState>(&raw).ok())
+        .unwrap_or_default()
+}
+
+fn save_ui_state(state: &UiState) {
+    let path = ui_state_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(serialized) = serde_json::to_string_pretty(state) {
+        let _ = std::fs::write(path, serialized);
+    }
+}
+
+fn persist_window_state(win: &WebviewWindow) {
+    let size = win.inner_size();
+    let pos = win.outer_position();
+    let (Ok(size), Ok(pos)) = (size, pos) else {
+        return;
+    };
+
+    let scale = win.scale_factor().unwrap_or(1.0);
+    let logical = size.to_logical::<f64>(scale);
+    let logical_pos = pos.to_logical::<f64>(scale);
+
+    let mut snapshot = load_ui_state();
+    snapshot.window_width = Some(logical.width);
+    snapshot.window_height = Some(logical.height);
+    snapshot.window_x = Some(logical_pos.x);
+    snapshot.window_y = Some(logical_pos.y);
+    save_ui_state(&snapshot);
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -2606,6 +2662,22 @@ async fn show_window(window: tauri::WebviewWindow) -> Result<(), VantaError> {
 }
 
 #[tauri::command]
+async fn get_ui_state() -> Result<serde_json::Value, VantaError> {
+    let state = load_ui_state();
+    Ok(serde_json::json!({
+        "last_view": state.last_view,
+    }))
+}
+
+#[tauri::command]
+async fn set_ui_last_view(view: String) -> Result<(), VantaError> {
+    let mut state = load_ui_state();
+    state.last_view = Some(view);
+    save_ui_state(&state);
+    Ok(())
+}
+
+#[tauri::command]
 async fn get_extensions(
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<ExtensionEntry>, VantaError> {
@@ -3332,6 +3404,8 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             rescan_apps,
             hide_window,
             show_window,
+            get_ui_state,
+            set_ui_last_view,
             get_extensions,
             get_extension_bundle,
             get_extension_styles,
@@ -3393,15 +3467,40 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             if let Some(win) = app.get_webview_window("main") {
                 let _ = window::init_window(&win, &app_handle);
 
-                let (width, height) = current_window_dims(&app_handle);
+                let mut width_height = current_window_dims(&app_handle);
+                let mut restore_position: Option<(f64, f64)> = None;
+                {
+                    let persisted = load_ui_state();
+                    if let (Some(w), Some(h)) = (persisted.window_width, persisted.window_height) {
+                        let mut wc = config::WindowConfig { width: w, height: h };
+                        let _ = clamp_window_size(&mut wc);
+                        width_height = (wc.width, wc.height);
+                    }
+                    if let (Some(x), Some(y)) = (persisted.window_x, persisted.window_y) {
+                        restore_position = Some((x, y));
+                    }
+                }
+
                 println!(
                     "[vanta][window] applying size {}x{} from {:?}",
-                    width,
-                    height,
+                    width_height.0,
+                    width_height.1,
                     config::config_path()
                 );
-                let _ = win.set_size(tauri::LogicalSize::new(width, height));
-                let _ = win.center();
+                let _ = win.set_size(LogicalSize::new(width_height.0, width_height.1));
+                if let Some((x, y)) = restore_position {
+                    let _ = win.set_position(LogicalPosition::new(x, y));
+                } else {
+                    let _ = win.center();
+                }
+
+                let win_for_events = win.clone();
+                let _ = win.on_window_event(move |event| {
+                    use tauri::WindowEvent;
+                    if matches!(event, WindowEvent::Resized(_) | WindowEvent::Moved(_)) {
+                        persist_window_state(&win_for_events);
+                    }
+                });
 
                 if open_clipboard {
                     let _ = win.set_always_on_top(true);
