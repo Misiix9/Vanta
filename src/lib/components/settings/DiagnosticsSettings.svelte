@@ -3,12 +3,15 @@
     import { invoke } from "@tauri-apps/api/core";
     import type { SearchDiagnostics, HealthDashboard, RecoveryHint, SupportBundleReport } from "$lib/types";
     import LoadingSkeleton from "$lib/components/LoadingSkeleton.svelte";
+    import ActionConfirmModal from "$lib/components/ActionConfirmModal.svelte";
 
     let diagnostics: SearchDiagnostics | null = $state(null);
     let healthDashboard: HealthDashboard | null = $state(null);
     let recoveryHints: RecoveryHint[] = $state([]);
     let supportBundle: SupportBundleReport | null = $state(null);
     let supportBusy = $state(false);
+    let resetBusy = $state(false);
+    let showFactoryResetConfirm = $state(false);
     let loading = $state(true);
 
     async function loadDiagnostics() {
@@ -36,6 +39,20 @@
         finally { supportBusy = false; }
     }
 
+    async function runFactoryReset() {
+        resetBusy = true;
+        try {
+            await invoke("factory_reset_config");
+            supportBundle = null;
+            await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints()]);
+        } catch (e) {
+            console.error("Failed to factory reset config:", e);
+        } finally {
+            resetBusy = false;
+            showFactoryResetConfirm = false;
+        }
+    }
+
     onMount(async () => {
         await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints()]);
         loading = false;
@@ -51,6 +68,9 @@
         <button class="close-btn" onclick={loadRecoveryHints}>Refresh Hints</button>
         <button class="close-btn" onclick={buildSupportBundle} disabled={supportBusy}>
             {supportBusy ? "Building..." : "Create Support Bundle"}
+        </button>
+        <button class="close-btn danger-outline" onclick={() => (showFactoryResetConfirm = true)} disabled={resetBusy}>
+            {resetBusy ? "Resetting..." : "Factory Reset"}
         </button>
     </div>
 
@@ -103,4 +123,23 @@
             <label>Size (bytes) <input type="text" value={`${supportBundle.size_bytes}`} readonly /></label>
         </div>
     {/if}
+
+    {#if showFactoryResetConfirm}
+        <ActionConfirmModal
+            title="Factory reset settings?"
+            description="This resets all Vanta settings to defaults immediately. This action cannot be undone."
+            confirmLabel="Factory Reset"
+            cancelLabel="Cancel"
+            onConfirm={runFactoryReset}
+            onCancel={() => (showFactoryResetConfirm = false)}
+            busy={resetBusy}
+        />
+    {/if}
 {/if}
+
+<style>
+    .danger-outline {
+        border-color: color-mix(in srgb, var(--ds-danger, #d44) 45%, transparent);
+        color: var(--ds-danger, #d44);
+    }
+</style>

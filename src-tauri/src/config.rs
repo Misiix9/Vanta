@@ -1065,6 +1065,14 @@ pub fn migrate_config_on_disk() -> Result<ConfigMigrationReport, VantaError> {
     })
 }
 
+pub fn factory_reset_on_disk() -> Result<VantaConfig, VantaError> {
+    let mut cfg = VantaConfig::default();
+    let _ = clamp_window_size(&mut cfg.window);
+    let _ = clamp_accessibility(&mut cfg.accessibility);
+    write_config_with_source(&cfg, "factory-reset")?;
+    Ok(cfg)
+}
+
 impl VantaConfig {
     /// Save the current configuration to disk.
     pub fn save(&self) -> Result<(), VantaError> {

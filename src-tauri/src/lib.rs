@@ -1856,6 +1856,34 @@ async fn get_config_audit(limit: Option<usize>) -> Result<Vec<config::ConfigAudi
     Ok(config::read_config_audit(limit.unwrap_or(200)))
 }
 
+#[tauri::command]
+async fn factory_reset_config(
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<VantaConfig, VantaError> {
+    let cfg = config::factory_reset_on_disk()?;
+
+    {
+        let mut current = state
+            .config
+            .lock()
+            .map_err(|_| "Failed to access config state".to_string())?;
+        *current = cfg.clone();
+    }
+
+    let index_clone = state.file_index.clone();
+    let files_cfg = cfg.files.clone();
+    std::thread::spawn(move || {
+        let index_state = files::build_index(&files_cfg);
+        if let Ok(mut guard) = index_clone.lock() {
+            *guard = index_state;
+        }
+    });
+
+    let _ = app_handle.emit("config-updated", &cfg);
+    Ok(cfg)
+}
+
 /// Monotonically increasing search generation counter for cancellation.
 static SEARCH_GENERATION: AtomicU64 = AtomicU64::new(0);
 
@@ -3396,6 +3424,7 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
         .invoke_handler(tauri::generate_handler![
             get_config,
             get_config_audit,
+            factory_reset_config,
             save_config,
             get_profiles,
             switch_profile,
