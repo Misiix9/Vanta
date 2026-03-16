@@ -7,6 +7,52 @@ static BASE_LITERAL_RE: LazyLock<Regex> = LazyLock::new(|| {
         .expect("base literal regex must be valid")
 });
 
+static UNIT_CONVERSION_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)^\s*([-+]?[0-9]*\.?[0-9]+)\s*(km|mi|kg|lb)\s*(?:to|in)?\s*(km|mi|kg|lb)\s*$")
+        .expect("unit conversion regex must be valid")
+});
+
+fn convert_units(value: f64, from: &str, to: &str) -> Option<f64> {
+    match (from, to) {
+        ("km", "mi") => Some(value * 0.621_371),
+        ("mi", "km") => Some(value / 0.621_371),
+        ("kg", "lb") => Some(value * 2.204_622_621_8),
+        ("lb", "kg") => Some(value / 2.204_622_621_8),
+        _ => None,
+    }
+}
+
+fn format_number(value: f64) -> String {
+    if value.fract().abs() < f64::EPSILON {
+        format!("{:.0}", value)
+    } else {
+        format!("{:.6}", value)
+            .trim_end_matches('0')
+            .trim_end_matches('.')
+            .to_string()
+    }
+}
+
+pub fn evaluate_display(expression: &str) -> Option<(String, String)> {
+    let trimmed = expression.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if let Some(caps) = UNIT_CONVERSION_RE.captures(trimmed) {
+        let raw_value = caps.get(1)?.as_str().parse::<f64>().ok()?;
+        let from = caps.get(2)?.as_str().to_ascii_lowercase();
+        let to = caps.get(3)?.as_str().to_ascii_lowercase();
+        let converted = convert_units(raw_value, &from, &to)?;
+        let display = format!("{} {}", format_number(converted), to);
+        return Some((display.clone(), display));
+    }
+
+    let val = evaluate(trimmed)?;
+    let out = format_number(val);
+    Some((out.clone(), out))
+}
+
 fn parse_base_literal(token: &str) -> Option<u64> {
     let lower = token.to_ascii_lowercase();
     if let Some(rest) = lower.strip_prefix("0x") {
@@ -88,7 +134,7 @@ pub fn evaluate(expression: &str) -> Option<f64> {
 
 #[cfg(test)]
 mod tests {
-    use super::evaluate;
+    use super::{evaluate, evaluate_display};
 
     #[test]
     fn evaluates_hex_literal() {
@@ -108,5 +154,23 @@ mod tests {
     #[test]
     fn rejects_invalid_base_literals() {
         assert_eq!(evaluate("0b102"), None);
+    }
+
+    #[test]
+    fn converts_km_to_mi() {
+        let out = evaluate_display("10 km to mi").expect("conversion result");
+        assert_eq!(out.0, "6.21371 mi");
+    }
+
+    #[test]
+    fn converts_lb_to_kg_without_to_keyword() {
+        let out = evaluate_display("10lb kg").expect("conversion result");
+        assert_eq!(out.0, "4.535924 kg");
+    }
+
+    #[test]
+    fn evaluate_display_falls_back_to_math() {
+        let out = evaluate_display("2 + 2").expect("math result");
+        assert_eq!(out.0, "4");
     }
 }

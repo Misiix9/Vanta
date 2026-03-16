@@ -2085,13 +2085,12 @@ async fn search(
 
     // Calculator (fast, synchronous)
     if search_config.calculator.enabled && !has_filter {
-        if let Some(val) = math::evaluate(&effective_query) {
-            let val_str = format!("{}", val);
+        if let Some((display, copy_value)) = math::evaluate_display(&effective_query) {
             results.push(SearchResult {
-                title: format!("= {}", val_str),
+                title: format!("= {}", display),
                 subtitle: Some("Click to Copy".to_string()),
                 icon: Some("calculator".to_string()),
-                exec: format!("copy:{}", val_str),
+                exec: format!("copy:{}", copy_value),
                 score: weighted_score(ranking_config::CALCULATOR_BASE_SCORE, search_config.calculator.weight),
                 match_indices: vec![],
                 source: matcher::ResultSource::Calculator,

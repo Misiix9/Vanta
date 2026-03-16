@@ -537,6 +537,7 @@ Implementation notes (March 2026):
 - Added generated external config schema (`config.schema.json`) from Rust types plus runtime schema validation command and diagnostics status/errors view.
 - Replaced shared runtime config access in app state from `Mutex<VantaConfig>` to `RwLock<VantaConfig>` and updated read/write callsites across launcher, workflows, and community paths.
 - Started Phase 42 calculator enhancements by adding `0x`/`0b`/`0o` base literal support (including underscore separators) in expression evaluation with dedicated tests.
+- Added unit conversion parsing for calculator queries (`km`↔`mi`, `kg`↔`lb`) with formatted copy-ready outputs and fallback to normal math evaluation.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.
