@@ -488,12 +488,21 @@ fn default_timeout_behavior() -> TimeoutBehavior {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowScheduleEvent {
+    Startup,
+    NetworkConnected,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct WorkflowSchedule {
     #[serde(default)]
     pub enabled: bool,
     pub interval_minutes: u64,
     #[serde(default)]
     pub run_on_startup: bool,
+    #[serde(default)]
+    pub on_events: Vec<WorkflowScheduleEvent>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

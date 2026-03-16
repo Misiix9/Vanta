@@ -154,10 +154,13 @@ export interface StepErrorHandling {
 
 export type TimeoutBehavior = "abort" | "skip";
 
+export type WorkflowScheduleEvent = "startup" | "network_connected";
+
 export interface WorkflowSchedule {
     enabled?: boolean;
     interval_minutes: number;
     run_on_startup?: boolean;
+    on_events?: WorkflowScheduleEvent[];
 }
 
 export type MacroStep =

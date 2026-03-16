@@ -26,7 +26,9 @@ use tauri::{Manager, Emitter};
 use serde::{Deserialize, Serialize};
 use clap::Parser;
 
-use config::{ProfileConfig, ProfilesConfig, VantaConfig, WorkflowMacro};
+use config::{
+    ProfileConfig, ProfilesConfig, VantaConfig, WorkflowMacro, WorkflowScheduleEvent,
+};
 use errors::VantaError;
 use history::History;
 use matcher::{ResultSource, SearchResult};
@@ -99,6 +101,7 @@ async fn run_scheduled_workflows_loop(app_handle: tauri::AppHandle) {
     use std::sync::Arc;
 
     let mut last_run: HashMap<String, Instant> = HashMap::new();
+    let mut previous_network_online: Option<bool> = None;
     let running: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
 
     loop {
@@ -114,6 +117,9 @@ async fn run_scheduled_workflows_loop(app_handle: tauri::AppHandle) {
         };
 
         let now_instant = Instant::now();
+        let network_online = has_network_connectivity().await;
+        let network_connected_event = matches!(previous_network_online, Some(false)) && network_online;
+        previous_network_online = Some(network_online);
 
         for macro_def in macros {
             if !macro_def.enabled {
@@ -129,10 +135,24 @@ async fn run_scheduled_workflows_loop(app_handle: tauri::AppHandle) {
             }
 
             let interval = Duration::from_secs(schedule.interval_minutes.max(1) * 60);
-            let should_run = match last_run.get(&macro_def.id) {
-                None => schedule.run_on_startup,
+            let first_run = !last_run.contains_key(&macro_def.id);
+            let startup_event = schedule
+                .on_events
+                .iter()
+                .any(|e| matches!(e, WorkflowScheduleEvent::Startup));
+            let network_event = schedule
+                .on_events
+                .iter()
+                .any(|e| matches!(e, WorkflowScheduleEvent::NetworkConnected));
+
+            let should_run_startup = first_run && (schedule.run_on_startup || startup_event);
+            let should_run_interval = match last_run.get(&macro_def.id) {
                 Some(prev) => now_instant.duration_since(*prev) >= interval,
+                None => false,
             };
+            let should_run_network_event = network_event && network_connected_event;
+
+            let should_run = should_run_startup || should_run_interval || should_run_network_event;
 
             if !should_run {
                 continue;
@@ -197,6 +217,11 @@ async fn run_scheduled_workflows_loop(app_handle: tauri::AppHandle) {
             });
         }
     }
+}
+
+async fn has_network_connectivity() -> bool {
+    let connect = tokio::net::TcpStream::connect(("1.1.1.1", 53));
+    matches!(tokio::time::timeout(Duration::from_secs(2), connect).await, Ok(Ok(_)))
 }
 
 fn current_window_dims(app: &tauri::AppHandle) -> (f64, f64) {
