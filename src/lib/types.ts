@@ -54,6 +54,36 @@ export interface CommunityTrustMetadata {
     verified: boolean;
     risk_level: string;
     signature_hint?: string | null;
+    publisher_url?: string | null;
+    compatibility_hint?: string | null;
+    rating?: number | null;
+    vote_count?: number | null;
+}
+
+export interface CommunitySnippetPreview {
+    schema_version: number;
+    kind: string;
+    name: string;
+    trust: CommunityTrustMetadata;
+    target_id?: string | null;
+    will_replace_existing: boolean;
+    compatible: boolean;
+    blockers: string[];
+    warnings: string[];
+    badges: string[];
+}
+
+export type CommunityImportConflictStrategy = "replace" | "keep_local";
+
+export interface CommunityImportHistoryEntry {
+    id: string;
+    created_at: number;
+    snippet_kind: string;
+    snippet_name: string;
+    target_id?: string | null;
+    conflict_strategy: CommunityImportConflictStrategy | string;
+    trust_verified: boolean;
+    rollback_available: boolean;
 }
 
 export interface PopularWorkflowFeedEntry {

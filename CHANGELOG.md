@@ -4,6 +4,14 @@
 
 - Ongoing work for next phase.
 
+## 5.18.0
+
+- Completed Phase 49 collaborative artifact UX with preview-first import flow for workflow/profile/theme snippets.
+- Added richer trust metadata and source attribution (publisher/source, compatibility hints, ratings, and vote context) across Community Hub artifact cards.
+- Added import conflict handling strategies (`replace` or `keep_local`) so users can avoid overwriting local artifacts.
+- Added rollback-safe import history with backend persistence plus in-app "Undo Latest Import" and per-entry rollback actions.
+- Updated release workflow note generation to render changelog bullets once (no duplicate Highlights/Patch Notes sections).
+
 ## 5.17.0
 
 - Synced Rust package metadata version in `src-tauri/Cargo.toml` with the current app release (`5.16.0`).

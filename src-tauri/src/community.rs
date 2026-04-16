@@ -12,6 +12,7 @@ const MAX_MESSAGE_LEN: usize = 2000;
 const MAX_CONTACT_LEN: usize = 200;
 const MAX_TOPIC_LEN: usize = 64;
 const MAX_ENTRIES: usize = 1000;
+const MAX_IMPORT_HISTORY: usize = 120;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommunityTrustMetadata {
@@ -21,6 +22,14 @@ pub struct CommunityTrustMetadata {
     pub risk_level: String,
     #[serde(default)]
     pub signature_hint: Option<String>,
+    #[serde(default)]
+    pub publisher_url: Option<String>,
+    #[serde(default)]
+    pub compatibility_hint: Option<String>,
+    #[serde(default)]
+    pub rating: Option<f32>,
+    #[serde(default)]
+    pub vote_count: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -47,6 +56,20 @@ struct CommunitySnippetPayload {
     pub name: String,
     pub trust: CommunityTrustMetadata,
     pub payload: serde_json::Value,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CommunitySnippetPreview {
+    pub schema_version: u32,
+    pub kind: String,
+    pub name: String,
+    pub trust: CommunityTrustMetadata,
+    pub target_id: Option<String>,
+    pub will_replace_existing: bool,
+    pub compatible: bool,
+    pub blockers: Vec<String>,
+    pub warnings: Vec<String>,
+    pub badges: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -93,6 +116,74 @@ struct CommunityFeedbackEntry {
     roadmap_topic: Option<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CommunityImportHistoryEntry {
+    pub id: String,
+    pub created_at: i64,
+    pub snippet_kind: String,
+    pub snippet_name: String,
+    pub target_id: Option<String>,
+    pub conflict_strategy: String,
+    pub trust_verified: bool,
+    pub rollback_available: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CommunityImportConflictStrategy {
+    Replace,
+    KeepLocal,
+}
+
+impl CommunityImportConflictStrategy {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Replace => "replace",
+            Self::KeepLocal => "keep_local",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct CommunityImportHistoryStore {
+    #[serde(default = "default_schema")]
+    schema_version: u32,
+    #[serde(default)]
+    updated_at: i64,
+    #[serde(default)]
+    entries: Vec<CommunityImportRecord>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct CommunityImportRecord {
+    id: String,
+    created_at: i64,
+    snippet_kind: String,
+    snippet_name: String,
+    #[serde(default)]
+    target_id: Option<String>,
+    conflict_strategy: String,
+    trust_verified: bool,
+    rollback: CommunityImportRollback,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum CommunityImportRollback {
+    Workflow {
+        id: String,
+        #[serde(default)]
+        previous: Option<WorkflowMacro>,
+    },
+    Profile {
+        id: String,
+        #[serde(default)]
+        previous: Option<ProfileConfig>,
+    },
+    Theme {
+        previous: ThemeSnippetData,
+    },
+}
+
 fn default_schema() -> u32 {
     COMMUNITY_SCHEMA_VERSION
 }
@@ -108,6 +199,16 @@ impl Default for CommunityFeedbackStore {
     }
 }
 
+impl Default for CommunityImportHistoryStore {
+    fn default() -> Self {
+        Self {
+            schema_version: COMMUNITY_SCHEMA_VERSION,
+            updated_at: now_millis(),
+            entries: Vec::new(),
+        }
+    }
+}
+
 fn now_millis() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -117,6 +218,147 @@ fn now_millis() -> i64 {
 
 fn storage_path() -> std::path::PathBuf {
     config::config_dir().join("community-feedback.json")
+}
+
+fn import_history_path() -> std::path::PathBuf {
+    config::config_dir().join("community-import-history.json")
+}
+
+fn parse_conflict_strategy(
+    on_conflict: Option<String>,
+) -> Result<CommunityImportConflictStrategy, VantaError> {
+    let Some(raw) = on_conflict.map(|v| v.trim().to_ascii_lowercase()) else {
+        return Ok(CommunityImportConflictStrategy::Replace);
+    };
+    if raw.is_empty() {
+        return Ok(CommunityImportConflictStrategy::Replace);
+    }
+    match raw.as_str() {
+        "replace" => Ok(CommunityImportConflictStrategy::Replace),
+        "keep_local" | "keep-local" => Ok(CommunityImportConflictStrategy::KeepLocal),
+        _ => Err("Unsupported conflict strategy. Use replace or keep_local.".into()),
+    }
+}
+
+fn history_entry_from_record(record: &CommunityImportRecord) -> CommunityImportHistoryEntry {
+    CommunityImportHistoryEntry {
+        id: record.id.clone(),
+        created_at: record.created_at,
+        snippet_kind: record.snippet_kind.clone(),
+        snippet_name: record.snippet_name.clone(),
+        target_id: record.target_id.clone(),
+        conflict_strategy: record.conflict_strategy.clone(),
+        trust_verified: record.trust_verified,
+        rollback_available: true,
+    }
+}
+
+fn load_import_history_store() -> CommunityImportHistoryStore {
+    let path = import_history_path();
+    let Ok(raw) = std::fs::read_to_string(&path) else {
+        return CommunityImportHistoryStore::default();
+    };
+
+    let mut parsed = serde_json::from_str::<CommunityImportHistoryStore>(&raw).unwrap_or_default();
+    if parsed.schema_version < COMMUNITY_SCHEMA_VERSION {
+        parsed.schema_version = COMMUNITY_SCHEMA_VERSION;
+    }
+    parsed
+}
+
+fn save_import_history_store(store: &CommunityImportHistoryStore) -> Result<(), VantaError> {
+    let path = import_history_path();
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)
+            .map_err(|e| format!("Failed to create import history directory: {}", e))?;
+    }
+
+    let data = serde_json::to_string_pretty(store)
+        .map_err(|e| format!("Failed to serialize import history: {}", e))?;
+
+    Ok(std::fs::write(path, data).map_err(|e| format!("Failed to save import history: {}", e))?)
+}
+
+fn append_import_history_record(
+    snippet_kind: &str,
+    snippet_name: &str,
+    target_id: Option<String>,
+    conflict_strategy: CommunityImportConflictStrategy,
+    trust_verified: bool,
+    rollback: CommunityImportRollback,
+) -> Result<String, VantaError> {
+    let mut store = load_import_history_store();
+    let created_at = now_millis();
+    let id = format!("imp-{}-{}", created_at, store.entries.len() + 1);
+
+    store.entries.push(CommunityImportRecord {
+        id: id.clone(),
+        created_at,
+        snippet_kind: snippet_kind.to_string(),
+        snippet_name: snippet_name.to_string(),
+        target_id,
+        conflict_strategy: conflict_strategy.as_str().to_string(),
+        trust_verified,
+        rollback,
+    });
+
+    if store.entries.len() > MAX_IMPORT_HISTORY {
+        let overflow = store.entries.len() - MAX_IMPORT_HISTORY;
+        store.entries.drain(0..overflow);
+    }
+
+    store.updated_at = now_millis();
+    save_import_history_store(&store)?;
+    Ok(id)
+}
+
+fn apply_import_rollback(
+    cfg: &mut config::VantaConfig,
+    rollback: &CommunityImportRollback,
+) -> Result<(), VantaError> {
+    match rollback {
+        CommunityImportRollback::Workflow { id, previous } => {
+            if let Some(prev_workflow) = previous {
+                if let Some(pos) = cfg.workflows.macros.iter().position(|m| &m.id == id) {
+                    cfg.workflows.macros[pos] = prev_workflow.clone();
+                } else {
+                    cfg.workflows.macros.push(prev_workflow.clone());
+                }
+            } else {
+                cfg.workflows.macros.retain(|m| &m.id != id);
+            }
+        }
+        CommunityImportRollback::Profile { id, previous } => {
+            if let Some(prev_profile) = previous {
+                if let Some(pos) = cfg.profiles.entries.iter().position(|p| &p.id == id) {
+                    cfg.profiles.entries[pos] = prev_profile.clone();
+                } else {
+                    cfg.profiles.entries.push(prev_profile.clone());
+                }
+            } else {
+                cfg.profiles.entries.retain(|p| &p.id != id);
+                if cfg.profiles.entries.is_empty() {
+                    return Err("Rollback would remove all profiles; operation blocked.".into());
+                }
+                if !cfg
+                    .profiles
+                    .entries
+                    .iter()
+                    .any(|p| p.id == cfg.profiles.active_profile_id)
+                {
+                    cfg.profiles.active_profile_id = cfg.profiles.entries[0].id.clone();
+                }
+            }
+        }
+        CommunityImportRollback::Theme { previous } => {
+            let mut restored = previous.clone();
+            let _ = config::clamp_window_size(&mut restored.window);
+            cfg.appearance = restored.appearance;
+            cfg.window = restored.window;
+        }
+    }
+
+    Ok(())
 }
 
 fn community_default_trust(verified: bool) -> CommunityTrustMetadata {
@@ -142,6 +384,18 @@ fn community_default_trust(verified: bool) -> CommunityTrustMetadata {
         } else {
             None
         },
+        publisher_url: if verified {
+            Some("https://github.com/Misiix9/Vanta".to_string())
+        } else {
+            None
+        },
+        compatibility_hint: if verified {
+            Some("validated-with-stable-community-schema".to_string())
+        } else {
+            None
+        },
+        rating: None,
+        vote_count: None,
     }
 }
 
@@ -181,6 +435,115 @@ fn is_valid_identifier(id: &str) -> bool {
         && id
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+fn evaluate_snippet_preview(
+    snippet: &CommunitySnippetPayload,
+    cfg: &config::VantaConfig,
+) -> Result<CommunitySnippetPreview, VantaError> {
+    let kind = snippet.kind.trim().to_ascii_lowercase();
+    let mut blockers = Vec::new();
+    let mut warnings = Vec::new();
+    let mut badges = vec![
+        format!("schema:v{}", snippet.schema_version),
+        if snippet.trust.verified {
+            "verified".to_string()
+        } else {
+            "unverified".to_string()
+        },
+        format!("risk:{}", snippet.trust.risk_level),
+    ];
+
+    if snippet.schema_version > COMMUNITY_SCHEMA_VERSION {
+        blockers.push(format!(
+            "Snippet schema v{} is newer than supported schema v{}",
+            snippet.schema_version, COMMUNITY_SCHEMA_VERSION
+        ));
+    } else if snippet.schema_version < COMMUNITY_SCHEMA_VERSION {
+        warnings.push(format!(
+            "Snippet schema v{} is older than current schema v{}",
+            snippet.schema_version, COMMUNITY_SCHEMA_VERSION
+        ));
+    }
+
+    let mut target_id = None;
+
+    let will_replace_existing = match kind.as_str() {
+        "workflow" => {
+            let workflow: WorkflowMacro = serde_json::from_value(snippet.payload.clone())
+                .map_err(|e| format!("Invalid workflow snippet: {}", e))?;
+
+            target_id = Some(workflow.id.clone());
+
+            if !is_valid_identifier(&workflow.id) {
+                blockers.push("Workflow id must be alphanumeric with '-' or '_'".to_string());
+            }
+
+            let risky = workflow_has_risky_caps(&workflow);
+            if risky {
+                badges.push("risky-capabilities".to_string());
+            }
+            if !snippet.trust.verified && risky {
+                blockers.push(
+                    "Unverified workflow snippet contains risky capabilities; import blocked."
+                        .to_string(),
+                );
+            }
+
+            let will_replace_existing = cfg.workflows.macros.iter().any(|m| m.id == workflow.id);
+            if will_replace_existing {
+                warnings.push(format!(
+                    "Workflow '{}' already exists and will be replaced",
+                    workflow.id
+                ));
+            }
+            will_replace_existing
+        }
+        "profile" => {
+            let profile: ProfileConfig = serde_json::from_value(snippet.payload.clone())
+                .map_err(|e| format!("Invalid profile snippet: {}", e))?;
+
+            target_id = Some(profile.id.clone());
+
+            if !is_valid_identifier(&profile.id) {
+                blockers.push("Profile id must be alphanumeric with '-' or '_'".to_string());
+            }
+
+            let will_replace_existing = cfg.profiles.entries.iter().any(|p| p.id == profile.id);
+            if will_replace_existing {
+                warnings.push(format!(
+                    "Profile '{}' already exists and will be replaced",
+                    profile.id
+                ));
+            }
+            will_replace_existing
+        }
+        "theme" => {
+            let _theme: ThemeSnippetData = serde_json::from_value(snippet.payload.clone())
+                .map_err(|e| format!("Invalid theme snippet: {}", e))?;
+
+            warnings.push(
+                "Theme import will overwrite current appearance and window settings".to_string(),
+            );
+            true
+        }
+        _ => {
+            return Err("Unsupported snippet kind. Use workflow, profile, or theme.".into());
+        }
+    };
+
+    Ok(CommunitySnippetPreview {
+        schema_version: snippet.schema_version,
+        kind,
+        name: snippet.name.clone(),
+        trust: snippet.trust.clone(),
+        target_id,
+        will_replace_existing,
+        compatible: blockers.is_empty(),
+        blockers,
+        warnings,
+        badges,
+    })
 }
 
 fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
@@ -245,6 +608,10 @@ fn popular_workflow_feed() -> Vec<PopularWorkflowFeedEntry> {
                 verified: true,
                 risk_level: "low".to_string(),
                 signature_hint: Some("verified-by-vanta-registry".to_string()),
+                publisher_url: Some("https://github.com/Misiix9/Vanta".to_string()),
+                compatibility_hint: Some("validated-with-stable-community-schema".to_string()),
+                rating: Some(4.9),
+                vote_count: Some(37),
             },
             workflow: WorkflowMacro {
                 id: "focus-mode-clean-start".to_string(),
@@ -530,13 +897,57 @@ pub async fn export_community_snippet(
 }
 
 #[tauri::command]
+pub async fn preview_community_snippet(
+    snippet_json: String,
+    state: State<'_, AppState>,
+) -> Result<CommunitySnippetPreview, VantaError> {
+    let snippet: CommunitySnippetPayload = serde_json::from_str(&snippet_json)
+        .map_err(|e| format!("Invalid snippet payload: {}", e))?;
+
+    let cfg = state
+        .config
+        .read()
+        .map_err(|_| "Failed to access config".to_string())?;
+
+    evaluate_snippet_preview(&snippet, &cfg)
+}
+
+#[tauri::command]
+pub async fn get_community_import_history() -> Result<Vec<CommunityImportHistoryEntry>, VantaError> {
+    let store = load_import_history_store();
+    let mut entries: Vec<CommunityImportHistoryEntry> = store
+        .entries
+        .iter()
+        .rev()
+        .map(history_entry_from_record)
+        .collect();
+    entries.truncate(25);
+    Ok(entries)
+}
+
+#[tauri::command]
 pub async fn import_community_snippet(
     snippet_json: String,
+    on_conflict: Option<String>,
     state: State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<String, VantaError> {
     let snippet: CommunitySnippetPayload = serde_json::from_str(&snippet_json)
         .map_err(|e| format!("Invalid snippet payload: {}", e))?;
+
+    let preview = {
+        let cfg = state
+            .config
+            .read()
+            .map_err(|_| "Failed to access config".to_string())?;
+        evaluate_snippet_preview(&snippet, &cfg)?
+    };
+
+    if !preview.compatible {
+        return Err(format!("Import blocked: {}", preview.blockers.join(" ")).into());
+    }
+
+    let conflict_strategy = parse_conflict_strategy(on_conflict)?;
 
     let mut cfg = state
         .config
@@ -545,10 +956,9 @@ pub async fn import_community_snippet(
 
     let kind = snippet.kind.trim().to_ascii_lowercase();
     let imported_name = snippet.name.clone();
-
-    match kind.as_str() {
+    let rollback: Option<CommunityImportRollback> = match kind.as_str() {
         "workflow" => {
-            let workflow: WorkflowMacro = serde_json::from_value(snippet.payload)
+            let workflow: WorkflowMacro = serde_json::from_value(snippet.payload.clone())
                 .map_err(|e| format!("Invalid workflow snippet: {}", e))?;
             if !is_valid_identifier(&workflow.id) {
                 return Err("Workflow id must be alphanumeric with '-' or '_'".into());
@@ -558,41 +968,145 @@ pub async fn import_community_snippet(
             }
 
             if let Some(pos) = cfg.workflows.macros.iter().position(|m| m.id == workflow.id) {
-                cfg.workflows.macros[pos] = workflow;
+                if conflict_strategy == CommunityImportConflictStrategy::KeepLocal {
+                    return Ok(format!(
+                        "Skipped workflow import '{}' because local item already exists.",
+                        workflow.id
+                    ));
+                }
+                let previous = cfg.workflows.macros[pos].clone();
+                cfg.workflows.macros[pos] = workflow.clone();
+                Some(CommunityImportRollback::Workflow {
+                    id: workflow.id,
+                    previous: Some(previous),
+                })
             } else {
-                cfg.workflows.macros.push(workflow);
+                cfg.workflows.macros.push(workflow.clone());
+                Some(CommunityImportRollback::Workflow {
+                    id: workflow.id,
+                    previous: None,
+                })
             }
         }
         "profile" => {
-            let profile: ProfileConfig = serde_json::from_value(snippet.payload)
+            let profile: ProfileConfig = serde_json::from_value(snippet.payload.clone())
                 .map_err(|e| format!("Invalid profile snippet: {}", e))?;
             if !is_valid_identifier(&profile.id) {
                 return Err("Profile id must be alphanumeric with '-' or '_'".into());
             }
 
             if let Some(pos) = cfg.profiles.entries.iter().position(|p| p.id == profile.id) {
-                cfg.profiles.entries[pos] = profile;
+                if conflict_strategy == CommunityImportConflictStrategy::KeepLocal {
+                    return Ok(format!(
+                        "Skipped profile import '{}' because local item already exists.",
+                        profile.id
+                    ));
+                }
+                let previous = cfg.profiles.entries[pos].clone();
+                cfg.profiles.entries[pos] = profile.clone();
+                Some(CommunityImportRollback::Profile {
+                    id: profile.id,
+                    previous: Some(previous),
+                })
             } else {
-                cfg.profiles.entries.push(profile);
+                cfg.profiles.entries.push(profile.clone());
+                Some(CommunityImportRollback::Profile {
+                    id: profile.id,
+                    previous: None,
+                })
             }
         }
         "theme" => {
-            let mut theme: ThemeSnippetData = serde_json::from_value(snippet.payload)
+            if conflict_strategy == CommunityImportConflictStrategy::KeepLocal {
+                return Ok("Skipped theme import because conflict strategy is keep_local.".to_string());
+            }
+            let previous = ThemeSnippetData {
+                appearance: cfg.appearance.clone(),
+                window: cfg.window.clone(),
+            };
+            let mut theme: ThemeSnippetData = serde_json::from_value(snippet.payload.clone())
                 .map_err(|e| format!("Invalid theme snippet: {}", e))?;
             let _ = config::clamp_window_size(&mut theme.window);
             let _ = config::clamp_accessibility(&mut cfg.accessibility);
             cfg.appearance = theme.appearance;
             cfg.window = theme.window;
+            Some(CommunityImportRollback::Theme { previous })
         }
         _ => {
             return Err("Unsupported snippet kind. Use workflow, profile, or theme.".into());
         }
-    }
+    };
 
     cfg.save_with_source("community")?;
     let _ = app_handle.emit("config-updated", &cfg.clone());
 
-    Ok(format!("Imported {} snippet '{}'", kind, imported_name))
+    let rollback_msg = if let Some(snapshot) = rollback {
+        match append_import_history_record(
+            &kind,
+            &imported_name,
+            preview.target_id.clone(),
+            conflict_strategy,
+            snippet.trust.verified,
+            snapshot,
+        ) {
+            Ok(id) => format!(" Rollback id: {}.", id),
+            Err(e) => format!(" Warning: rollback history not saved ({}).", e),
+        }
+    } else {
+        String::new()
+    };
+
+    Ok(format!(
+        "Imported {} snippet '{}' with {} strategy.{}",
+        kind,
+        imported_name,
+        conflict_strategy.as_str(),
+        rollback_msg
+    ))
+}
+
+#[tauri::command]
+pub async fn rollback_community_import(
+    import_id: Option<String>,
+    state: State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<String, VantaError> {
+    let mut store = load_import_history_store();
+    if store.entries.is_empty() {
+        return Err("No import history is available for rollback.".into());
+    }
+
+    let index = if let Some(id) = import_id.as_ref().map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        store
+            .entries
+            .iter()
+            .position(|entry| entry.id == id)
+            .ok_or_else(|| format!("Import record '{}' not found.", id))?
+    } else {
+        store.entries.len() - 1
+    };
+
+    let record = store.entries[index].clone();
+
+    let mut cfg = state
+        .config
+        .write()
+        .map_err(|_| "Failed to access config".to_string())?;
+    apply_import_rollback(&mut cfg, &record.rollback)?;
+    cfg.save_with_source("community-rollback")?;
+    let _ = app_handle.emit("config-updated", &cfg.clone());
+
+    store.entries.remove(index);
+    store.updated_at = now_millis();
+    let save_warning = match save_import_history_store(&store) {
+        Ok(_) => String::new(),
+        Err(e) => format!(" Warning: rollback history cleanup failed ({}).", e),
+    };
+
+    Ok(format!(
+        "Rolled back {} import '{}' (record {}).{}",
+        record.snippet_kind, record.snippet_name, record.id, save_warning
+    ))
 }
 
 #[cfg(test)]
@@ -636,5 +1150,116 @@ mod tests {
         };
 
         assert!(workflow_has_risky_caps(&workflow));
+    }
+
+    #[test]
+    fn preview_blocks_unverified_risky_workflow() {
+        let workflow = WorkflowMacro {
+            id: "test-risky".to_string(),
+            name: "Risky".to_string(),
+            description: None,
+            enabled: true,
+            timeout_ms: None,
+            timeout_behavior: crate::config::TimeoutBehavior::Abort,
+            schedule: None,
+            args: Vec::new(),
+            steps: vec![crate::config::MacroStep::System {
+                command: "echo".to_string(),
+                args: vec!["hello".to_string()],
+                capabilities: vec![Capability::Shell],
+                on_error: crate::config::StepErrorHandling::default(),
+                timeout_ms: None,
+                timeout_behavior: crate::config::TimeoutBehavior::Abort,
+            }],
+        };
+
+        let snippet = CommunitySnippetPayload {
+            schema_version: COMMUNITY_SCHEMA_VERSION,
+            created_at: now_millis(),
+            kind: "workflow".to_string(),
+            name: workflow.name.clone(),
+            trust: community_default_trust(false),
+            payload: serde_json::to_value(workflow).unwrap(),
+        };
+
+        let cfg = config::VantaConfig::default();
+        let preview = evaluate_snippet_preview(&snippet, &cfg).unwrap();
+
+        assert!(!preview.compatible);
+        assert!(preview
+            .blockers
+            .iter()
+            .any(|msg| msg.contains("risky capabilities")));
+    }
+
+    #[test]
+    fn parse_conflict_strategy_defaults_to_replace() {
+        assert_eq!(
+            parse_conflict_strategy(None).unwrap(),
+            CommunityImportConflictStrategy::Replace
+        );
+        assert_eq!(
+            parse_conflict_strategy(Some("".to_string())).unwrap(),
+            CommunityImportConflictStrategy::Replace
+        );
+    }
+
+    #[test]
+    fn rollback_removes_created_workflow() {
+        let mut cfg = config::VantaConfig::default();
+        cfg.workflows.macros.push(WorkflowMacro {
+            id: "temp-flow".to_string(),
+            name: "Temp Flow".to_string(),
+            description: None,
+            enabled: true,
+            timeout_ms: None,
+            timeout_behavior: crate::config::TimeoutBehavior::Abort,
+            schedule: None,
+            args: Vec::new(),
+            steps: vec![crate::config::MacroStep::System {
+                command: "echo".to_string(),
+                args: vec!["hello".to_string()],
+                capabilities: Vec::new(),
+                on_error: crate::config::StepErrorHandling::default(),
+                timeout_ms: None,
+                timeout_behavior: crate::config::TimeoutBehavior::Abort,
+            }],
+        });
+
+        let rollback = CommunityImportRollback::Workflow {
+            id: "temp-flow".to_string(),
+            previous: None,
+        };
+
+        apply_import_rollback(&mut cfg, &rollback).unwrap();
+        assert!(!cfg.workflows.macros.iter().any(|m| m.id == "temp-flow"));
+    }
+
+    #[test]
+    fn rollback_restores_previous_profile() {
+        let mut cfg = config::VantaConfig::default();
+        cfg.profiles.entries[0].name = "Current".to_string();
+
+        let previous = config::ProfileConfig {
+            id: cfg.profiles.entries[0].id.clone(),
+            name: "Previous".to_string(),
+            hotkey: cfg.profiles.entries[0].hotkey.clone(),
+            theme: cfg.profiles.entries[0].theme.clone(),
+            search: cfg.profiles.entries[0].search.clone(),
+        };
+
+        let rollback = CommunityImportRollback::Profile {
+            id: previous.id.clone(),
+            previous: Some(previous.clone()),
+        };
+
+        apply_import_rollback(&mut cfg, &rollback).unwrap();
+        let restored = cfg
+            .profiles
+            .entries
+            .iter()
+            .find(|p| p.id == previous.id)
+            .unwrap();
+        assert_eq!(restored.name, "Previous");
     }
 }

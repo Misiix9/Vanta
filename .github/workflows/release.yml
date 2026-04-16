@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (without v), optional override"
+        description: "Release version, optional override"
         required: false
         type: string
 
@@ -124,15 +124,9 @@ jobs:
             exit 1
           fi
 
-          HIGHLIGHTS=$(grep '^- ' "${SECTION_FILE}" | head -n 4)
-
           {
             echo "## Vanta v${VERSION}"
             echo
-            echo "### Highlights"
-            echo "${HIGHLIGHTS}"
-            echo
-            echo "### Patch Notes"
             cat "${SECTION_FILE}"
             echo
             echo "### Included artifacts"
