@@ -16,6 +16,48 @@
   let text = $state("");
   let status = $state<string | null>(null);
 
+  const ADAPTIVE_PROFILE_OPTIONS = ["balanced", "daylight", "night", "presentation"] as const;
+  const ADAPTIVE_LIGHTING_OPTIONS = ["neutral", "bright", "dim"] as const;
+  const ADAPTIVE_DENSITY_OPTIONS = ["compact", "comfortable", "relaxed"] as const;
+  const ADAPTIVE_PERFORMANCE_OPTIONS = ["quality", "balanced", "battery"] as const;
+  const ADAPTIVE_ACCESSIBILITY_OPTIONS = ["inherit", "readability", "focus", "calm"] as const;
+
+  function normalizeAdaptiveOption<T extends readonly string[]>(value: unknown, allowed: T, fallback: T[number]): T[number] {
+    return typeof value === "string" && (allowed as readonly string[]).includes(value) ? (value as T[number]) : fallback;
+  }
+
+  function ensureAdaptiveProfile() {
+    const adaptive = config.appearance.adaptive;
+    if (!adaptive || typeof adaptive !== "object") {
+      config.appearance.adaptive = {
+        enabled: false,
+        profile: "balanced",
+        lighting: "neutral",
+        density: "comfortable",
+        performance_tier: "balanced",
+        accessibility_preset: "inherit",
+      };
+      return;
+    }
+
+    config.appearance.adaptive.enabled = Boolean(adaptive.enabled);
+    config.appearance.adaptive.profile = normalizeAdaptiveOption(adaptive.profile, ADAPTIVE_PROFILE_OPTIONS, "balanced");
+    config.appearance.adaptive.lighting = normalizeAdaptiveOption(adaptive.lighting, ADAPTIVE_LIGHTING_OPTIONS, "neutral");
+    config.appearance.adaptive.density = normalizeAdaptiveOption(adaptive.density, ADAPTIVE_DENSITY_OPTIONS, "comfortable");
+    config.appearance.adaptive.performance_tier = normalizeAdaptiveOption(
+      adaptive.performance_tier,
+      ADAPTIVE_PERFORMANCE_OPTIONS,
+      "balanced",
+    );
+    config.appearance.adaptive.accessibility_preset = normalizeAdaptiveOption(
+      adaptive.accessibility_preset,
+      ADAPTIVE_ACCESSIBILITY_OPTIONS,
+      "inherit",
+    );
+  }
+
+  ensureAdaptiveProfile();
+
   function saveConfig() {
     applyTheme(config);
     invoke("save_config", { newConfig: config }).catch((e) => {
@@ -66,6 +108,7 @@
         return;
       }
       config.appearance = parsed.appearance;
+      ensureAdaptiveProfile();
       if (parsed.window) config.window = parsed.window;
       status = "Theme profile imported.";
       saveConfig();
@@ -110,6 +153,54 @@
       <label>Surface <input type="color" bind:value={config.appearance.colors.surface} oninput={saveConfig} /></label>
       <label>Accent <input type="color" bind:value={config.appearance.colors.accent} oninput={saveConfig} /></label>
       <label>Opacity <input type="range" min="0.1" max="1" step="0.05" bind:value={config.appearance.opacity} oninput={saveConfig} /></label>
+    </div>
+
+    <div class="control-group control-group-block">
+      <h3>Adaptive Appearance</h3>
+      <label>
+        <input type="checkbox" bind:checked={config.appearance.adaptive.enabled} onchange={saveConfig} />
+        Enable adaptive profile transforms
+      </label>
+      <label>
+        Profile
+        <select class="vanta-select" bind:value={config.appearance.adaptive.profile} onchange={saveConfig}>
+          {#each ADAPTIVE_PROFILE_OPTIONS as profile}
+            <option value={profile}>{profile}</option>
+          {/each}
+        </select>
+      </label>
+      <label>
+        Lighting
+        <select class="vanta-select" bind:value={config.appearance.adaptive.lighting} onchange={saveConfig}>
+          {#each ADAPTIVE_LIGHTING_OPTIONS as lighting}
+            <option value={lighting}>{lighting}</option>
+          {/each}
+        </select>
+      </label>
+      <label>
+        Density
+        <select class="vanta-select" bind:value={config.appearance.adaptive.density} onchange={saveConfig}>
+          {#each ADAPTIVE_DENSITY_OPTIONS as density}
+            <option value={density}>{density}</option>
+          {/each}
+        </select>
+      </label>
+      <label>
+        Performance Tier
+        <select class="vanta-select" bind:value={config.appearance.adaptive.performance_tier} onchange={saveConfig}>
+          {#each ADAPTIVE_PERFORMANCE_OPTIONS as tier}
+            <option value={tier}>{tier}</option>
+          {/each}
+        </select>
+      </label>
+      <label>
+        Accessibility Preset
+        <select class="vanta-select" bind:value={config.appearance.adaptive.accessibility_preset} onchange={saveConfig}>
+          {#each ADAPTIVE_ACCESSIBILITY_OPTIONS as preset}
+            <option value={preset}>{preset}</option>
+          {/each}
+        </select>
+      </label>
     </div>
 
     <div class="control-group control-group-block">

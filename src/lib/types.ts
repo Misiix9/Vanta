@@ -13,12 +13,28 @@ export interface VantaColors {
     info?: string;
 }
 
+export type AdaptiveAppearanceProfile = "balanced" | "daylight" | "night" | "presentation" | string;
+export type AdaptiveAppearanceLighting = "neutral" | "bright" | "dim" | string;
+export type AdaptiveAppearanceDensity = "compact" | "comfortable" | "relaxed" | string;
+export type AdaptiveAppearancePerformanceTier = "quality" | "balanced" | "battery" | string;
+export type AdaptiveAppearanceAccessibilityPreset = "inherit" | "readability" | "focus" | "calm" | string;
+
+export interface AdaptiveAppearanceConfig {
+    enabled: boolean;
+    profile: AdaptiveAppearanceProfile;
+    lighting: AdaptiveAppearanceLighting;
+    density: AdaptiveAppearanceDensity;
+    performance_tier: AdaptiveAppearancePerformanceTier;
+    accessibility_preset: AdaptiveAppearanceAccessibilityPreset;
+}
+
 export interface AppearanceConfig {
     blur_radius: number;
     opacity: number;
     border_radius: number;
     theme: string;
     colors: VantaColors;
+    adaptive: AdaptiveAppearanceConfig;
 }
 
 export interface ThemeDiagnostic {

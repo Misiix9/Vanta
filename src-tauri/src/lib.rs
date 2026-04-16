@@ -40,7 +40,7 @@ use extensions::ExtensionEntry;
 use permissions::Capability;
 use workflows::{MacroDryRunResult, MacroRunResult};
 use windows::{list_windows_grouped, WindowGroup};
-use config::{clamp_accessibility, clamp_window_size};
+use config::{clamp_accessibility, clamp_adaptive_appearance, clamp_window_size};
 
 use files::FileIndex;
 use tokio::time::sleep;
@@ -2157,6 +2157,7 @@ async fn save_config(
 
     let _ = clamp_window_size(&mut new_config.window);
     let _ = clamp_accessibility(&mut new_config.accessibility);
+    let _ = clamp_adaptive_appearance(&mut new_config.appearance.adaptive);
 
     {
         let mut config = state

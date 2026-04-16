@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "general": {
     "hotkey": "Alt+Space",
     "max_results": 8,
@@ -19,6 +19,14 @@
       "text_primary": "#F5F5F5",
       "text_secondary": "#888888",
       "border": "rgba(255, 255, 255, 0.08)"
+    },
+    "adaptive": {
+      "enabled": false,
+      "profile": "balanced",
+      "lighting": "neutral",
+      "density": "comfortable",
+      "performance_tier": "balanced",
+      "accessibility_preset": "inherit"
     }
   },
   "window": {

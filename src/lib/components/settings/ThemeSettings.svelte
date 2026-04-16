@@ -1,6 +1,6 @@
 <script lang="ts">
     import { invoke } from "@tauri-apps/api/core";
-    import type { VantaConfig, ThemeMeta } from "$lib/types";
+    import type { AdaptiveAppearanceConfig, VantaConfig, ThemeMeta } from "$lib/types";
 
     let {
         config = $bindable(),
@@ -29,7 +29,57 @@
             text_secondary: "#888888",
             border: "rgba(255, 255, 255, 0.08)",
         },
+        adaptive: {
+            enabled: false,
+            profile: "balanced",
+            lighting: "neutral",
+            density: "comfortable",
+            performance_tier: "balanced",
+            accessibility_preset: "inherit",
+        },
     } as const;
+
+    const ADAPTIVE_PROFILE_OPTIONS = ["balanced", "daylight", "night", "presentation"] as const;
+    const ADAPTIVE_LIGHTING_OPTIONS = ["neutral", "bright", "dim"] as const;
+    const ADAPTIVE_DENSITY_OPTIONS = ["compact", "comfortable", "relaxed"] as const;
+    const ADAPTIVE_PERFORMANCE_OPTIONS = ["quality", "balanced", "battery"] as const;
+    const ADAPTIVE_ACCESSIBILITY_OPTIONS = ["inherit", "readability", "focus", "calm"] as const;
+
+    function normalizeAdaptiveOption<T extends readonly string[]>(value: unknown, allowed: T, fallback: T[number]): T[number] {
+        return typeof value === "string" && (allowed as readonly string[]).includes(value) ? (value as T[number]) : fallback;
+    }
+
+    function ensureAdaptiveProfile(): void {
+        const adaptive = config.appearance.adaptive;
+        const fallback = DEFAULT_APPEARANCE.adaptive;
+        if (!adaptive || typeof adaptive !== "object") {
+            config.appearance.adaptive = { ...fallback };
+            return;
+        }
+
+        config.appearance.adaptive.enabled = Boolean(adaptive.enabled);
+        config.appearance.adaptive.profile = normalizeAdaptiveOption(adaptive.profile, ADAPTIVE_PROFILE_OPTIONS, fallback.profile);
+        config.appearance.adaptive.lighting = normalizeAdaptiveOption(adaptive.lighting, ADAPTIVE_LIGHTING_OPTIONS, fallback.lighting);
+        config.appearance.adaptive.density = normalizeAdaptiveOption(adaptive.density, ADAPTIVE_DENSITY_OPTIONS, fallback.density);
+        config.appearance.adaptive.performance_tier = normalizeAdaptiveOption(
+            adaptive.performance_tier,
+            ADAPTIVE_PERFORMANCE_OPTIONS,
+            fallback.performance_tier,
+        );
+        config.appearance.adaptive.accessibility_preset = normalizeAdaptiveOption(
+            adaptive.accessibility_preset,
+            ADAPTIVE_ACCESSIBILITY_OPTIONS,
+            fallback.accessibility_preset,
+        );
+    }
+
+    function resetAdaptiveProfile() {
+        config.appearance.adaptive = { ...DEFAULT_APPEARANCE.adaptive } as AdaptiveAppearanceConfig;
+        themeStudioStatus = "Adaptive profile reset to defaults";
+        onSave();
+    }
+
+    ensureAdaptiveProfile();
 
     function onThemeChange() {
         const selected = availableThemes.find((t) => t.id === config.appearance.theme);
@@ -122,6 +172,25 @@
                 config.appearance.border_radius = Math.max(0, Math.min(50, Math.round(parsed.appearance.border_radius)));
             if (typeof parsed.appearance.theme === "string")
                 config.appearance.theme = parsed.appearance.theme;
+            if (parsed.appearance.adaptive && typeof parsed.appearance.adaptive === "object") {
+                const adaptive = parsed.appearance.adaptive;
+                config.appearance.adaptive = {
+                    enabled: Boolean(adaptive.enabled),
+                    profile: normalizeAdaptiveOption(adaptive.profile, ADAPTIVE_PROFILE_OPTIONS, DEFAULT_APPEARANCE.adaptive.profile),
+                    lighting: normalizeAdaptiveOption(adaptive.lighting, ADAPTIVE_LIGHTING_OPTIONS, DEFAULT_APPEARANCE.adaptive.lighting),
+                    density: normalizeAdaptiveOption(adaptive.density, ADAPTIVE_DENSITY_OPTIONS, DEFAULT_APPEARANCE.adaptive.density),
+                    performance_tier: normalizeAdaptiveOption(
+                        adaptive.performance_tier,
+                        ADAPTIVE_PERFORMANCE_OPTIONS,
+                        DEFAULT_APPEARANCE.adaptive.performance_tier,
+                    ),
+                    accessibility_preset: normalizeAdaptiveOption(
+                        adaptive.accessibility_preset,
+                        ADAPTIVE_ACCESSIBILITY_OPTIONS,
+                        DEFAULT_APPEARANCE.adaptive.accessibility_preset,
+                    ),
+                };
+            }
             if (parsed.window && typeof parsed.window.width === "number" && typeof parsed.window.height === "number") {
                 config.window.width = Math.max(400, Math.min(1920, parsed.window.width));
                 config.window.height = Math.max(300, Math.min(1080, parsed.window.height));
@@ -144,6 +213,7 @@
         config.appearance.border_radius = DEFAULT_APPEARANCE.border_radius;
         config.appearance.theme = DEFAULT_APPEARANCE.theme;
         config.appearance.colors = { ...DEFAULT_APPEARANCE.colors };
+        config.appearance.adaptive = { ...DEFAULT_APPEARANCE.adaptive } as AdaptiveAppearanceConfig;
         themeStudioStatus = "Theme profile reset to defaults";
         onSave();
     }
@@ -185,6 +255,62 @@
     <label>Blur Radius ({config.appearance.blur_radius}px)
         <input type="range" min="0" max="100" step="1" bind:value={config.appearance.blur_radius} oninput={onSave} />
     </label>
+</div>
+
+<h3 class="settings-subheading">Adaptive Appearance</h3>
+
+<div class="control-group">
+    <label>
+        <input type="checkbox" bind:checked={config.appearance.adaptive.enabled} onchange={onSave} />
+        Enable adaptive profile transforms
+    </label>
+</div>
+
+<div class="control-group">
+    <label>
+        Profile
+        <select class="vanta-select" bind:value={config.appearance.adaptive.profile} onchange={onSave}>
+            {#each ADAPTIVE_PROFILE_OPTIONS as profile}
+                <option value={profile}>{profile}</option>
+            {/each}
+        </select>
+    </label>
+    <label>
+        Lighting
+        <select class="vanta-select" bind:value={config.appearance.adaptive.lighting} onchange={onSave}>
+            {#each ADAPTIVE_LIGHTING_OPTIONS as lighting}
+                <option value={lighting}>{lighting}</option>
+            {/each}
+        </select>
+    </label>
+    <label>
+        Density
+        <select class="vanta-select" bind:value={config.appearance.adaptive.density} onchange={onSave}>
+            {#each ADAPTIVE_DENSITY_OPTIONS as density}
+                <option value={density}>{density}</option>
+            {/each}
+        </select>
+    </label>
+    <label>
+        Performance Tier
+        <select class="vanta-select" bind:value={config.appearance.adaptive.performance_tier} onchange={onSave}>
+            {#each ADAPTIVE_PERFORMANCE_OPTIONS as tier}
+                <option value={tier}>{tier}</option>
+            {/each}
+        </select>
+    </label>
+    <label>
+        Accessibility Preset
+        <select class="vanta-select" bind:value={config.appearance.adaptive.accessibility_preset} onchange={onSave}>
+            {#each ADAPTIVE_ACCESSIBILITY_OPTIONS as preset}
+                <option value={preset}>{preset}</option>
+            {/each}
+        </select>
+    </label>
+</div>
+
+<div class="preset-row">
+    <button class="preset-btn" onclick={resetAdaptiveProfile}>Reset Adaptive Profile</button>
 </div>
 
 <h3 class="settings-subheading">Theme Studio</h3>

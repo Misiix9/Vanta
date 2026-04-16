@@ -12,7 +12,7 @@ use crate::errors::VantaError;
 
 // Embedded default config for fallback writes.
 const DEFAULT_CONFIG_JSON: &str = include_str!("../resources/config.json");
-pub const CONFIG_SCHEMA_VERSION: u32 = 5;
+pub const CONFIG_SCHEMA_VERSION: u32 = 6;
 pub const WORKFLOWS_SCHEMA_VERSION: u32 = 2;
 pub const PROFILES_SCHEMA_VERSION: u32 = 1;
 pub const PROFILE_EXPORT_SCHEMA_VERSION: u32 = 1;
@@ -357,6 +357,89 @@ impl Default for AccessibilityConfig {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct AdaptiveAppearanceConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_adaptive_profile")]
+    pub profile: String,
+    #[serde(default = "default_adaptive_lighting")]
+    pub lighting: String,
+    #[serde(default = "default_adaptive_density")]
+    pub density: String,
+    #[serde(default = "default_adaptive_performance_tier")]
+    pub performance_tier: String,
+    #[serde(default = "default_adaptive_accessibility_preset")]
+    pub accessibility_preset: String,
+}
+
+fn default_adaptive_profile() -> String {
+    "balanced".to_string()
+}
+
+fn default_adaptive_lighting() -> String {
+    "neutral".to_string()
+}
+
+fn default_adaptive_density() -> String {
+    "comfortable".to_string()
+}
+
+fn default_adaptive_performance_tier() -> String {
+    "balanced".to_string()
+}
+
+fn default_adaptive_accessibility_preset() -> String {
+    "inherit".to_string()
+}
+
+impl Default for AdaptiveAppearanceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            profile: default_adaptive_profile(),
+            lighting: default_adaptive_lighting(),
+            density: default_adaptive_density(),
+            performance_tier: default_adaptive_performance_tier(),
+            accessibility_preset: default_adaptive_accessibility_preset(),
+        }
+    }
+}
+
+pub fn clamp_adaptive_appearance(cfg: &mut AdaptiveAppearanceConfig) -> bool {
+    let mut changed = false;
+
+    if !matches!(
+        cfg.profile.as_str(),
+        "balanced" | "daylight" | "night" | "presentation"
+    ) {
+        cfg.profile = default_adaptive_profile();
+        changed = true;
+    }
+
+    if !matches!(cfg.lighting.as_str(), "neutral" | "bright" | "dim") {
+        cfg.lighting = default_adaptive_lighting();
+        changed = true;
+    }
+
+    if !matches!(cfg.density.as_str(), "compact" | "comfortable" | "relaxed") {
+        cfg.density = default_adaptive_density();
+        changed = true;
+    }
+
+    if !matches!(cfg.performance_tier.as_str(), "quality" | "balanced" | "battery") {
+        cfg.performance_tier = default_adaptive_performance_tier();
+        changed = true;
+    }
+
+    if !matches!(cfg.accessibility_preset.as_str(), "inherit" | "readability" | "focus" | "calm") {
+        cfg.accessibility_preset = default_adaptive_accessibility_preset();
+        changed = true;
+    }
+
+    changed
+}
+
 pub fn clamp_accessibility(cfg: &mut AccessibilityConfig) -> bool {
     let mut changed = false;
 
@@ -410,6 +493,8 @@ pub struct AppearanceConfig {
     #[serde(default = "default_theme")]
     pub theme: String,
     pub colors: ColorsConfig,
+    #[serde(default)]
+    pub adaptive: AdaptiveAppearanceConfig,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
@@ -710,6 +795,7 @@ impl Default for VantaConfig {
                     text_secondary: "#888888".to_string(), // Grey
                     border: "rgba(255, 255, 255, 0.08)".to_string(),
                 },
+                adaptive: AdaptiveAppearanceConfig::default(),
             },
             extensions: ExtensionsConfig::default(),
             files: FilesConfig {
@@ -1141,6 +1227,9 @@ pub fn load_or_create_default() -> VantaConfig {
                     if clamp_accessibility(&mut config.accessibility) {
                         changed = true;
                     }
+                    if clamp_adaptive_appearance(&mut config.appearance.adaptive) {
+                        changed = true;
+                    }
                     if changed {
                         let _ = write_config_with_source(&config, "migration");
                     }
@@ -1218,6 +1307,9 @@ pub fn migrate_config_on_disk() -> Result<ConfigMigrationReport, VantaError> {
     if clamp_accessibility(&mut cfg.accessibility) {
         changed = true;
     }
+    if clamp_adaptive_appearance(&mut cfg.appearance.adaptive) {
+        changed = true;
+    }
 
     if changed {
         write_config_with_source(&cfg, "migration")?;
@@ -1236,6 +1328,7 @@ pub fn factory_reset_on_disk() -> Result<VantaConfig, VantaError> {
     let mut cfg = VantaConfig::default();
     let _ = clamp_window_size(&mut cfg.window);
     let _ = clamp_accessibility(&mut cfg.accessibility);
+    let _ = clamp_adaptive_appearance(&mut cfg.appearance.adaptive);
     write_config_with_source(&cfg, "factory-reset")?;
     Ok(cfg)
 }
@@ -1254,6 +1347,9 @@ impl VantaConfig {
 fn write_config_with_source(cfg: &VantaConfig, source: &str) -> Result<(), VantaError> {
     let mut cfg = cfg.clone();
     let _ = ensure_profiles(&mut cfg);
+    let _ = clamp_window_size(&mut cfg.window);
+    let _ = clamp_accessibility(&mut cfg.accessibility);
+    let _ = clamp_adaptive_appearance(&mut cfg.appearance.adaptive);
 
     let old_cfg: Option<VantaConfig> = fs::read_to_string(config_path())
         .ok()
@@ -1382,6 +1478,12 @@ mod tests {
                 assert!(!cfg.accessibility.reduced_motion);
                 assert_eq!(cfg.accessibility.text_scale, 1.0);
                 assert_eq!(cfg.accessibility.spacing_preset, "comfortable");
+            assert!(!cfg.appearance.adaptive.enabled);
+            assert_eq!(cfg.appearance.adaptive.profile, "balanced");
+            assert_eq!(cfg.appearance.adaptive.lighting, "neutral");
+            assert_eq!(cfg.appearance.adaptive.density, "comfortable");
+            assert_eq!(cfg.appearance.adaptive.performance_tier, "balanced");
+            assert_eq!(cfg.appearance.adaptive.accessibility_preset, "inherit");
                 assert_eq!(cfg.workflows.schema_version, WORKFLOWS_SCHEMA_VERSION);
                 assert_eq!(cfg.profiles.schema_version, PROFILES_SCHEMA_VERSION);
                 assert_eq!(cfg.profiles.active_profile_id, "default");
@@ -1434,6 +1536,12 @@ mod tests {
                 assert!(!parsed.accessibility.reduced_motion);
                 assert_eq!(parsed.accessibility.text_scale, 1.0);
                 assert_eq!(parsed.accessibility.spacing_preset, "comfortable");
+                assert!(!parsed.appearance.adaptive.enabled);
+                assert_eq!(parsed.appearance.adaptive.profile, "balanced");
+                assert_eq!(parsed.appearance.adaptive.lighting, "neutral");
+                assert_eq!(parsed.appearance.adaptive.density, "comfortable");
+                assert_eq!(parsed.appearance.adaptive.performance_tier, "balanced");
+                assert_eq!(parsed.appearance.adaptive.accessibility_preset, "inherit");
                 assert_eq!(parsed.workflows.schema_version, WORKFLOWS_SCHEMA_VERSION);
                 assert_eq!(parsed.profiles.active_profile_id, "default");
                 assert_eq!(parsed.profiles.entries.len(), 1);
@@ -1442,6 +1550,25 @@ mod tests {
                 assert_eq!(parsed.bookmarks.max_entries, 200);
                 assert!(parsed.bookmarks.entries.is_empty());
         }
+
+            #[test]
+            fn adaptive_appearance_clamp_enforces_safe_values() {
+                let mut cfg = AdaptiveAppearanceConfig {
+                    enabled: true,
+                    profile: "unknown".to_string(),
+                    lighting: "sunset".to_string(),
+                    density: "ultra".to_string(),
+                    performance_tier: "turbo".to_string(),
+                    accessibility_preset: "extreme".to_string(),
+                };
+
+                assert!(clamp_adaptive_appearance(&mut cfg));
+                assert_eq!(cfg.profile, "balanced");
+                assert_eq!(cfg.lighting, "neutral");
+                assert_eq!(cfg.density, "comfortable");
+                assert_eq!(cfg.performance_tier, "balanced");
+                assert_eq!(cfg.accessibility_preset, "inherit");
+            }
 
         #[test]
         fn accessibility_clamp_enforces_safe_ranges() {

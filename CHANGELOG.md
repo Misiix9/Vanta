@@ -4,6 +4,13 @@
 
 - Ongoing work for next phase.
 
+## 5.20.0
+
+- Completed Phase 51 adaptive appearance profiles with environment-aware profile controls in Theme Profile and Theme Studio.
+- Added adaptive appearance config schema (`appearance.adaptive`) with strict backend compatibility guards and safe migration defaults.
+- Added deterministic runtime transforms for blur, opacity, radius, spacing, text scale, and motion based on profile, lighting, density, performance, and accessibility presets.
+- Added profile-aware import/export handling so theme profile JSON round-trips adaptive settings safely.
+
 ## 5.19.0
 
 - Completed Phase 50 global navigation and cross-surface wayfinding improvements.
