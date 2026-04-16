@@ -579,15 +579,17 @@
   {:else if workspaceLayout === "multi"}
     <div class="workspace-canvas">
       <div class="workspace-pane-main">
-        <ResultsList
-          bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
-          query={query}
-          showScore={showScoreOverlay}
-          onActivate={handleActivate}
-          onActionClick={handleActionClick}
-          onContextMenu={handleResultContextMenu}
-          on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
-        />
+        <div class="workspace-results-region" id="vanta-results">
+          <ResultsList
+            bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
+            query={query}
+            showScore={showScoreOverlay}
+            onActivate={handleActivate}
+            onActionClick={handleActionClick}
+            onContextMenu={handleResultContextMenu}
+            on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
+          />
+        </div>
         {#if query.trim() !== "" && config && config.search.show_explain_panel !== false}
           <SearchExplainPanel query={query} results={results} searchConfig={config.search} />
         {/if}
@@ -602,15 +604,17 @@
       />
     </div>
   {:else}
-    <ResultsList
-      bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
-      query={query}
-      showScore={showScoreOverlay}
-      onActivate={handleActivate}
-      onActionClick={handleActionClick}
-      onContextMenu={handleResultContextMenu}
-      on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
-    />
+    <div class="workspace-results-region" id="vanta-results">
+      <ResultsList
+        bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
+        query={query}
+        showScore={showScoreOverlay}
+        onActivate={handleActivate}
+        onActionClick={handleActionClick}
+        onContextMenu={handleResultContextMenu}
+        on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
+      />
+    </div>
     {#if query.trim() !== "" && config && config.search.show_explain_panel !== false}
       <SearchExplainPanel query={query} results={results} searchConfig={config.search} />
     {/if}

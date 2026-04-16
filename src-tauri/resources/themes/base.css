@@ -329,6 +329,18 @@ a:hover {
     gap: calc(var(--space-1) * var(--vanta-space-scale, 1));
 }
 
+.workspace-results-region {
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.workspace-results-region .results-wrapper {
+    flex: 1;
+    min-height: 0;
+}
+
 .workspace-pane-side {
     min-height: 0;
     overflow: auto;
@@ -846,6 +858,13 @@ a:hover {
     min-width: 0;
     flex: 1;
 }
+.settings-version {
+    margin-left: calc(var(--space-1) * var(--vanta-space-scale, 1));
+    font-size: var(--type-caption);
+    color: var(--ds-text-muted);
+    font-weight: 500;
+}
+
 
 .sections {
     flex: 1;

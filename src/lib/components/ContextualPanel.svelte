@@ -15,10 +15,11 @@
     onQuickLook?: (result: SearchResult) => void;
   } = $props();
 
-  let actionButtons: HTMLButtonElement[] = [];
+  let panelEl: HTMLElement | null = null;
 
   export function focusFirstAction() {
-    actionButtons[0]?.focus();
+    const first = panelEl?.querySelector<HTMLButtonElement>("button");
+    first?.focus();
   }
 
   function sourceLabel(source: SearchResult["source"]): string {
@@ -64,7 +65,7 @@
   }
 </script>
 
-<aside class="context-panel v2-panel" aria-label="Contextual details panel">
+<aside class="context-panel v2-panel" aria-label="Contextual details panel" bind:this={panelEl}>
   {#if result}
     <header class="context-panel-header">
       <h3>{result.title}</h3>
@@ -109,19 +110,17 @@
     <div class="context-actions">
       <button
         class="btn-secondary"
-        bind:this={actionButtons[0]}
         onclick={() => onActivate?.(result)}
       >
         Open
       </button>
-      <button class="btn-ghost" bind:this={actionButtons[1]} onclick={() => onQuickLook?.(result)}>
+      <button class="btn-ghost" onclick={() => onQuickLook?.(result)}>
         Quick Look
       </button>
       {#if result.actions?.length}
         {#each result.actions as action, i}
           <button
             class="btn-ghost"
-            bind:this={actionButtons[i + 2]}
             onclick={() => onAction?.(result, action.exec ?? result.exec, action.command)}
           >
             {action.label}

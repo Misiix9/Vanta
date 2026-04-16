@@ -74,6 +74,48 @@
         await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation(), loadUsageAnalytics()]);
         loading = false;
     });
+
+    function statusTone(status: string): "ok" | "warn" | "bad" {
+        const value = status.toLowerCase();
+        if (value.includes("ok") || value.includes("healthy") || value.includes("pass")) return "ok";
+        if (value.includes("warn") || value.includes("degrad") || value.includes("slow")) return "warn";
+        return "bad";
+    }
+
+    function buildSparkline(values: number[], width = 220, height = 48): string {
+        if (!values.length) return "";
+        if (values.length === 1) return `M0 ${height / 2} L${width} ${height / 2}`;
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const span = Math.max(1, max - min);
+        const step = width / (values.length - 1);
+        return values
+            .map((v, i) => {
+                const x = i * step;
+                const y = height - ((v - min) / span) * height;
+                return `${i === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
+            })
+            .join(" ");
+    }
+
+    let healthRisk = $derived.by(() => {
+        if (!healthDashboard) return { ok: 0, warn: 0, bad: 0 };
+        const summary = { ok: 0, warn: 0, bad: 0 };
+        for (const check of healthDashboard.checks) summary[statusTone(check.status)] += 1;
+        return summary;
+    });
+
+    let usageHourSparkline = $derived.by(() => {
+        if (!usageAnalytics?.peak_usage_hours?.length) return "";
+        const sorted = [...usageAnalytics.peak_usage_hours].sort((a, b) => a.hour - b.hour);
+        return buildSparkline(sorted.map((h) => h.launches));
+    });
+
+    let appFrecencySparkline = $derived.by(() => {
+        if (!usageAnalytics?.most_used_apps?.length) return "";
+        return buildSparkline(usageAnalytics.most_used_apps.slice(0, 8).map((a) => a.frecency));
+    });
+
 </script>
 
 {#if loading}
@@ -94,16 +136,25 @@
         </button>
     </div>
 
+
+
     {#if diagnostics}
-        <div class="control-group">
-            <label>Search Calls <input type="text" value={`${diagnostics.search.calls}`} readonly /></label>
-            <label>Search Avg (ms) <input type="text" value={diagnostics.search.avg_ms.toFixed(2)} readonly /></label>
-            <label>Search Max (ms) <input type="text" value={`${diagnostics.search.max_ms}`} readonly /></label>
-        </div>
-        <div class="control-group">
-            <label>Suggestion Calls <input type="text" value={`${diagnostics.suggestions.calls}`} readonly /></label>
-            <label>Suggestion Avg (ms) <input type="text" value={diagnostics.suggestions.avg_ms.toFixed(2)} readonly /></label>
-            <label>Launch Avg (ms) <input type="text" value={diagnostics.launch.avg_ms.toFixed(2)} readonly /></label>
+        <div class="control-group control-group-block diagnostics-cards">
+            <article class="diag-card">
+                <span class="diag-label">Search Latency</span>
+                <strong>{diagnostics.search.avg_ms.toFixed(1)}ms</strong>
+                <span class="diag-sub">max {diagnostics.search.max_ms.toFixed(1)}ms · {diagnostics.search.calls} calls</span>
+            </article>
+            <article class="diag-card">
+                <span class="diag-label">Suggestion Latency</span>
+                <strong>{diagnostics.suggestions.avg_ms.toFixed(1)}ms</strong>
+                <span class="diag-sub">max {diagnostics.suggestions.max_ms.toFixed(1)}ms · {diagnostics.suggestions.calls} calls</span>
+            </article>
+            <article class="diag-card">
+                <span class="diag-label">Launch Latency</span>
+                <strong>{diagnostics.launch.avg_ms.toFixed(1)}ms</strong>
+                <span class="diag-sub">max {diagnostics.launch.max_ms.toFixed(1)}ms · {diagnostics.launch.calls} calls</span>
+            </article>
         </div>
     {/if}
 
@@ -118,6 +169,25 @@
             <label>Extensions Cached <input type="text" value={`${healthDashboard.extensions_cached}`} readonly /></label>
             <label>Macro Jobs <input type="text" value={`${healthDashboard.macro_jobs_total}`} readonly /></label>
         </div>
+
+        <div class="control-group control-group-block diagnostics-cards">
+            <article class="diag-card">
+                <span class="diag-label">Healthy Checks</span>
+                <strong>{healthRisk.ok}</strong>
+                <span class="diag-sub">Stable subsystems</span>
+            </article>
+            <article class="diag-card warn">
+                <span class="diag-label">Warnings</span>
+                <strong>{healthRisk.warn}</strong>
+                <span class="diag-sub">Needs monitoring</span>
+            </article>
+            <article class="diag-card danger">
+                <span class="diag-label">High Risk</span>
+                <strong>{healthRisk.bad}</strong>
+                <span class="diag-sub">Investigate immediately</span>
+            </article>
+        </div>
+
         <div class="control-group control-group-block">
             <h4>Health Checks</h4>
             <ul class="hint-list">
@@ -190,6 +260,30 @@
             <h4>Usage Analytics (Local Only)</h4>
             <p>Total launch events: <strong>{usageAnalytics.total_launch_events}</strong></p>
             <p>Generated: {new Date(usageAnalytics.generated_at).toLocaleString()}</p>
+        </div>
+
+
+        <div class="control-group control-group-block diagnostics-cards">
+            <article class="diag-card wide">
+                <span class="diag-label">Hourly Usage Trend</span>
+                {#if usageHourSparkline}
+                    <svg viewBox="0 0 220 48" class="diag-sparkline" aria-label="Hourly usage sparkline">
+                        <path d={usageHourSparkline} fill="none" stroke="var(--ds-accent, #7b35f0)" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                {:else}
+                    <span class="diag-sub">No hourly data yet.</span>
+                {/if}
+            </article>
+            <article class="diag-card wide">
+                <span class="diag-label">App Frecency Trend</span>
+                {#if appFrecencySparkline}
+                    <svg viewBox="0 0 220 48" class="diag-sparkline" aria-label="App frecency sparkline">
+                        <path d={appFrecencySparkline} fill="none" stroke="var(--ds-info, #58a6ff)" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                {:else}
+                    <span class="diag-sub">No app usage trend yet.</span>
+                {/if}
+            </article>
         </div>
 
         <div class="control-group control-group-block">
@@ -271,6 +365,53 @@
         border-radius: 6px;
         background: color-mix(in srgb, var(--ds-surface, #1b1b1f) 80%, black 20%);
         border: 1px solid color-mix(in srgb, var(--ds-border, rgba(255,255,255,0.16)) 70%, transparent);
+    }
+
+
+
+    .diagnostics-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+    }
+
+    .diag-card {
+        border: 1px solid color-mix(in srgb, var(--ds-border, rgba(255,255,255,0.14)) 70%, transparent);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--ds-surface-2, #15151a) 75%, transparent);
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .diag-card.warn {
+        border-color: color-mix(in srgb, var(--ds-warning, #f0b34d) 60%, transparent);
+    }
+
+    .diag-card.danger {
+        border-color: color-mix(in srgb, var(--ds-danger, #d44) 65%, transparent);
+    }
+
+    .diag-card.wide {
+        min-height: 88px;
+    }
+
+    .diag-label {
+        font-size: var(--type-caption, 11px);
+        color: var(--ds-text-muted, #a1a1aa);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .diag-sub {
+        font-size: var(--type-caption, 11px);
+        color: var(--ds-text-secondary, #b0b0b8);
+    }
+
+    .diag-sparkline {
+        width: 100%;
+        height: 54px;
     }
 
     .schema-ok {

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { getVersion } from "@tauri-apps/api/app";
     import { invoke } from "@tauri-apps/api/core";
     import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
     import { LogicalSize } from "@tauri-apps/api/dpi";
@@ -31,6 +32,7 @@
     let lastInitialSection = $state<string | null>(null);
     let sectionQuery = $state("");
     let sectionSearchStatus = $state<string | null>(null);
+    let appVersion = $state("…");
 
     const sectionAliases: Record<string, string> = {
         "theme": "Theme Profile", "appearance": "Theme Profile",
@@ -111,6 +113,7 @@
         if (config.search.show_explain_panel === undefined) config.search.show_explain_panel = true;
         if (config.search.layout_mode === undefined) config.search.layout_mode = "single";
         applyTheme(config);
+        getVersion().then((v) => (appVersion = v)).catch(() => (appVersion = "unknown"));
     });
 
     $effect(() => {
@@ -124,7 +127,7 @@
 <div class="settings-panel v2-panel v2-stack" role="dialog" aria-modal="true" aria-label="Settings">
     <header class="settings-header sticky">
         <div class="settings-header-main">
-            <h2>Settings</h2>
+            <h2>Settings <span class="settings-version">v{appVersion}</span></h2>
             <input type="text" class="settings-section-search" bind:value={sectionQuery}
                 oninput={runSectionSearch} placeholder="Jump to section (theme, files, diagnostics...)"
                 aria-label="Search settings sections" />
