@@ -25,7 +25,7 @@
 </script>
 
 <!-- Extensions -->
-<div class="control-group control-group-block ext-surface-card">
+<div class="control-group control-group-block v2-card">
     <h4>Extension Runtime</h4>
     <label>Extensions Directory
         <input type="text" bind:value={config.extensions.directory} oninput={onSave} readonly />
@@ -34,7 +34,7 @@
         <input type="checkbox" bind:checked={config.extensions.dev_mode} onchange={onSave} />
     </label>
 </div>
-<div class="control-group control-group-block ext-surface-card">
+<div class="control-group control-group-block v2-card">
     <h4>Discovery</h4>
     <p class="hub-window-subtitle">Browse verified and community extensions with trust and permission risk metadata.</p>
     <div class="preset-row">

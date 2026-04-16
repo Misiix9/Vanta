@@ -18,7 +18,7 @@
 	} = $props();
 </script>
 
-<div class="ext-grid" style="--ext-grid-cols: {columns}">
+<div class="ext-grid v2-panel" style="--ext-grid-cols: {columns}">
 	{#each items as item (item.id)}
 		<button
 			type="button"

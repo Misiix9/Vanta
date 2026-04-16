@@ -82,7 +82,7 @@
 	}
 </script>
 
-<div class="ext-list" onkeydown={handleKeydown} tabindex="-1" role="listbox">
+<div class="ext-list v2-stack v2-panel" onkeydown={handleKeydown} tabindex="-1" role="listbox">
 	<div class="ext-list-search">
 		<input
 			type="text"

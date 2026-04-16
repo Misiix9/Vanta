@@ -10,10 +10,11 @@ const themeFiles = [
   "src-tauri/resources/themes/universal.css",
 ];
 
+// Phase 44: budgets raised to accommodate scoped-to-global CSS consolidation
 const budgets = {
   maxInlineStyleUses: 16,
-  maxCombinedThemeBytes: 140_000,
-  maxBaseThemeBytes: 65_000,
+  maxCombinedThemeBytes: 150_000,
+  maxBaseThemeBytes: 72_000,
   maxDefaultThemeBytes: 50_000,
   maxUniversalThemeBytes: 35_000,
 };

@@ -63,10 +63,10 @@
 	}
 </script>
 
-<form class="ext-form" onsubmit={handleSubmit}>
+<form class="ext-form v2-stack" onsubmit={handleSubmit}>
 	{#each fields as field (field.id)}
-		<div class="ext-form-field">
-			<label for={field.id} class="ext-form-label">
+		<div class="ext-form-field v2-form-field">
+			<label for={field.id} class="ext-form-label v2-form-label">
 				{field.label}
 				{#if field.required}
 					<span class="ext-form-required">*</span>

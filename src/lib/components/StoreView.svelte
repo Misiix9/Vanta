@@ -235,8 +235,8 @@
   }
 </script>
 
-<div class="store-root hub-window-root ext-surface-root" role="dialog" aria-modal="true" aria-label="Vanta Store">
-  <div class="store-header hub-window-header ext-surface-header">
+<div class="v2-shell v2-fill store-root" role="dialog" aria-modal="true" aria-label="Vanta Store">
+  <div class="v2-header store-header">
     <button class="back-btn btn-ghost icon-btn" onclick={onClose} aria-label="Close store">
       <i class="fa-solid fa-arrow-left"></i>
     </button>
@@ -292,9 +292,9 @@
         <span>No extensions in this category yet.</span>
       </div>
     {:else}
-    <div class="store-grid hub-window-scroll">
+    <div class="store-grid v2-scroll">
       {#each visibleExtensions as ext (ext.name)}
-        <div class="ext-card ext-surface-card" class:installed={ext.installed}>
+        <div class="ext-card v2-card" class:installed={ext.installed}>
           <div class="ext-icon">
             {#if isInlineSvg(ext.icon)}
               <span class="icon-svg extension-svg" aria-label={ext.title}>
@@ -337,7 +337,7 @@
               <div class="ext-changelog">Latest: {ext.changelog[0]}</div>
             {/if}
           </div>
-          <div class="ext-actions ext-surface-actions">
+          <div class="ext-actions v2-stack">
             <div class="ext-rate-actions">
               {#each [1, 2, 3, 4, 5] as score}
                 <button

@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.13.0
+- Completed Phase 44 universal layout runtime: canonical v2 layout vocabulary with documented primitives.
+- Migrated all hub windows, StoreView, settings, and SDK components to use `v2-shell`/`v2-panel`/`v2-card`/`v2-stack` classes.
+- Added `v2-fill`, `v2-scroll`, `v2-header`, `v2-gap-xs`, `v2-gap-lg` modifier classes for composable layouts.
+- Moved notification center and permission modal styles from scoped CSS to global `base.css`.
+- Removed dead universal layout compatibility classes (`layout-shell-v2`, `panel-universal`, etc.).
+- Added proper CSS for the permission modal dialog.
+- Added `docs/layout-primitives.md` with full migration guide for extension authors.
+
 ## 5.12.0
 - Completed Phase 43 performance and resource optimization with shared theme CSS extraction into `base.css`.
 - Added visual performance budget checks for inline layout styles and theme file size drift in the release workflow.

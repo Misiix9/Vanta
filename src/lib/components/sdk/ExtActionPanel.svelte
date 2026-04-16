@@ -64,7 +64,7 @@
 		onclick={(e) => e.target === e.currentTarget && onClose?.()}
 		tabindex="-1"
 	>
-		<div class="ext-action-panel" role="presentation" onclick={(e) => e.stopPropagation()}>
+		<div class="ext-action-panel v2-panel" role="presentation" onclick={(e) => e.stopPropagation()}>
 			<div class="ext-action-list">
 				{#each actions as action, i (action.id)}
 					<button

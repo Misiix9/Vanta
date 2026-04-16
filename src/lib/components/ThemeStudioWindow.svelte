@@ -75,8 +75,8 @@
   }
 </script>
 
-<div class="hub-window-root window-shell">
-  <div class="hub-window-header window-header">
+<div class="v2-shell v2-fill hub-window-root">
+  <div class="v2-header hub-window-header">
     <div class="window-header-main">
       <span class="window-breadcrumb">Feature Hub</span>
       <h2>Theme And Profile Studio</h2>
@@ -87,7 +87,7 @@
     </div>
   </div>
 
-  <div class="hub-window-scroll window-scroll">
+  <div class="v2-scroll window-scroll">
     <div class="control-group">
       <label>
         Active Theme

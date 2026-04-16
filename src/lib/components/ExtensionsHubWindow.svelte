@@ -34,8 +34,8 @@
   }
 </script>
 
-<div class="hub-window-root window-shell">
-  <div class="hub-window-header window-header ext-surface-header">
+<div class="v2-shell v2-fill hub-window-root">
+  <div class="v2-header hub-window-header">
     <div class="window-header-main">
       <span class="window-breadcrumb">Feature Hub</span>
       <h2>Extensions Hub</h2>
@@ -46,8 +46,8 @@
     </div>
   </div>
 
-  <div class="hub-window-scroll window-scroll">
-    <div class="control-group control-group-block ext-surface-card">
+  <div class="v2-scroll window-scroll">
+    <div class="control-group control-group-block v2-card">
       <h3>Extension Template Generator</h3>
       <p class="hub-window-subtitle">Create a complete starter extension in one click.</p>
       <label>
@@ -65,7 +65,7 @@
       {/if}
     </div>
 
-    <div class="control-group control-group-block ext-surface-card">
+    <div class="control-group control-group-block v2-card">
       <h3>Template Workflow</h3>
       <ul class="hint-list">
         <li>1. Create template.</li>

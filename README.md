@@ -29,26 +29,28 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_5.12.0_amd64.deb
+sudo dpkg -i vanta_5.13.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.12.0-1.x86_64.rpm
+sudo rpm -i vanta-5.13.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.12.0)
+### Latest Minor (v5.13.0)
+- Canonical v2 layout runtime: `v2-shell`, `v2-panel`, `v2-card`, `v2-stack`, `v2-header` adopted across all surfaces.
+- Migrated hub windows, store, settings, and SDK components to the shared v2 vocabulary.
+- Moved notification center and permission modal styles from scoped CSS to global `base.css`.
+- Removed dead universal layout compatibility layer.
+- Added `docs/layout-primitives.md` migration guide for extension authors.
+
+### Previous Minor (v5.12.0)
 - Extracted shared theme/component primitives into `base.css` and kept theme files focused on tokens and overrides.
 - Added release-time visual budget checks for inline layout styles and theme CSS size drift.
 - Added icon cache bounds and integrity pruning for stale or invalid cached icon paths.
-- Lazy-loaded non-critical hub surfaces (`Store`, `Community Hub`, `Theme Studio`, `Extensions Hub`) to reduce startup/bundle waste.
-- Expanded file-type icon coverage for Java, C/C++, Python, Go, Kotlin, Ruby, and Office formats.
+- Lazy-loaded non-critical hub surfaces to reduce startup/bundle waste.
 - Pinned `svelte` to an exact version for build stability across releases.
-
-### Previous Minor (v5.11.0)
-- Added calculator upgrades for unit conversion, timezone lookup, number-base parsing, and offline currency conversion.
-- Added smart clipboard contextual actions, persistent bookmarks, quick notes, command palette mode, and local analytics surfaces.
 
 ---
 

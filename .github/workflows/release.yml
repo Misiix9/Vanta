@@ -1,4 +1,4 @@
-name: Release Vanta v5.12.0
+name: Release Vanta v5.13.0
 
 on:
   push:
@@ -89,20 +89,20 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v5.12.0 -- Phase 43 Performance And Resource Optimization
+            ## Vanta v5.13.0 -- Phase 44 Universal Layout Runtime
 
-            Minor release focused on performance cleanup, theme CSS deduplication, resource bounds, and bundle/startup efficiency.
+            Establishes a canonical layout vocabulary (v2 primitives) used by every first-party surface and SDK component.
 
             ### Highlights
-            - Extracted shared theme and component primitives into `base.css` to reduce duplicated theme payload.
-            - Added visual budget checks in the release workflow to catch inline layout drift and oversized theme assets.
-            - Added icon cache pruning and integrity bounds for healthier long-running installs.
-            - Lazy-loaded non-critical hub surfaces to keep the initial UI leaner.
-            - Expanded developer and office file icon coverage.
-            - Pinned Svelte to an exact version for more predictable releases.
+            - Canonical `v2-shell`, `v2-panel`, `v2-card`, `v2-stack`, `v2-hstack`, `v2-form-field` primitives documented and adopted.
+            - New modifier classes: `v2-fill`, `v2-scroll`, `v2-header`, `v2-gap-xs`, `v2-gap-lg`.
+            - Migrated hub windows, store, settings, and extension SDK to v2 classes.
+            - Moved notification and permission modal styles from scoped to global CSS.
+            - Removed dead universal layout compatibility layer.
+            - Added `docs/layout-primitives.md` migration guide for extension authors.
 
             ### Packaging
-            - Deb and RPM bundles are published for this release with package verification checks.
+            - Deb and RPM bundles with package verification checks.
 
             ### Known Issues
             - AppImage bundling remains disabled due to linuxdeploy strip failures on RELR ELF sections.

@@ -1,5 +1,48 @@
-/* Theme Base: Shared layout and component primitives */
-/* Auto-extracted during Phase 43 CSS deduplication. */
+/* ═══════════════════════════════════════════════════════════════
+   Theme Base: Universal Layout Runtime (v2)
+   ═══════════════════════════════════════════════════════════════
+   Phase 44 — canonical layout contract for all first-party surfaces.
+
+   VOCABULARY (always prefer v2-* classes in new markup):
+   ────────────────────────────────────────────────────────────
+   Shell    │ .v2-shell          column flex, gap/padding via --space-3
+   Panel    │ .v2-panel          bordered surface-1 box with radius
+   Card     │ .v2-card           lighter bordered item box
+   Stack    │ .v2-stack          column flex, gap via --space-2
+   HStack   │ .v2-hstack         row flex, centered, gap via --space-2
+   Form     │ .v2-form-field     label+input column, gap via --space-1
+            │ .v2-form-label     caption-size secondary label
+            │ .v2-form-help      caption-size muted help text
+   Badge    │ .v2-status-badge   pill badge (.success/.warning/.danger/.info)
+   Density  │ .density-compact / .density-comfortable / .density-relaxed
+
+   MODIFIERS (compose with any v2 root):
+   ────────────────────────────────────────────────────────────
+   Fill     │ .v2-fill           height:100%, overflow:hidden
+   Scroll   │ .v2-scroll         flex:1, min-height:0, overflow:auto
+   Header   │ .v2-header         flex header bar (space-between, border-bottom)
+   Gap-xs   │ .v2-gap-xs         gap override: --space-1
+   Gap-lg   │ .v2-gap-lg         gap override: --space-4
+
+   BACKWARD-COMPAT ALIASES (still functional, prefer v2-* in new code):
+   ────────────────────────────────────────────────────────────
+   .hub-window-root   ≈ .v2-shell.v2-fill
+   .hub-window-header ≈ .v2-header
+   .hub-window-scroll ≈ .v2-scroll + padding
+   .store-root        ≈ .v2-shell.v2-fill
+   .ext-surface-card  ≈ .v2-card
+
+   TOKENS (inherited from the active theme's :root):
+   ────────────────────────────────────────────────────────────
+   Spacing  │ --space-1 … --space-5, scaled by --vanta-space-scale
+   Type     │ --type-caption, --type-body, --type-heading, --type-display
+   Surface  │ --ds-surface-0, --ds-surface-1, --ds-surface-2
+   Text     │ --ds-text-primary, --ds-text-secondary, --ds-text-muted
+   Border   │ --ds-border
+   Accent   │ --ds-accent, --ds-success, --ds-warning, --ds-danger, --ds-info
+   Radius   │ --radius, --radius-item
+   Motion   │ --motion-enter-duration, --motion-ease-enter, --motion-stagger-step
+   ═══════════════════════════════════════════════════════════════ */
 
 
 /* Section headers (ResultsList / SectionHeader) */
@@ -137,6 +180,30 @@
 .v2-status-badge.warning { color: var(--ds-warning); }
 .v2-status-badge.danger { color: var(--ds-danger); }
 .v2-status-badge.info { color: var(--ds-info); }
+
+/* ── v2 Modifier Utilities ──────────────────────────────────── */
+.v2-fill {
+    height: 100%;
+    overflow: hidden;
+}
+
+.v2-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
+.v2-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+    padding: calc(var(--space-3) * var(--vanta-space-scale, 1));
+    border-bottom: 1px solid color-mix(in srgb, var(--ds-border) 62%, transparent);
+}
+
+.v2-gap-xs { gap: calc(var(--space-1) * var(--vanta-space-scale, 1)); }
+.v2-gap-lg { gap: calc(var(--space-4) * var(--vanta-space-scale, 1)); }
 
 .density-compact {
     --vanta-space-scale: 0.88;
@@ -2371,54 +2438,6 @@ input[type="range"] {
     }
 }
 
-/* ── Universal Layout Compatibility Layer (tokens in merged :root above) ── */
-
-.layout-shell-v2 {
-    background: var(--layout-shell-bg);
-    border: 1px solid var(--layout-border);
-    border-radius: var(--radius, 12px);
-}
-
-.layout-header-v2 {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 12px 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.layout-content-v2 {
-    flex: 1;
-    min-height: 0;
-    overflow: auto;
-    padding: 12px;
-}
-
-.panel-universal {
-    background: var(--layout-panel-bg);
-    border: 1px solid var(--layout-border);
-    border-radius: 12px;
-}
-
-.card-universal {
-    background: var(--layout-card-bg);
-    border: 1px solid var(--layout-border);
-    border-radius: 10px;
-}
-
-.btn-universal {
-    border: 1px solid var(--layout-border);
-    border-radius: 8px;
-    background: rgba(123, 53, 240, 0.12);
-    color: var(--layout-text);
-}
-
-.btn-universal:hover {
-    background: rgba(123, 53, 240, 0.22);
-    border-color: rgba(155, 95, 248, 0.7);
-}
-
 /* ── Accessibility Utilities ────────────────────────────────── */
 
 .sr-only {
@@ -2514,9 +2533,192 @@ input[type="range"] {
     text-align: right;
 }
 
-.input-universal {
-    border: 1px solid var(--layout-border);
+/* ── Notification Center ────────────────────────────────────── */
+.notification-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9990;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
+    background: rgba(0, 0, 0, 0.28);
+}
+
+.notification-panel {
+    width: min(440px, calc(100vw - 24px));
+    max-height: min(70vh, 680px);
+    margin: 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(12, 12, 18, 0.96);
+    backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.notification-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.notification-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.notification-list {
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+}
+
+.notification-item {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.notification-item.success { border-color: rgba(52, 211, 153, 0.5); }
+.notification-item.error { border-color: rgba(248, 113, 113, 0.55); }
+.notification-item.info { border-color: rgba(96, 165, 250, 0.5); }
+
+.notification-main {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.notification-main strong { font-size: 12px; }
+.notification-main span { font-size: 12px; color: rgba(255, 255, 255, 0.78); overflow-wrap: anywhere; }
+.notification-item time { font-size: 11px; color: rgba(255, 255, 255, 0.55); align-self: flex-end; }
+.notification-empty { padding: 16px; color: rgba(255, 255, 255, 0.68); font-size: 12px; }
+
+/* ── Permission Modal ──────────────────────────────────────── */
+.permission-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2, 4, 10, 0.65);
+    backdrop-filter: blur(4px);
+}
+
+.permission-modal {
+    width: min(460px, 90vw);
+    border: 1px solid var(--ds-border, rgba(149, 118, 206, 0.30));
+    border-radius: var(--radius, 12px);
+    background: color-mix(in srgb, var(--ds-surface-1, #0c0c0c) 92%, #101322 8%);
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+    padding: calc(var(--space-3) * var(--vanta-space-scale, 1));
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
+.permission-modal .header {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
+.permission-modal .pill {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(123, 53, 240, 0.18);
+    color: var(--ds-accent, #7b35f0);
+    font-size: var(--type-caption);
+    font-weight: 600;
+}
+
+.permission-modal .script-id {
+    font-size: var(--type-body);
+    color: var(--ds-text-primary);
+    font-weight: 600;
+}
+
+.permission-modal .lede {
+    font-size: var(--type-body);
+    color: var(--ds-text-secondary);
+    line-height: 1.45;
+}
+
+.cap-grid {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
+.cap-card {
+    display: flex;
+    align-items: flex-start;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+    padding: calc(var(--space-2) * var(--vanta-space-scale, 1));
+    border: 1px solid color-mix(in srgb, var(--ds-border) 68%, transparent);
+    border-radius: var(--radius-item, 9px);
+    background: color-mix(in srgb, var(--ds-surface-2) 60%, transparent);
+}
+
+.cap-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 16px;
+    color: var(--ds-accent, #7b35f0);
+}
+
+.cap-body { min-width: 0; }
+.cap-title { font-size: var(--type-body); font-weight: 600; color: var(--ds-text-primary); }
+.cap-desc { font-size: var(--type-caption); color: var(--ds-text-secondary); line-height: 1.4; }
+
+.permission-modal .actions {
+    display: flex;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+    justify-content: flex-end;
+}
+
+.permission-modal .actions .btn {
+    padding: 6px 14px;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.04);
-    color: var(--layout-text);
+    border: 1px solid var(--ds-border, rgba(255,255,255,0.08));
+    font-size: var(--type-body);
+    cursor: pointer;
+}
+
+.permission-modal .actions .btn.primary {
+    background: var(--ds-accent, #7b35f0);
+    color: #fff;
+    border-color: var(--ds-accent, #7b35f0);
+}
+
+.permission-modal .actions .btn.ghost {
+    background: transparent;
+    color: var(--ds-text-secondary);
+}
+
+.permission-modal .actions .btn.danger {
+    background: rgba(255, 94, 94, 0.12);
+    color: #ffb0b0;
+    border-color: rgba(255, 94, 94, 0.4);
+}
+
+.permission-modal .footnote {
+    font-size: var(--type-caption);
+    color: var(--ds-text-muted);
+    text-align: center;
 }

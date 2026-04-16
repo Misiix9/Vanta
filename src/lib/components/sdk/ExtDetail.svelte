@@ -15,7 +15,7 @@
 	} = $props();
 </script>
 
-<div class="ext-detail">
+<div class="ext-detail v2-panel v2-hstack">
 	<div class="ext-detail-main">
 		<h1 class="ext-detail-title">{title}</h1>
 		{#if content}
