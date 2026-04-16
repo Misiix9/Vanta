@@ -357,7 +357,7 @@
     <div class="sr-only" aria-live="polite" aria-atomic="true">{viewAnnouncement}</div>
 
     {#if view === "store"}
-      <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
+      <div in:fade={{ duration: fadeDuration }} class="view-fill view-relative">
         {#if StoreViewLazy}
           <StoreViewLazy onClose={() => (view = "launcher")} onToast={notify} />
         {:else}
@@ -365,7 +365,7 @@
         {/if}
       </div>
     {:else if view === "featureHub"}
-      <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
+      <div in:fade={{ duration: fadeDuration }} class="view-fill view-relative">
         <FeatureHubWindow
           onClose={() => { view = "launcher"; launcherRef?.refreshSuggestions(); }}
           onOpenCommunity={() => (view = "communityHub")}
@@ -376,7 +376,7 @@
         />
       </div>
     {:else if view === "communityHub" && vantaConfig}
-      <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
+      <div in:fade={{ duration: fadeDuration }} class="view-fill view-relative">
         {#if CommunityHubWindowLazy}
           <CommunityHubWindowLazy
             communityFeedOptIn={vantaConfig.general.community_feed_opt_in ?? false}
@@ -396,7 +396,7 @@
         {/if}
       </div>
     {:else if view === "themeHub" && vantaConfig}
-      <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
+      <div in:fade={{ duration: fadeDuration }} class="view-fill view-relative">
         {#if ThemeStudioWindowLazy}
           <ThemeStudioWindowLazy bind:config={vantaConfig} {availableThemes} onClose={() => (view = "featureHub")} />
         {:else}
@@ -404,7 +404,7 @@
         {/if}
       </div>
     {:else if view === "extensionsHub"}
-      <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
+      <div in:fade={{ duration: fadeDuration }} class="view-fill view-relative">
         {#if ExtensionsHubWindowLazy}
           <ExtensionsHubWindowLazy onClose={() => (view = "featureHub")} onOpenStore={() => (view = "store")} />
         {:else}
@@ -412,7 +412,7 @@
         {/if}
       </div>
     {:else if view === "settings" && vantaConfig}
-      <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%; position: relative;">
+      <div in:fade={{ duration: fadeDuration }} class="view-fill view-relative">
         <SettingsView
           bind:config={vantaConfig}
           {availableThemes}
@@ -422,11 +422,11 @@
         />
       </div>
     {:else if currentMode === "clipboard"}
-      <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%;">
+      <div in:fade={{ duration: fadeDuration }} class="view-fill">
         <ClipboardView onEscape={() => resetAndHide()} />
       </div>
     {:else if extensionView}
-      <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%;">
+      <div in:fade={{ duration: fadeDuration }} class="view-fill">
         <ExtensionHost
           extId={extensionView.extId}
           commandName={extensionView.command}
@@ -436,7 +436,7 @@
         />
       </div>
     {:else}
-      <div in:fade={{ duration: fadeDuration }} style="height: 100%; width: 100%;">
+      <div in:fade={{ duration: fadeDuration }} class="view-fill">
         <LauncherView
           bind:this={launcherRef}
           bind:config={vantaConfig}
@@ -473,13 +473,3 @@
   </div>
 {/if}
 
-<style>
-  .loading-view {
-    height: 100%;
-    width: 100%;
-    display: grid;
-    place-items: center;
-    color: var(--text-secondary, #9aa0aa);
-    font-size: 0.95rem;
-  }
-</style>

@@ -1,5 +1,27 @@
 # Changelog
 
+## 5.12.0
+- Completed Phase 43 performance and resource optimization with shared theme CSS extraction into `base.css`.
+- Added visual performance budget checks for inline layout styles and theme file size drift in the release workflow.
+- Added bounded icon-cache pruning and integrity checks to keep cached icon metadata healthy at scale.
+- Lazy-loaded non-critical hub views (`Store`, `Community Hub`, `Theme Studio`, and `Extensions Hub`) to reduce initial UI cost.
+- Expanded file-type icon coverage for common developer and office formats.
+- Pinned `svelte` to an exact version for release stability.
+
+## 5.11.0
+- Completed Phase 42 daily-driver polish with bookmarks, quick notes, command palette mode, smart clipboard actions, and local analytics.
+- Added calculator enhancements for unit conversion, currency conversion, timezone lookup, and hex/bin/oct literal support.
+
+## 5.10.0
+- Completed Phase 41 config and state management improvements with config audit trail, window state persistence, factory reset, and config schema validation.
+- Added diagnostics visibility for recent config diffs and mutation sources.
+
+## 5.9.0
+- Completed Phase 40 workflow engine v2 with conditional branches, step-output chaining, retry/finally handling, timeouts, workflow composition, schedules, and encrypted secrets.
+
+## 5.8.0
+- Completed Phase 39 extension lifecycle work with update detection, rollback support, dependency validation, and user-visible lifecycle feedback.
+
 ## 4.7.0
 - Added Phase 27 motion system primitives (enter, emphasis, hierarchy, and stagger cadence) with reduced-motion-safe fallbacks.
 - Added consistent micro-interaction choreography across launcher results, grouped headers, store filters, and extension cards.

@@ -29,26 +29,26 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_5.5.0_amd64.deb
+sudo dpkg -i vanta_5.12.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.5.0-1.x86_64.rpm
+sudo rpm -i vanta-5.12.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.8.0)
-- Added in-app toast notifications with auto-dismiss and severity styling (info/success/error).
-- Replaced key silent launcher/store failures with user-visible feedback toasts.
-- Added store-side update detection for installed extensions using semver comparisons against the registry.
-- Added extension update action in Vanta Store (`Update to vX`) when newer versions are available.
-- Added extension rollback support with backup snapshots and one-click rollback from Vanta Store.
-- Added extension dependency contract support (`requires`) with install-time dependency/version validation.
-- Added notification center panel from status bar with recent event history.
+### Latest Minor (v5.12.0)
+- Extracted shared theme/component primitives into `base.css` and kept theme files focused on tokens and overrides.
+- Added release-time visual budget checks for inline layout styles and theme CSS size drift.
+- Added icon cache bounds and integrity pruning for stale or invalid cached icon paths.
+- Lazy-loaded non-critical hub surfaces (`Store`, `Community Hub`, `Theme Studio`, `Extensions Hub`) to reduce startup/bundle waste.
+- Expanded file-type icon coverage for Java, C/C++, Python, Go, Kotlin, Ruby, and Office formats.
+- Pinned `svelte` to an exact version for build stability across releases.
 
-### Previous Minor (v5.7.0)
-- Added Phase 38 notification and feedback architecture baseline across launcher/store/extension-host flows.
+### Previous Minor (v5.11.0)
+- Added calculator upgrades for unit conversion, timezone lookup, number-base parsing, and offline currency conversion.
+- Added smart clipboard contextual actions, persistent bookmarks, quick notes, command palette mode, and local analytics surfaces.
 
 ---
 

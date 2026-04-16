@@ -1,6 +1,6 @@
 {
   "name": "vanta",
-  "version": "5.8.0",
+  "version": "5.12.0",
   "description": "",
   "type": "module",
   "scripts": {
@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:visual-budgets": "node scripts/check-visual-budgets.mjs",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri",
     "extensions:validate": "node vanta-extensions/tools/validate-manifests.mjs",

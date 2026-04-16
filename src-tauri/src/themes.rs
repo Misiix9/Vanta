@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
 
+const BASE_THEME_CSS: &str = include_str!("../resources/themes/base.css");
 const DEFAULT_THEME_CSS: &str = include_str!("../resources/themes/default.css");
 const UNIVERSAL_THEME_CSS: &str = include_str!("../resources/themes/universal.css");
 
@@ -85,7 +86,35 @@ pub fn get_themes_dir() -> PathBuf {
 
 pub fn seed_default_theme(app: &tauri::AppHandle) {
     let themes_dir = get_themes_dir();
+    let base_dest = themes_dir.join("base.css");
     let dest = themes_dir.join("default.css");
+    let base_needs_update = if base_dest.exists() {
+        match fs::read_to_string(&base_dest) {
+            Ok(existing) => existing != BASE_THEME_CSS,
+            Err(_) => true,
+        }
+    } else {
+        true
+    };
+
+    if base_needs_update {
+        if let Ok(resource_path) = app.path().resolve(
+            "resources/themes/base.css",
+            tauri::path::BaseDirectory::Resource,
+        ) {
+            if let Err(e) = fs::copy(&resource_path, &base_dest) {
+                log::warn!("Could not seed base.css from resource: {}", e);
+            } else {
+                log::info!("Updated base theme at {:?}", base_dest);
+            }
+        }
+
+        if let Err(e) = fs::write(&base_dest, BASE_THEME_CSS) {
+            log::warn!("Could not write embedded base theme: {}", e);
+        } else {
+            log::info!("Updated base theme from embedded copy at {:?}", base_dest);
+        }
+    }
 
     let needs_update = if dest.exists() {
         match fs::read_to_string(&dest) {
@@ -205,6 +234,14 @@ fn validate_theme_tokens(
     diagnostics
 }
 
+fn compose_theme_css(theme_css: &str) -> String {
+    format!("{}\n\n{}", BASE_THEME_CSS.trim_end(), theme_css.trim_start())
+}
+
+fn is_selectable_theme_id(id: &str) -> bool {
+    id != "base"
+}
+
 #[tauri::command]
 pub fn get_installed_themes() -> Result<Vec<ThemeMeta>, VantaError> {
     let dir = get_themes_dir();
@@ -229,6 +266,10 @@ pub fn get_installed_themes() -> Result<Vec<ThemeMeta>, VantaError> {
                         .and_then(|s| s.to_str())
                         .unwrap_or("theme")
                         .to_string();
+
+                    if !is_selectable_theme_id(&id) {
+                        continue;
+                    }
 
                     // Fallbacks
                     let mut name = id.clone();
@@ -262,7 +303,7 @@ pub fn get_installed_themes() -> Result<Vec<ThemeMeta>, VantaError> {
                         name,
                         width,
                         height,
-                        css_content: content,
+                        css_content: compose_theme_css(&content),
                         diagnostics,
                     });
                 }
@@ -297,4 +338,36 @@ pub fn resize_window_for_theme(
     // Also center it since dimensions changed
     let _ = window.center();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compose_theme_css_prepends_base_layer() {
+        let composed = compose_theme_css(":root { --bg: #000; }");
+
+        assert!(composed.contains(":root { --bg: #000; }"));
+        assert!(composed.starts_with(BASE_THEME_CSS));
+    }
+
+    #[test]
+    fn compose_theme_css_separates_base_and_theme_content() {
+        let composed = compose_theme_css(".foo { color: red; }");
+
+        assert!(composed.contains(".foo { color: red; }"));
+        assert!(composed.contains("\n\n.foo { color: red; }"));
+    }
+
+    #[test]
+    fn base_theme_id_is_not_selectable() {
+        assert!(!is_selectable_theme_id("base"));
+    }
+
+    #[test]
+    fn regular_theme_ids_remain_selectable() {
+        assert!(is_selectable_theme_id("default"));
+        assert!(is_selectable_theme_id("universal"));
+    }
 }
