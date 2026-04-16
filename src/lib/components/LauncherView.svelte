@@ -37,6 +37,7 @@
   import KeyboardShortcutsModal from "$lib/components/KeyboardShortcutsModal.svelte";
   import PreviewPanel from "$lib/components/PreviewPanel.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
+  import ContextualPanel from "$lib/components/ContextualPanel.svelte";
   import type { ToastOptions } from "$lib/sdk/types";
   import { toastHistory } from "$lib/stores/toastStore";
 
@@ -90,6 +91,7 @@
   let actionInFlight = $state(false);
   let searchInputRef: SearchInput | undefined = $state();
   let resultsListRef: ResultsList | undefined = $state();
+  let contextPanelRef: ContextualPanel | undefined = $state();
   let pendingScrollFrame: number | null = null;
   let isSearching = $state(false);
   let queryHistory: string[] = $state([]);
@@ -424,6 +426,10 @@
     handleActivate({ ...result, exec, command: action.command }, false);
   }
 
+  function handlePanelAction(result: SearchResult, exec: string, command?: ResultAction["command"]) {
+    void handleActivate({ ...result, exec, command }, false);
+  }
+
   function handleContextMenuAction(result: SearchResult, exec: string, command?: ResultAction["command"]) {
     handleActivate({ ...result, exec, command }, false);
   }
@@ -465,11 +471,6 @@
     });
   }
 
-  function sourceLabel(source: SearchResult["source"]): string {
-    if (typeof source === "object") return `Extension (${source.Extension.ext_id})`;
-    return source;
-  }
-
   function handleKeydown(e: KeyboardEvent) {
     if (shortcutsOpen) return;
     if (pendingConfirmResult) {
@@ -481,6 +482,8 @@
     if (e.key === "d" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); showScoreOverlay = !showScoreOverlay; return; }
     if (activeMacroId && e.key === "Escape") { resetMacroState(); return; }
     if (e.key === "," && e.ctrlKey) { e.preventDefault(); view = view === "launcher" ? "settings" : "launcher"; return; }
+    if (workspaceLayout === "multi" && e.ctrlKey && e.key === "ArrowRight") { e.preventDefault(); contextPanelRef?.focusFirstAction(); return; }
+    if (workspaceLayout === "multi" && e.ctrlKey && e.key === "ArrowLeft") { e.preventDefault(); searchInputRef?.focus?.(); return; }
     if (e.ctrlKey && e.key === "\\") { e.preventDefault(); void toggleWorkspaceLayout(); return; }
     if (view === "settings" || view === "store") {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); view = "launcher"; }
@@ -589,26 +592,14 @@
           <SearchExplainPanel query={query} results={results} searchConfig={config.search} />
         {/if}
       </div>
-      <aside class="workspace-pane-side v2-panel" aria-label="Result details and actions">
-        {#if selectedResult}
-          <div class="workspace-pane-head">
-            <h3>{selectedResult.title}</h3>
-            <p>{selectedResult.subtitle ?? "No description"}</p>
-            <span class="v2-form-help">{sourceLabel(selectedResult.source)}</span>
-          </div>
-          <div class="workspace-pane-actions">
-            <button class="btn-secondary" onclick={() => handleActivate(selectedResult)}>Open</button>
-            <button class="btn-ghost" onclick={() => (previewResult = selectedResult)}>Quick Look</button>
-            {#if selectedResult.actions?.length}
-              {#each selectedResult.actions as action}
-                <button class="btn-ghost" onclick={() => handleActionClick(selectedResult, action)}>{action.label}</button>
-              {/each}
-            {/if}
-          </div>
-        {:else}
-          <p class="workspace-pane-empty">Select a result to inspect details and actions.</p>
-        {/if}
-      </aside>
+      <ContextualPanel
+        bind:this={contextPanelRef}
+        result={selectedResult}
+        {availableExtensions}
+        onActivate={(result) => void handleActivate(result)}
+        onQuickLook={(result) => (previewResult = result)}
+        onAction={handlePanelAction}
+      />
     </div>
   {:else}
     <ResultsList

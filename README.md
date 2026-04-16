@@ -29,25 +29,26 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_5.14.0_amd64.deb
+sudo dpkg -i vanta_5.15.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.14.0-1.x86_64.rpm
+sudo rpm -i vanta-5.15.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.14.0)
+### Latest Minor (v5.15.0)
+- Added contextual smart side panels with intent-specific templates for files, windows, clipboard, extensions, and workflows.
+- Added safety context messaging for destructive system actions and elevated extension capabilities.
+- Added keyboard-first panel navigation (`Ctrl+Right` to panel actions, `Ctrl+Left` back to search).
+- Improved multi-pane discoverability and action execution flow.
+
+### Previous Minor (v5.14.0)
 - Added optional workspace canvas multi-pane mode for complex workflows.
 - Added persisted `layout_mode` launcher preference (single pane vs multi pane).
 - Added right-side inspector/actions pane in multi mode while keeping launcher speed and keyboard flow.
 - Added quick layout switching from status bar and `Ctrl+\`.
-
-### Previous Minor (v5.13.0)
-- Canonical v2 layout runtime: `v2-shell`, `v2-panel`, `v2-card`, `v2-stack`, `v2-header` adopted across all surfaces.
-- Migrated hub windows, store, settings, and SDK components to the shared v2 vocabulary.
-- Added `docs/layout-primitives.md` migration guide for extension authors.
 
 ---
 

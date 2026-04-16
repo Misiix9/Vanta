@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.15.0
+- Completed Phase 46 contextual surfaces and smart panels.
+- Added intent-specific contextual panel templates for files, windows, clipboard items, extension actions, and workflows.
+- Added safety-context messaging in side panel for destructive system actions and elevated extension permissions.
+- Added keyboard-first panel navigation (`Ctrl+Right` focus panel, `Ctrl+Left` return focus to search).
+
 ## 5.14.0
 - Completed Phase 45 workspace canvas and multi-pane launcher views.
 - Added optional multi-pane composition (results + inspector/actions) while preserving single-pane default mode.

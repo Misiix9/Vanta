@@ -1,4 +1,4 @@
-name: Release Vanta v5.14.0
+name: Release Vanta v5.15.0
 
 on:
   push:
@@ -89,15 +89,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v5.14.0 -- Phase 45 Workspace Canvas And Multi-Pane Views
+            ## Vanta v5.15.0 -- Phase 46 Contextual Surfaces And Smart Panels
 
-            Introduces optional workspace canvas layouts for advanced workflows while preserving single-pane launcher speed as default.
+            Adds intent-sensitive contextual panels that surface the right details, actions, and safety cues for the currently selected result.
 
             ### Highlights
-            - Added optional multi-pane composition for results + details + quick actions.
-            - Persisted per-profile workspace layout preference via `search.layout_mode`.
-            - Added status bar and keyboard (`Ctrl+\`) toggles between single and multi pane modes.
-            - Kept single-pane fast mode as first-class default for instant launch/search flow.
+            - Added context templates for file, window, clipboard, extension, and workflow results.
+            - Added safety-context messaging for destructive system actions and elevated extension capabilities.
+            - Added keyboard-first panel navigation (`Ctrl+Right` to panel actions, `Ctrl+Left` back to search).
+            - Improved discoverability and execution speed for advanced workflows in multi-pane mode.
 
             ### Packaging
             - Deb and RPM bundles with package verification checks.
