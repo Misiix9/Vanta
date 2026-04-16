@@ -4,6 +4,14 @@
 
 - Ongoing work for next phase.
 
+## 5.19.0
+
+- Completed Phase 50 global navigation and cross-surface wayfinding improvements.
+- Added universal wayfinding overlay with breadcrumb trail, back/search actions, and contextual next-step guidance across non-launcher surfaces.
+- Added navigation return-point memory so users can move back through recent surfaces without losing context.
+- Added global shortcuts (`Alt+Left`, `Alt+Home`) for consistent navigation behavior across launcher surfaces.
+- Added explicit next-step action buttons in the wayfinding layer to reduce dead-end navigation states.
+
 ## 5.18.0
 
 - Completed Phase 49 collaborative artifact UX with preview-first import flow for workflow/profile/theme snippets.

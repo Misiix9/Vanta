@@ -29,24 +29,24 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_5.18.0_amd64.deb
+sudo dpkg -i vanta_5.19.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.18.0-1.x86_64.rpm
+sudo rpm -i vanta-5.19.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.18.0)
+### Latest Minor (v5.19.0)
+- Added universal wayfinding with breadcrumb overlays, return-point memory, and contextual next-step actions across non-launcher surfaces.
+- Added consistent global navigation shortcuts (`Alt+Left` for back, `Alt+Home` for search) to improve cross-surface movement.
+- Added updated shortcut docs and navigation hints to reduce dead-end flows when moving between hubs, settings, and store.
+
+### Previous Minor (v5.18.0)
 - Completed collaborative artifact UX with preview-first snippet import for workflows, profiles, and themes.
 - Added trust/attribution metadata (source, compatibility hint, ratings, and publisher context) in Community Hub artifact cards.
 - Added import conflict strategies (`replace` / `keep_local`) with rollback history and one-click undo support.
-
-### Previous Minor (v5.17.0)
-- Added reusable macro command templates with save/list/delete support for workflow-driven command composition.
-- Added `>` command-mode template discovery so saved workflow presets are instantly searchable and runnable.
-- Added keyboard-first macro composer flow (`Enter` run, `Ctrl+Enter` dry run, `Esc` close) with contextual status hints.
 
 ---
 
