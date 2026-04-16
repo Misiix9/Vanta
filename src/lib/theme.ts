@@ -85,7 +85,10 @@ type AdaptedAppearance = {
     spacingScale: number;
     motionScale: number;
     settings: AdaptiveSettings;
+    runtimeTier: VisualRuntimeTier;
 };
+
+type VisualRuntimeTier = "full" | "balanced" | "degraded";
 
 function clamp(value: number, min: number, max: number): number {
     return Math.max(min, Math.min(max, value));
@@ -138,11 +141,45 @@ function resolveAdaptiveSettings(config: VantaConfig): AdaptiveSettings {
     };
 }
 
+function detectLowEndRuntime(): boolean {
+    if (typeof navigator === "undefined") {
+        return false;
+    }
+
+    const nav = navigator as Navigator & {
+        deviceMemory?: number;
+        connection?: { saveData?: boolean };
+    };
+
+    const hardwareConcurrency = typeof nav.hardwareConcurrency === "number" ? nav.hardwareConcurrency : 8;
+    const deviceMemory = typeof nav.deviceMemory === "number" ? nav.deviceMemory : 8;
+    const saveData = Boolean(nav.connection?.saveData);
+
+    return hardwareConcurrency <= 4 || deviceMemory <= 4 || saveData;
+}
+
+function resolveVisualRuntimeTier(settings: AdaptiveSettings, reducedMotion: boolean): VisualRuntimeTier {
+    if (reducedMotion) {
+        return "degraded";
+    }
+
+    if (settings.enabled && settings.performance_tier === "battery") {
+        return "degraded";
+    }
+
+    if (settings.enabled && settings.performance_tier === "quality") {
+        return "full";
+    }
+
+    return detectLowEndRuntime() ? "balanced" : "full";
+}
+
 function resolveAdaptedAppearance(config: VantaConfig): AdaptedAppearance {
     const settings = resolveAdaptiveSettings(config);
     const baseTextScale = clamp(config.accessibility.text_scale || 1, 0.85, 1.4);
     const baseSpacingScale = resolveSpacingScale(config.accessibility.spacing_preset);
     const reducedMotion = Boolean(config.accessibility.reduced_motion);
+    const runtimeTier = resolveVisualRuntimeTier(settings, reducedMotion);
 
     let blur = config.appearance.blur_radius;
     let opacity = config.appearance.opacity;
@@ -208,6 +245,16 @@ function resolveAdaptedAppearance(config: VantaConfig): AdaptedAppearance {
         }
     }
 
+    if (runtimeTier === "balanced") {
+        blur *= 0.9;
+        motionScale *= 0.9;
+    } else if (runtimeTier === "degraded") {
+        blur *= 0.72;
+        motionScale *= 0.55;
+        opacity += 0.02;
+        radius -= 1;
+    }
+
     if (reducedMotion) {
         motionScale = 0;
     }
@@ -220,6 +267,7 @@ function resolveAdaptedAppearance(config: VantaConfig): AdaptedAppearance {
         spacingScale: round(clamp(spacingScale, 0.8, 1.25), 3),
         motionScale: round(clamp(motionScale, 0, 1), 3),
         settings,
+        runtimeTier,
     };
 }
 
@@ -332,5 +380,6 @@ export function applyTheme(config: VantaConfig): void {
     root.dataset.appearanceDensity = adapted.settings.density;
     root.dataset.appearancePerformance = adapted.settings.performance_tier;
     root.dataset.appearanceAccessibility = adapted.settings.accessibility_preset;
+    root.dataset.visualPerf = adapted.runtimeTier;
     root.dataset.reducedMotion = reduced_motion ? "true" : "false";
 }

@@ -178,7 +178,12 @@
   const RESCAN_INTERVAL_MS = 15000;
   let lastAppRescan = $state(0);
   const unlisteners: Array<() => void> = [];
-  let fadeDuration = $derived(vantaConfig?.accessibility?.reduced_motion ? 0 : 150);
+  let fadeDuration = $derived.by(() => {
+    if (vantaConfig?.accessibility?.reduced_motion) return 0;
+    const adaptive = vantaConfig?.appearance?.adaptive;
+    if (adaptive?.enabled && adaptive.performance_tier === "battery") return 80;
+    return 150;
+  });
 
   const validViews = new Set<ViewId>([
     "launcher",

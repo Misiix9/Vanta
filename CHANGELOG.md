@@ -4,6 +4,13 @@
 
 - Ongoing work for next phase.
 
+## 5.21.0
+
+- Completed Phase 52 performance-first visual runtime with adaptive visual degradation for low-end and battery-sensitive environments.
+- Added automatic runtime performance tiering in theme application (`full`/`balanced`/`degraded`) using adaptive performance intent plus device capability heuristics.
+- Reduced high-cost animation/compositing paths by introducing performance-aware CSS overrides for blur, hover effects, and media backdrops.
+- Extended visual budget CI checks to fail on `transition: all` regressions and excess layout-affecting dynamic style directives.
+
 ## 5.20.0
 
 - Completed Phase 51 adaptive appearance profiles with environment-aware profile controls in Theme Profile and Theme Studio.

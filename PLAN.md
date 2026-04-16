@@ -798,6 +798,7 @@ Implementation notes (March 2026):
 
 ### Execution Notes
 
+- Phase 52: Added performance-first visual runtime with adaptive runtime tiering (`full`/`balanced`/`degraded`), degraded compositing fallbacks for low-end systems, and stricter CI visual hotspot budgets for `transition: all` and layout-affecting dynamic styles.
 - Phase 51: Added adaptive appearance profiles with backend schema guards (`appearance.adaptive`), deterministic runtime transforms in theme application, and Theme Profile/Theme Studio controls for profile, lighting, density, performance, and accessibility presets.
 - Phase 42: Added command palette search mode (`>` prefix) with direct internal command results and v3 typed command mapping for `open-window:`* actions.
 - Phase 42: Added quick note capture/search flow using `note:` prefix, with persistent notes stored in config and retrievable/copyable note results.

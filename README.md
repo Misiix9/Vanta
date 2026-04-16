@@ -29,24 +29,24 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_5.20.0_amd64.deb
+sudo dpkg -i vanta_5.21.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.20.0-1.x86_64.rpm
+sudo rpm -i vanta-5.21.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.20.0)
+### Latest Minor (v5.21.0)
+- Added a performance-first visual runtime with automatic tiering (`full`, `balanced`, `degraded`) to keep the UI responsive under heavier load.
+- Added graceful degradation rules for low-end or battery-constrained systems, reducing blur/animation overhead while preserving usability.
+- Added stricter CI visual hotspot budgets that block `transition: all` regressions and excessive layout-affecting dynamic style directives.
+
+### Previous Minor (v5.20.0)
 - Added adaptive appearance profiles with environment-aware controls for lighting, density, performance tier, and accessibility presets.
 - Added deterministic runtime adaptation that safely adjusts blur, opacity, radius, spacing, text scale, and motion without unpredictable drift.
 - Added strict compatibility guards plus migration-safe defaults so profile-specific styling remains stable across restarts and imports.
-
-### Previous Minor (v5.19.0)
-- Added universal wayfinding with breadcrumb overlays, return-point memory, and contextual next-step actions across non-launcher surfaces.
-- Added consistent global navigation shortcuts (`Alt+Left` for back, `Alt+Home` for search) to improve cross-surface movement.
-- Added updated shortcut docs and navigation hints to reduce dead-end flows when moving between hubs, settings, and store.
 
 ---
 

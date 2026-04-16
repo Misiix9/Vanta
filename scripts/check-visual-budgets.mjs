@@ -10,17 +10,29 @@ const themeFiles = [
   "src-tauri/resources/themes/universal.css",
 ];
 
-// Phase 44: budgets raised to accommodate scoped-to-global CSS consolidation
+// Phase 52: budgets account for performance-tier fallback rules and hotspot guardrails
 const budgets = {
   maxInlineStyleUses: 16,
-  maxCombinedThemeBytes: 150_000,
-  maxBaseThemeBytes: 72_000,
+  maxTransitionAllUses: 0,
+  maxLayoutStyleDirectiveUses: 2,
+  maxCombinedThemeBytes: 155_000,
+  maxBaseThemeBytes: 75_000,
   maxDefaultThemeBytes: 50_000,
   maxUniversalThemeBytes: 35_000,
 };
 
 function countInlineStyles(content) {
   return (content.match(/style=/g) || []).length;
+}
+
+function countTransitionAll(content) {
+  return (content.match(/transition\s*:\s*all\b/g) || []).length;
+}
+
+function countLayoutStyleDirectives(content) {
+  return (
+    content.match(/style:(top|left|right|bottom|width|height|margin|padding)\b/g) || []
+  ).length;
 }
 
 function collectSvelteFiles(dir, acc = []) {
@@ -41,6 +53,7 @@ function fail(message) {
 }
 
 let totalInlineStyleUses = 0;
+let totalLayoutStyleDirectiveUses = 0;
 const svelteFiles = collectSvelteFiles(join(root, "src"))
   .map((absPath) => absPath.slice(root.length + 1))
   .sort();
@@ -49,9 +62,14 @@ for (const relPath of svelteFiles) {
   const absPath = join(root, relPath);
   const content = readFileSync(absPath, "utf8");
   const count = countInlineStyles(content);
+  const layoutDirectiveCount = countLayoutStyleDirectives(content);
   totalInlineStyleUses += count;
+  totalLayoutStyleDirectiveUses += layoutDirectiveCount;
   if (count > 0) {
     console.log(`visual-budget: ${relPath} inline-style-uses=${count}`);
+  }
+  if (layoutDirectiveCount > 0) {
+    console.log(`visual-budget: ${relPath} layout-style-directives=${layoutDirectiveCount}`);
   }
 }
 
@@ -63,6 +81,28 @@ if (countInlineStyles(pageContent) !== 0) {
 if (totalInlineStyleUses > budgets.maxInlineStyleUses) {
   fail(
     `total inline style usage ${totalInlineStyleUses} exceeds budget ${budgets.maxInlineStyleUses}`,
+  );
+}
+
+if (totalLayoutStyleDirectiveUses > budgets.maxLayoutStyleDirectiveUses) {
+  fail(
+    `total layout style directives ${totalLayoutStyleDirectiveUses} exceeds budget ${budgets.maxLayoutStyleDirectiveUses}`,
+  );
+}
+
+let totalTransitionAllUses = 0;
+for (const relPath of themeFiles) {
+  const content = readFileSync(join(root, relPath), "utf8");
+  const transitionAllCount = countTransitionAll(content);
+  totalTransitionAllUses += transitionAllCount;
+  if (transitionAllCount > 0) {
+    console.log(`visual-budget: ${relPath} transition-all-uses=${transitionAllCount}`);
+  }
+}
+
+if (totalTransitionAllUses > budgets.maxTransitionAllUses) {
+  fail(
+    `theme transition-all usage ${totalTransitionAllUses} exceeds budget ${budgets.maxTransitionAllUses}`,
   );
 }
 

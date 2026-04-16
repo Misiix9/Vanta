@@ -926,7 +926,10 @@ input[type="checkbox"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all var(--t-fast);
+    transition:
+        background var(--t-fast),
+        border-color var(--t-fast),
+        box-shadow var(--t-fast);
     flex-shrink: 0;
 }
 
@@ -1227,7 +1230,12 @@ input[type="range"] {
     border-radius: 8px;
     font-family: inherit;
     cursor: pointer;
-    transition: all var(--t-fast, 160ms) var(--ease-std, ease);
+    transition:
+        background var(--t-fast, 160ms) var(--ease-std, ease),
+        border-color var(--t-fast, 160ms) var(--ease-std, ease),
+        color var(--t-fast, 160ms) var(--ease-std, ease),
+        box-shadow var(--t-fast, 160ms) var(--ease-std, ease),
+        transform var(--t-fast, 160ms) var(--ease-std, ease);
 }
 
 .btn-primary {
@@ -1356,7 +1364,7 @@ input[type="range"] {
     padding: 6px 8px;
     border-radius: 6px;
     font-size: 0.95rem;
-    transition: all 0.15s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .back-btn:hover,
@@ -1564,7 +1572,7 @@ input[type="range"] {
     font-size: 0.72rem;
     padding: 2px 6px;
     cursor: pointer;
-    transition: all 0.12s;
+    transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
 }
 
 .btn-rate:hover:not(:disabled) {
@@ -1599,7 +1607,7 @@ input[type="range"] {
     color: var(--vanta-text-dim, #888);
     font-size: 0.78rem;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .btn-uninstall:hover:not(:disabled) {
@@ -1886,7 +1894,7 @@ input[type="range"] {
     font-size: 12px;
     cursor: pointer;
     font-family: inherit;
-    transition: all 0.15s;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, filter 0.15s;
 }
 
 .cv-action-btn:hover {
@@ -2039,7 +2047,7 @@ input[type="range"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.12s;
+    transition: background 0.12s, color 0.12s;
     padding: 0;
 }
 
@@ -2143,7 +2151,59 @@ input[type="range"] {
     color: var(--purple-bright);
     font-size: 12px;
     cursor: pointer;
-    transition: all var(--t-fast) var(--ease-std);
+    transition:
+        background var(--t-fast) var(--ease-std),
+        border-color var(--t-fast) var(--ease-std),
+        color var(--t-fast) var(--ease-std),
+        transform var(--t-fast) var(--ease-std);
+}
+
+html[data-visual-perf="balanced"] {
+    --motion-enter-duration: 120ms;
+    --motion-stagger-step: 10ms;
+}
+
+html[data-visual-perf="degraded"] {
+    --motion-enter-duration: 90ms;
+    --motion-stagger-step: 0ms;
+    --motion-lift-y: 0px;
+}
+
+html[data-visual-perf="balanced"] .vanta-root.css-blur {
+    backdrop-filter: blur(28px) saturate(150%);
+    -webkit-backdrop-filter: blur(28px) saturate(150%);
+}
+
+html[data-visual-perf="degraded"] .vanta-root.css-blur {
+    backdrop-filter: blur(10px) saturate(120%);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+
+html[data-visual-perf="degraded"] .results-container > * {
+    animation: none;
+}
+
+html[data-visual-perf="degraded"] .result-item:hover,
+html[data-visual-perf="degraded"] .script-item:hover,
+html[data-visual-perf="degraded"] .ext-card:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+html[data-visual-perf="balanced"] .npb-bg {
+    filter: blur(20px) brightness(0.38) saturate(1.25);
+}
+
+html[data-visual-perf="degraded"] .npb-bg {
+    filter: blur(12px) brightness(0.45) saturate(1.1);
+}
+
+html[data-visual-perf="balanced"] .mini-player-backdrop {
+    filter: blur(22px) brightness(0.35) saturate(1.25);
+}
+
+html[data-visual-perf="degraded"] .mini-player-backdrop {
+    filter: blur(14px) brightness(0.42) saturate(1.1);
 }
 
 .chip-btn:hover {

@@ -555,7 +555,11 @@ input[type="checkbox"]:checked::after {
     cursor: pointer;
     font-size: 12.5px;
     font-family: inherit;
-    transition: all var(--t-fast) var(--ease-std);
+    transition:
+        background var(--t-fast) var(--ease-std),
+        border-color var(--t-fast) var(--ease-std),
+        color var(--t-fast) var(--ease-std),
+        box-shadow var(--t-fast) var(--ease-std);
 }
 
 .link-btn {
@@ -568,7 +572,12 @@ input[type="checkbox"]:checked::after {
     font-size: 12px;
     font-weight: 500;
     font-family: inherit;
-    transition: all var(--t-fast) var(--ease-std);
+    transition:
+        background var(--t-fast) var(--ease-std),
+        border-color var(--t-fast) var(--ease-std),
+        color var(--t-fast) var(--ease-std),
+        box-shadow var(--t-fast) var(--ease-std),
+        transform var(--t-fast) var(--ease-std);
 }
 
 .accordion-header {
@@ -738,7 +747,7 @@ input[type="checkbox"]:checked::after {
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, filter 0.15s, transform 0.15s;
     white-space: nowrap;
 }
 
@@ -928,7 +937,7 @@ input[type="checkbox"]:checked::after {
     align-items: center;
     justify-content: center;
     -webkit-app-region: no-drag;
-    transition: all 0.12s;
+    transition: background 0.12s, color 0.12s, transform 0.12s;
     padding: 0;
 }
 
@@ -1018,7 +1027,7 @@ input[type="checkbox"]:checked::after {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.12s;
+    transition: background 0.12s, color 0.12s, transform 0.12s;
     padding: 0;
 }
 
@@ -1038,7 +1047,7 @@ input[type="checkbox"]:checked::after {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.12s;
+    transition: background 0.12s, color 0.12s, transform 0.12s;
     padding: 0;
     backdrop-filter: blur(8px);
 }
@@ -1100,7 +1109,7 @@ input[type="checkbox"]:checked::after {
     font-size: 11px;
     line-height: 1.5;
     color: rgba(255, 255, 255, 0.4);
-    transition: all 0.3s ease;
+    transition: color 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
     padding: 1px 0;
 }
 
