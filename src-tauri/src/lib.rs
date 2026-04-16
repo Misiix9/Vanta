@@ -29,7 +29,8 @@ use serde::{Deserialize, Serialize};
 use clap::Parser;
 
 use config::{
-    ProfileConfig, ProfilesConfig, VantaConfig, WorkflowMacro, WorkflowScheduleEvent,
+    CommandTemplate, ProfileConfig, ProfilesConfig, VantaConfig, WorkflowMacro,
+    WorkflowScheduleEvent,
 };
 use errors::VantaError;
 use history::History;
@@ -521,6 +522,7 @@ enum CommandV1 {
     MoveWindowCurrentWorkspace { id: String },
     SystemAction { action: String },
     MacroOpen { id: String },
+    MacroTemplateOpen { template_id: String },
     ExtensionView { ext_id: String, command: String },
     ExtensionAction { ext_id: String, command: String },
     QueryFill { value: String },
@@ -888,6 +890,80 @@ fn build_command_palette_results(query: &str, weight: u32) -> Vec<SearchResult> 
     out
 }
 
+fn build_command_template_palette_results(
+    query: &str,
+    templates: &[CommandTemplate],
+    macros: &[WorkflowMacro],
+    weight: u32,
+) -> Vec<SearchResult> {
+    let needle = query.trim().to_lowercase();
+    let macro_names = macros
+        .iter()
+        .map(|m| (m.id.clone(), m.name.clone()))
+        .collect::<HashMap<_, _>>();
+
+    let mut sorted = templates.to_vec();
+    sorted.sort_by(|a, b| b.updated_at_ms.cmp(&a.updated_at_ms));
+
+    let mut out = Vec::new();
+    for (idx, template) in sorted.into_iter().enumerate() {
+        let macro_name = macro_names
+            .get(&template.macro_id)
+            .cloned()
+            .unwrap_or_else(|| template.macro_id.clone());
+
+        let mut args_preview = template
+            .args
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>();
+        args_preview.sort();
+        let args_summary = if args_preview.is_empty() {
+            "No args".to_string()
+        } else {
+            args_preview.join(" ")
+        };
+
+        let hay = format!(
+            "{} {} {} {}",
+            template.name.to_lowercase(),
+            macro_name.to_lowercase(),
+            template.macro_id.to_lowercase(),
+            args_summary.to_lowercase()
+        );
+
+        if !needle.is_empty() && !hay.contains(&needle) {
+            continue;
+        }
+
+        let base = if needle.is_empty() {
+            ranking_config::STORE_SEARCH_SCORE + 250
+        } else if template.name.to_lowercase() == needle {
+            ranking_config::STORE_SEARCH_SCORE + 500
+        } else if template.name.to_lowercase().starts_with(&needle) {
+            ranking_config::STORE_SEARCH_SCORE + 380
+        } else {
+            ranking_config::STORE_SEARCH_SCORE + 260
+        };
+
+        out.push(SearchResult {
+            title: format!("Template: {}", template.name),
+            subtitle: Some(format!("{} · {}", macro_name, args_summary)),
+            icon: Some("fa-solid fa-layer-group".to_string()),
+            exec: format!("macro-template:{}", template.id),
+            score: weighted_score(base.saturating_sub(idx as u32), weight),
+            match_indices: vec![],
+            source: ResultSource::Application,
+            actions: None,
+            id: Some(format!("cmd-template:{}", template.id)),
+            group: None,
+            section: Some("Templates".to_string()),
+        });
+    }
+
+    out
+}
+
 fn build_quick_note_results(
     note_query: &str,
     notes: &config::NotesConfig,
@@ -1168,6 +1244,11 @@ fn exec_to_command(exec: &str, source: &matcher::ResultSource) -> CommandV1 {
     }
     if let Some(v) = exec.strip_prefix("profile-switch:") {
         return CommandV1::ProfileSwitch { id: v.to_string() };
+    }
+    if let Some(v) = exec.strip_prefix("macro-template:") {
+        return CommandV1::MacroTemplateOpen {
+            template_id: v.to_string(),
+        };
     }
     if let Some(v) = exec.strip_prefix("macro:") {
         return CommandV1::MacroOpen { id: v.to_string() };
@@ -1836,10 +1917,47 @@ mod command_palette_tests {
     }
 
     #[test]
+    fn command_template_palette_includes_saved_template() {
+        let templates = vec![CommandTemplate {
+            id: "tmpl-a".to_string(),
+            name: "Deploy Main".to_string(),
+            macro_id: "deploy".to_string(),
+            args: HashMap::from([("branch".to_string(), "main".to_string())]),
+            created_at_ms: 1,
+            updated_at_ms: 2,
+        }];
+        let macros = vec![WorkflowMacro {
+            id: "deploy".to_string(),
+            name: "Deploy Workflow".to_string(),
+            description: Some("Deploy application".to_string()),
+            enabled: true,
+            args: vec![],
+            steps: vec![],
+            timeout_ms: None,
+            timeout_behavior: config::TimeoutBehavior::Abort,
+            schedule: None,
+        }];
+
+        let results = build_command_template_palette_results("deploy", &templates, &macros, 100);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].exec, "macro-template:tmpl-a");
+        assert_eq!(results[0].section.as_deref(), Some("Templates"));
+    }
+
+    #[test]
     fn exec_to_command_maps_open_window_contract() {
         let command = exec_to_command("open-window:featureHub", &ResultSource::Application);
         match command {
             CommandV1::OpenFeatureWindow { window } => assert_eq!(window, "featureHub"),
+            other => panic!("unexpected command mapping: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn exec_to_command_maps_macro_template_contract() {
+        let command = exec_to_command("macro-template:tmpl-123", &ResultSource::Application);
+        match command {
+            CommandV1::MacroTemplateOpen { template_id } => assert_eq!(template_id, "tmpl-123"),
             other => panic!("unexpected command mapping: {:?}", other),
         }
     }
@@ -2214,7 +2332,23 @@ async fn search(
     let generation = SEARCH_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
 
     if let Some(command_query) = query.trim().strip_prefix('>') {
+        let (templates, macros) = {
+            let config = state
+                .config
+                .read()
+                .map_err(|_| "Failed to access config".to_string())?;
+            (
+                config.workflows.command_templates.clone(),
+                config.workflows.macros.clone(),
+            )
+        };
         let mut command_results = build_command_palette_results(command_query, 100);
+        command_results.extend(build_command_template_palette_results(
+            command_query,
+            &templates,
+            &macros,
+            100,
+        ));
         command_results.sort_by(|a, b| b.score.cmp(&a.score));
         record_latency(
             "search",
@@ -3318,6 +3452,169 @@ async fn get_workflows(
 }
 
 #[tauri::command]
+async fn get_command_templates(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<CommandTemplate>, VantaError> {
+    let config = state
+        .config
+        .read()
+        .map_err(|_| "Failed to access config".to_string())?;
+    Ok(config.workflows.command_templates.clone())
+}
+
+#[tauri::command]
+async fn save_command_template(
+    name: String,
+    macro_id: String,
+    args: HashMap<String, String>,
+    template_id: Option<String>,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<CommandTemplate, VantaError> {
+    let trimmed_name = name.trim();
+    if trimmed_name.len() < 2 {
+        return Err("Template name must be at least 2 characters".into());
+    }
+
+    let now = u64::try_from(now_millis()).unwrap_or(0);
+
+    let (saved, updated_cfg, updated_templates) = {
+        let mut config = state
+            .config
+            .write()
+            .map_err(|_| "Failed to access config".to_string())?;
+
+        let macro_def = config
+            .workflows
+            .macros
+            .iter()
+            .find(|m| m.id == macro_id)
+            .cloned()
+            .ok_or_else(|| format!("Macro '{}' not found", macro_id))?;
+
+        let allowed_names = macro_def
+            .args
+            .iter()
+            .map(|a| a.name.as_str())
+            .collect::<HashSet<_>>();
+        let filtered_args = args
+            .into_iter()
+            .filter(|(k, v)| allowed_names.contains(k.as_str()) && !v.trim().is_empty())
+            .collect::<HashMap<_, _>>();
+
+        let saved = if let Some(existing_id) = template_id {
+            let existing = config
+                .workflows
+                .command_templates
+                .iter_mut()
+                .find(|t| t.id == existing_id)
+                .ok_or_else(|| format!("Template '{}' not found", existing_id))?;
+            existing.name = trimmed_name.to_string();
+            existing.macro_id = macro_id.clone();
+            existing.args = filtered_args;
+            existing.updated_at_ms = now;
+            existing.clone()
+        } else {
+            let mut slug = trimmed_name
+                .chars()
+                .map(|c| {
+                    if c.is_ascii_alphanumeric() {
+                        c.to_ascii_lowercase()
+                    } else {
+                        '-'
+                    }
+                })
+                .collect::<String>()
+                .trim_matches('-')
+                .to_string();
+            if slug.is_empty() {
+                slug = "template".to_string();
+            }
+
+            let mut candidate = format!("tmpl-{}-{}", slug, now);
+            let mut suffix = 1u32;
+            while config
+                .workflows
+                .command_templates
+                .iter()
+                .any(|t| t.id == candidate)
+            {
+                candidate = format!("tmpl-{}-{}-{}", slug, now, suffix);
+                suffix = suffix.saturating_add(1);
+            }
+
+            let template = CommandTemplate {
+                id: candidate,
+                name: trimmed_name.to_string(),
+                macro_id: macro_id.clone(),
+                args: filtered_args,
+                created_at_ms: now,
+                updated_at_ms: now,
+            };
+            config.workflows.command_templates.insert(0, template.clone());
+            if config.workflows.command_templates.len() > 200 {
+                config.workflows.command_templates.truncate(200);
+            }
+            template
+        };
+
+        config.workflows.schema_version = config::WORKFLOWS_SCHEMA_VERSION;
+        config.save_with_source("user")?;
+
+        (
+            saved,
+            config.clone(),
+            config.workflows.command_templates.clone(),
+        )
+    };
+
+    let _ = app_handle.emit("config-updated", &updated_cfg);
+    let _ = app_handle.emit("command-templates-changed", &updated_templates);
+    Ok(saved)
+}
+
+#[tauri::command]
+async fn delete_command_template(
+    template_id: String,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<bool, VantaError> {
+    let (deleted, updated_cfg, updated_templates) = {
+        let mut config = state
+            .config
+            .write()
+            .map_err(|_| "Failed to access config".to_string())?;
+
+        let before = config.workflows.command_templates.len();
+        config
+            .workflows
+            .command_templates
+            .retain(|t| t.id != template_id);
+        let deleted = config.workflows.command_templates.len() != before;
+
+        if !deleted {
+            (false, None, Vec::new())
+        } else {
+            config.save_with_source("user")?;
+            (
+                true,
+                Some(config.clone()),
+                config.workflows.command_templates.clone(),
+            )
+        }
+    };
+
+    if let Some(cfg) = updated_cfg {
+        let _ = app_handle.emit("config-updated", &cfg);
+    }
+    if deleted {
+        let _ = app_handle.emit("command-templates-changed", &updated_templates);
+    }
+
+    Ok(deleted)
+}
+
+#[tauri::command]
 async fn list_workflow_secret_names() -> Result<Vec<String>, VantaError> {
     secrets::list_secret_names()
 }
@@ -4049,6 +4346,9 @@ pub fn run(start_hidden: bool, open_clipboard: bool) {
             community::export_community_snippet,
             community::import_community_snippet,
             get_workflows,
+            get_command_templates,
+            save_command_template,
+            delete_command_template,
             list_workflow_secret_names,
             set_workflow_secret,
             delete_workflow_secret,

@@ -3,17 +3,20 @@
 Transform Vanta into the most usable and trusted Linux launcher by sequencing reliability first, then UX/workflow excellence, then platform-scale capabilities.
 
 Release policy:
+
 - Patch (`vX.Y.Z`): bugfix/reliability only
 - Minor (`vX.Y.0`): backward-compatible features
 - Major (`vX.0.0`): breaking contracts or config/runtime architecture changes
 
 Phase template:
+
 - **Goal**
 - **Prerequisites**
 - **What gets done**
 - **Definition of Done**
 
 ### Phase 01 - v2.2.1 (Patch) - Stability Baseline Lock
+
 - **Goal:** Eliminate current UI/runtime regressions and establish a trusted baseline.
 - **Prerequisites:** Current `main` at v2.2.x.
 - **What gets done:**
@@ -25,6 +28,7 @@ Phase template:
   - No known critical regressions in launcher/settings/store flows.
 
 ### Phase 02 - v2.2.2 (Patch) - Performance And Input Reliability
+
 - **Goal:** Make keyboard-driven interaction feel instant and deterministic.
 - **Prerequisites:** Phase 01.
 - **What gets done:**
@@ -36,6 +40,7 @@ Phase template:
   - Input latency and result render latency stay within target budget.
 
 ### Phase 03 - v2.3.0 (Minor) - First-Run And Onboarding UX
+
 - **Goal:** New users succeed in first 60 seconds.
 - **Prerequisites:** Phase 02.
 - **What gets done:**
@@ -47,6 +52,7 @@ Phase template:
   - Users can launch apps/files/scripts without docs.
 
 ### Phase 04 - v2.4.0 (Minor) - Visual Design System v1
+
 - **Goal:** Make Vanta visually distinctive, polished, and consistently readable.
 - **Prerequisites:** Phase 03.
 - **What gets done:**
@@ -58,6 +64,7 @@ Phase template:
   - Accessibility contrast checks pass for default themes.
 
 ### Phase 05 - v2.5.0 (Minor) - Search Quality v2
+
 - **Goal:** Best-in-class relevance for Linux launcher use-cases.
 - **Prerequisites:** Phase 04.
 - **What gets done:**
@@ -69,6 +76,7 @@ Phase template:
   - Ranking is tunable and immediately reflected in results.
 
 ### Phase 06 - v2.6.0 (Minor) - Action Model v3
+
 - **Goal:** Turn results into workflows, not just launches.
 - **Prerequisites:** Phase 05.
 - **What gets done:**
@@ -80,6 +88,7 @@ Phase template:
   - No accidental destructive action execution.
 
 ### Phase 07 - v2.7.0 (Minor) - Clipboard And History Excellence
+
 - **Goal:** Make clipboard mode a daily-driver productivity surface.
 - **Prerequisites:** Phase 06.
 - **What gets done:**
@@ -91,6 +100,7 @@ Phase template:
   - Privacy filters are enforced and auditable.
 
 ### Phase 08 - v2.8.0 (Minor) - Theme Studio And Presets
+
 - **Goal:** Make customization powerful and safe for all users.
 - **Prerequisites:** Phase 07.
 - **What gets done:**
@@ -102,6 +112,7 @@ Phase template:
   - Theme switching is instant and reversible.
 
 ### Phase 09 - v2.9.0 (Minor) - Store Discoverability And Trust
+
 - **Goal:** Make extensions easy to discover and safe to install.
 - **Prerequisites:** Phase 08.
 - **What gets done:**
@@ -113,6 +124,7 @@ Phase template:
   - Users understand permission impact before install.
 
 ### Phase 10 - v2.10.0 (Minor) - Accessibility Completion
+
 - **Goal:** Full keyboard-first and readability-first operation.
 - **Prerequisites:** Phase 09.
 - **What gets done:**
@@ -124,6 +136,7 @@ Phase template:
   - Accessibility audits pass agreed baseline.
 
 ### Phase 11 - v2.11.0 (Minor) - Window And Workspace Intelligence
+
 - **Goal:** Make window switching a superpower for power users.
 - **Prerequisites:** Phase 10.
 - **What gets done:**
@@ -135,6 +148,7 @@ Phase template:
   - Switching is measurably faster than current baseline.
 
 ### Phase 12 - v2.12.0 (Minor) - Jobs And Async Workflows
+
 - **Goal:** Support long tasks without blocking launcher flow.
 - **Prerequisites:** Phase 11.
 - **What gets done:**
@@ -146,6 +160,7 @@ Phase template:
   - Job state survives restarts where expected.
 
 ### Phase 13 - v3.0.0 (Major) - Unified Command Contract
+
 - **Goal:** Establish a typed, future-proof core contract across all result/action sources.
 - **Prerequisites:** Phase 12.
 - **What gets done:**
@@ -157,6 +172,7 @@ Phase template:
   - Backward compatibility policy is explicit for ecosystem maintainers.
 
 ### Phase 14 - v3.1.0 (Minor) - Profiles v2 (Context-Aware Environments)
+
 - **Goal:** Let users switch instantly between work/personal/project contexts.
 - **Prerequisites:** Phase 13.
 - **What gets done:**
@@ -168,6 +184,7 @@ Phase template:
   - Profile operations are deterministic and reversible.
 
 ### Phase 15 - v3.2.0 (Minor) - Diagnostics, Recovery, And Support Bundle v2
+
 - **Goal:** Make bug reports reproducible and fixes faster.
 - **Prerequisites:** Phase 14.
 - **What gets done:**
@@ -179,6 +196,7 @@ Phase template:
   - Recovery hints reduce repeated startup failures.
 
 ### Phase 16 - v3.3.0 (Minor) - Enterprise Security And Policy Controls
+
 - **Goal:** Make Vanta deployable in stricter environments.
 - **Prerequisites:** Phase 15.
 - **What gets done:**
@@ -190,6 +208,7 @@ Phase template:
   - Restricted mode prevents unauthorized paths.
 
 ### Phase 17 - v3.4.0 (Minor) - Extension SDK v2
+
 - **Goal:** Make third-party extension development easy, stable, and high quality.
 - **Prerequisites:** Phase 16.
 - **What gets done:**
@@ -201,6 +220,7 @@ Phase template:
   - SDK upgrade paths are predictable and low-friction.
 
 ### Phase 18 - v3.5.0 (Minor) - Packaging And Distribution Excellence
+
 - **Goal:** Be installable and updatable smoothly across Linux ecosystems.
 - **Prerequisites:** Phase 17.
 - **What gets done:**
@@ -212,6 +232,7 @@ Phase template:
   - Packaging regressions are caught before publish.
 
 ### Phase 19 - v3.6.0 (Minor) - Community Growth Features
+
 - **Goal:** Increase adoption through sharing and discoverability.
 - **Prerequisites:** Phase 18.
 - **What gets done:**
@@ -223,6 +244,7 @@ Phase template:
   - Feedback loop measurably informs roadmap priorities.
 
 ### Phase 20 - v4.0.0 (Major) - Adaptive Intent Engine
+
 - **Goal:** Deliver next-generation launcher intelligence while preserving speed and trust.
 - **Prerequisites:** Phase 19.
 - **What gets done:**
@@ -235,6 +257,7 @@ Phase template:
   - Migration path from v3.x contract is documented and reliable.
 
 ### Phase 21 - v4.1.0 (Minor) - Smartest Search And Result Intelligence
+
 - **Goal:** Deliver the smartest possible search and ranking flow across every source.
 - **Prerequisites:** Phase 20.
 - **What gets done:**
@@ -248,6 +271,7 @@ Phase template:
   - Results are presented in pure relevance order independent of source category.
 
 ### Phase 22 - v4.2.0 (Minor) - Universal UI Redesign Foundation
+
 - **Goal:** Establish a beautiful, unified, and universal visual direction across every Vanta surface.
 - **Prerequisites:** Phase 21.
 - **What gets done:**
@@ -259,6 +283,7 @@ Phase template:
   - Theme compatibility matrix exists for legacy + new classes/tokens.
 
 ### Phase 23 - v4.3.0 (Minor) - Launcher Layout Recomposition
+
 - **Goal:** Redesign launcher composition for clarity, speed, and visual cohesion.
 - **Prerequisites:** Phase 22.
 - **What gets done:**
@@ -270,6 +295,7 @@ Phase template:
   - No spacing/typography inconsistency across launcher sections.
 
 ### Phase 24 - v4.4.0 (Minor) - Settings IA And Visual Refresh
+
 - **Goal:** Make settings universally understandable, fast, and visually consistent.
 - **Prerequisites:** Phase 23.
 - **What gets done:**
@@ -281,6 +307,7 @@ Phase template:
   - Settings visuals fully match Design Language v2.
 
 ### Phase 25 - v4.5.0 (Minor) - Store And Extension Surfaces Redesign
+
 - **Goal:** Make extension discovery and trust evaluation visually first-class.
 - **Prerequisites:** Phase 24.
 - **What gets done:**
@@ -292,6 +319,7 @@ Phase template:
   - Trust-related information is scannable before install actions.
 
 ### Phase 26 - v4.6.0 (Minor) - Dedicated Window UX Suite v2
+
 - **Goal:** Polish all dedicated windows into premium, consistent experiences.
 - **Prerequisites:** Phase 25.
 - **What gets done:**
@@ -303,6 +331,7 @@ Phase template:
   - Window-to-window transitions feel predictable and polished.
 
 ### Phase 27 - v4.7.0 (Minor) - Motion System And Interaction Choreography
+
 - **Goal:** Make interactions feel alive without sacrificing speed or accessibility.
 - **Prerequisites:** Phase 26.
 - **What gets done:**
@@ -314,6 +343,7 @@ Phase template:
   - Reduced-motion mode remains fully respected.
 
 ### Phase 28 - v4.8.0 (Minor) - Typography And Readability Program
+
 - **Goal:** Achieve beautiful and highly readable text hierarchy in all contexts.
 - **Prerequisites:** Phase 27.
 - **What gets done:**
@@ -325,6 +355,7 @@ Phase template:
   - Readability audits pass across supported scale presets.
 
 ### Phase 29 - v4.9.0 (Minor) - Iconography And Visual Semantics v2
+
 - **Goal:** Make icons and visual cues expressive, predictable, and brand-consistent.
 - **Prerequisites:** Phase 28.
 - **What gets done:**
@@ -336,6 +367,7 @@ Phase template:
   - State colors communicate meaning without ambiguity.
 
 ### Phase 30 - v5.0.0 (Major) - Theme Engine v3 And Token Inheritance
+
 - **Goal:** Let themes deeply customize appearance while retaining guaranteed UX quality.
 - **Prerequisites:** Phase 29.
 - **What gets done:**
@@ -347,6 +379,7 @@ Phase template:
   - Theme diagnostics produce actionable guidance.
 
 ### Phase 31 - v5.0.1 (Patch) - Critical Security And Crash Prevention
+
 - **Goal:** Eliminate every known crash vector and injection vulnerability before adding features.
 - **Prerequisites:** Phase 30.
 - **What gets done:**
@@ -362,6 +395,7 @@ Phase template:
   - Icons render offline.
 
 ### Phase 32 - v5.1.0 (Minor) - Unified Error Architecture
+
 - **Goal:** Replace all `Result<T, String>` returns with a typed error system so the frontend can programmatically handle failures.
 - **Prerequisites:** Phase 31.
 - **What gets done:**
@@ -377,6 +411,7 @@ Phase template:
   - `thiserror` derive macros used consistently.
 
 ### Phase 33 - v5.2.0 (Minor) - Frontend Architecture Decomposition
+
 - **Goal:** Break the two god components into focused, testable modules to unblock all future frontend velocity.
 - **Prerequisites:** Phase 32.
 - **What gets done:**
@@ -392,6 +427,7 @@ Phase template:
   - Error recovery shows actionable UI.
 
 ### Phase 34 - v5.3.0 (Minor) - Accessibility Compliance
+
 - **Goal:** Achieve WCAG AA compliance across all primary surfaces — keyboard-first, screen-reader-friendly, contrast-safe.
 - **Prerequisites:** Phase 33.
 - **What gets done:**
@@ -410,6 +446,7 @@ Phase template:
   - Keyboard shortcut discoverability exists.
 
 ### Phase 35 - v5.4.0 (Minor) - Parallel Search And Ranking Engine
+
 - **Goal:** Make search feel instant by querying sources in parallel, streaming results, and cancelling stale queries.
 - **Prerequisites:** Phase 34.
 - **What gets done:**
@@ -427,6 +464,7 @@ Phase template:
   - Frecency reflects actual recency.
 
 ### Phase 36 - v5.5.0 (Minor) - Search UX And Query Intelligence
+
 - **Goal:** Give users powerful query tools and always keep them informed about what the launcher is doing.
 - **Prerequisites:** Phase 35.
 - **What gets done:**
@@ -445,6 +483,7 @@ Phase template:
   - Action chips work with both keyboard and mouse.
 
 ### Phase 37 - v5.6.0 (Minor) - Result Preview And Context Actions
+
 - **Goal:** Let users inspect results before acting and provide full action flexibility.
 - **Prerequisites:** Phase 36.
 - **What gets done:**
@@ -462,6 +501,7 @@ Phase template:
   - Results can be dragged to external targets.
 
 ### Phase 38 - v5.7.0 (Minor) - Notification And Feedback System
+
 - **Goal:** Never leave the user wondering "did it work?" — every async action gets visible feedback.
 - **Prerequisites:** Phase 37.
 - **What gets done:**
@@ -478,6 +518,7 @@ Phase template:
   - Recent notifications are reviewable.
 
 ### Phase 39 - v5.8.0 (Minor) - Extension Lifecycle And Ecosystem Health
+
 - **Goal:** Make extensions upgradeable, rollbackable, and granularly permissioned — ready for an ecosystem.
 - **Prerequisites:** Phase 38.
 - **What gets done:**
@@ -495,6 +536,7 @@ Phase template:
   - Dependencies resolve before install.
 
 Implementation notes (March 2026):
+
 - Enforce scoped permissions at runtime in extension bridge commands (`extension_fetch`, `extension_shell_execute`) using manifest allowlists.
 - Keep backward compatibility: if scope arrays are omitted/empty for legacy extensions, allow existing behavior but emit warnings and guide migration.
 - Add `permission_scopes` to extension manifests (`network_domains`, `shell_commands`, `filesystem_paths`) and provide scoped defaults for first-party extensions.
@@ -502,6 +544,7 @@ Implementation notes (March 2026):
 - Block install when dependency requirements (`requires`) are not satisfied and return user-actionable errors.
 
 ### Phase 40 - v5.9.0 (Minor) - Workflow Engine v2 And Automation
+
 - **Goal:** Make workflows powerful enough for real automation — conditions, error handling, and composition.
 - **Prerequisites:** Phase 39.
 - **What gets done:**
@@ -520,6 +563,7 @@ Implementation notes (March 2026):
   - Sensitive data is encrypted.
 
 Implementation notes (March 2026):
+
 - Added step-output chaining support in blocking workflow execution: successful system-step stdout is now exposed as `{step.N.output}` for downstream steps.
 - Introduced conditional workflow steps with `if` branches and `else` fallback (`kind: "if"`) and condition expressions for step-output checks and command exit-code checks.
 - Extended dry-run preflight to traverse conditional branches for capability visibility so permission prompts happen before job execution.
@@ -543,6 +587,7 @@ Implementation notes (March 2026):
 - Added smart clipboard contextual actions: URL open, path open, JSON formatting copy action, and command execution shortcut for command-like entries.
 
 ### Phase 41 - v5.10.0 (Minor) - Config And State Management v2
+
 - **Goal:** Make configuration resilient, auditable, and stateful across restarts.
 - **Prerequisites:** Phase 40.
 - **What gets done:**
@@ -560,6 +605,7 @@ Implementation notes (March 2026):
   - Memory usage drops from reduced cloning.
 
 ### Phase 42 - v5.11.0 (Minor) - Smart Features And Daily Driver Polish
+
 - **Goal:** Add the small features that make Vanta indispensable for daily use.
 - **Prerequisites:** Phase 41.
 - **What gets done:**
@@ -578,6 +624,7 @@ Implementation notes (March 2026):
   - Usage stats are viewable.
 
 ### Phase 43 - v5.12.0 (Minor) - Performance And Resource Optimization
+
 - **Goal:** Strip waste, bound caches, and ensure Vanta stays fast at scale.
 - **Prerequisites:** Phase 42.
 - **What gets done:**
@@ -596,6 +643,7 @@ Implementation notes (March 2026):
   - File icons cover all common development and office formats.
 
 ### Phase 44 - v5.13.0 (Minor) - Universal Layout Runtime
+
 - **Goal:** Promote all major surfaces to a shared layout runtime and component contract.
 - **Prerequisites:** Phase 43.
 - **What gets done:**
@@ -607,6 +655,7 @@ Implementation notes (March 2026):
   - Major-version migration notes are complete and tested.
 
 ### Phase 45 - v5.14.0 (Minor) - Workspace Canvas And Multi-Pane Views
+
 - **Goal:** Enable richer productivity layouts while preserving launcher speed.
 - **Prerequisites:** Phase 44.
 - **What gets done:**
@@ -618,6 +667,7 @@ Implementation notes (March 2026):
   - Single-pane mode remains instant and stable.
 
 ### Phase 46 - v5.15.0 (Minor) - Contextual Surfaces And Smart Panels
+
 - **Goal:** Present the right UI affordances for the current intent/context.
 - **Prerequisites:** Phase 45.
 - **What gets done:**
@@ -629,6 +679,7 @@ Implementation notes (March 2026):
   - Panels are discoverable and fully keyboard operable.
 
 ### Phase 47 - v5.16.0 (Minor) - Data Visualization And System Health UX
+
 - **Goal:** Make system state and metrics beautiful, useful, and actionable.
 - **Prerequisites:** Phase 46.
 - **What gets done:**
@@ -640,6 +691,7 @@ Implementation notes (March 2026):
   - Visuals are consistent with all other Vanta surfaces.
 
 ### Phase 48 - v5.17.0 (Minor) - Input System v2 And Command Composer
+
 - **Goal:** Make command composition powerful while keeping interaction elegant.
 - **Prerequisites:** Phase 47.
 - **What gets done:**
@@ -651,6 +703,7 @@ Implementation notes (March 2026):
   - Error-prevention guidance appears before risky execution.
 
 ### Phase 49 - v5.18.0 (Minor) - Collaborative Artifact UX
+
 - **Goal:** Make community snippets/macros/themes feel premium and safe to consume.
 - **Prerequisites:** Phase 48.
 - **What gets done:**
@@ -662,6 +715,7 @@ Implementation notes (March 2026):
   - Users can safely undo problematic imports.
 
 ### Phase 50 - v5.19.0 (Minor) - Global Navigation And Cross-Surface Wayfinding
+
 - **Goal:** Make movement between all Vanta surfaces feel effortless and coherent.
 - **Prerequisites:** Phase 49.
 - **What gets done:**
@@ -673,6 +727,7 @@ Implementation notes (March 2026):
   - Navigation consistency score improves in usability testing.
 
 ### Phase 51 - v5.20.0 (Minor) - Adaptive Appearance Profiles
+
 - **Goal:** Automatically keep the UI beautiful and readable across environments.
 - **Prerequisites:** Phase 50.
 - **What gets done:**
@@ -684,6 +739,7 @@ Implementation notes (March 2026):
   - Profile-specific styling remains stable across restarts.
 
 ### Phase 52 - v5.21.0 (Minor) - Performance-First Visual Runtime
+
 - **Goal:** Guarantee visual polish at scale without sacrificing responsiveness.
 - **Prerequisites:** Phase 51.
 - **What gets done:**
@@ -695,6 +751,7 @@ Implementation notes (March 2026):
   - Polished visuals remain smooth on supported hardware tiers.
 
 ### Phase 53 - v6.0.0 (Major) - Design QA Automation And UI Contract Testing
+
 - **Goal:** Keep the universal UI system reliable as features evolve.
 - **Prerequisites:** Phase 52.
 - **What gets done:**
@@ -706,6 +763,7 @@ Implementation notes (March 2026):
   - Styling contract violations fail CI with clear diagnostics.
 
 ### Phase 54 - v6.1.0 (Minor) - Vanta Experience Platform
+
 - **Goal:** Deliver a fully unified, beautiful, and extensible experience platform.
 - **Prerequisites:** Phase 53.
 - **What gets done:**
@@ -716,7 +774,22 @@ Implementation notes (March 2026):
   - Vanta ships with end-to-end visual and interaction continuity.
   - Platform documentation and migration tooling are complete for ecosystem authors.
 
+### Phase 55 - v6.1.1 (Patch) - AppImage Packaging Recovery
+
+- **Goal:** Re-enable reliable AppImage bundling in CI and releases.
+- **Prerequisites:** Phase 54.
+- **What gets done:**
+  - Resolve linuxdeploy strip failures on RELR ELF sections by pinning a compatible linuxdeploy toolchain and disabling unsafe strip behavior for binaries that use RELR relocations.
+  - Add an AppImage-specific packaging path in release automation with explicit checks for required runtime dependencies and plugin compatibility.
+  - Add a reproducible local/CI smoke test for AppImage startup (`--appimage-extract-and-run` and normal launch) so regressions are caught before release.
+  - Update release workflow messaging and docs to remove the current AppImage-disabled note once packaging is stable.
+- **Definition of Done:**
+  - AppImage builds successfully in CI without linuxdeploy RELR strip errors.
+  - Produced AppImage launches successfully in smoke tests.
+  - Release workflow publishes AppImage artifacts alongside existing packages.
+
 ### Global Release Gates (apply to every phase)
+
 - Backend quality gate: `cargo test`
 - Frontend quality gate: `npm run check`
 - Build gate: `tauri build` smoke run
@@ -724,7 +797,8 @@ Implementation notes (March 2026):
 - Rollback gate: define fallback for partial failures
 
 ### Execution Notes
-- Phase 42: Added command palette search mode (`>` prefix) with direct internal command results and v3 typed command mapping for `open-window:*` actions.
+
+- Phase 42: Added command palette search mode (`>` prefix) with direct internal command results and v3 typed command mapping for `open-window:`* actions.
 - Phase 42: Added quick note capture/search flow using `note:` prefix, with persistent notes stored in config and retrievable/copyable note results.
 - Phase 42: Added persistent file bookmarks with context-menu starring, `bookmark:`/`bm:` retrieval, remove actions, and bookmark suggestions for instant recall.
 - Phase 42: Added local-only usage analytics dashboard data (most-used apps, peak usage hours, query patterns) and surfaced it in Diagnostics.

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Ongoing work for next phase.
+
+## 5.17.0
+
+- Synced Rust package metadata version in `src-tauri/Cargo.toml` with the current app release (`5.16.0`).
+- Added CI workflow for pull requests and pushes to `main` with backend/frontend/visual/extension quality gates.
+- Hardened release workflow with dynamic version checks, changelog-driven patch notes, and required pre-build verification steps.
+- Updated packaging metadata (`PKGBUILD`, `vanta-bin/PKGBUILD`) and README install/version references.
+- Started Phase 48 command composer implementation with reusable macro command templates (save/list/delete), `>` command-mode template search, and keyboard-first macro composer shortcuts (`Enter`, `Ctrl+Enter`, `Esc`).
+
 ## 5.16.0
 - Completed Phase 47 data visualization and system health UX.
 - Redesigned diagnostics and health dashboards with trend cards, sparklines, and clear semantic states.

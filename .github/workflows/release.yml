@@ -1,12 +1,15 @@
-name: Release Vanta v5.16.0
+name: Release Vanta
 
 on:
   push:
     tags:
       - 'v*'
-  release:
-    types: [published, created]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (without v), optional override"
+        required: false
+        type: string
 
 jobs:
   release:
@@ -55,13 +58,109 @@ jobs:
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli
 
-      - name: Verify version
+      - name: Resolve versions
+        id: versions
         run: |
-          node -p "require('./package.json').version"
-          jq -r '.version' src-tauri/tauri.conf.json
-          grep '^version' src-tauri/Cargo.toml
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          TAURI_VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | cut -d '"' -f2)
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          DISPATCH_VERSION="${{ github.event.inputs.version || '' }}"
 
-      - name: Check Visual Performance Budgets
+          if [ -n "${DISPATCH_VERSION}" ]; then
+            RELEASE_VERSION="${DISPATCH_VERSION}"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            RELEASE_VERSION="${TAG_VERSION}"
+          else
+            RELEASE_VERSION="${PACKAGE_VERSION}"
+          fi
+
+          echo "package_version=${PACKAGE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tauri_version=${TAURI_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "cargo_version=${CARGO_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag_version=${TAG_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "dispatch_version=${DISPATCH_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "release_version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify version alignment
+        run: |
+          if [ "${{ steps.versions.outputs.package_version }}" != "${{ steps.versions.outputs.tauri_version }}" ]; then
+            echo "package.json and tauri.conf.json versions differ"
+            exit 1
+          fi
+
+          if [ "${{ steps.versions.outputs.package_version }}" != "${{ steps.versions.outputs.cargo_version }}" ]; then
+            echo "package.json and Cargo.toml versions differ"
+            exit 1
+          fi
+
+          if [[ "${GITHUB_REF}" == refs/tags/* ]] && [ "${{ steps.versions.outputs.package_version }}" != "${{ steps.versions.outputs.tag_version }}" ]; then
+            echo "Tag version does not match package version"
+            exit 1
+          fi
+
+          if [ -n "${{ steps.versions.outputs.dispatch_version }}" ] && [ "${{ steps.versions.outputs.package_version }}" != "${{ steps.versions.outputs.dispatch_version }}" ]; then
+            echo "workflow_dispatch version does not match package version"
+            exit 1
+          fi
+
+      - name: Build release notes from changelog
+        id: notes
+        run: |
+          VERSION="${{ steps.versions.outputs.package_version }}"
+          SECTION_FILE="${RUNNER_TEMP}/changelog_section.md"
+          BODY_FILE="${RUNNER_TEMP}/release_body.md"
+
+          awk -v version="${VERSION}" '
+            $0 == "## " version { capture = 1; next }
+            capture && /^## / { exit }
+            capture { print }
+          ' CHANGELOG.md > "${SECTION_FILE}"
+
+          sed -i '/./,$!d' "${SECTION_FILE}"
+
+          if ! grep -q '^- ' "${SECTION_FILE}"; then
+            echo "CHANGELOG.md is missing bullet patch notes for version ${VERSION}"
+            exit 1
+          fi
+
+          HIGHLIGHTS=$(grep '^- ' "${SECTION_FILE}" | head -n 4)
+
+          {
+            echo "## Vanta v${VERSION}"
+            echo
+            echo "### Highlights"
+            echo "${HIGHLIGHTS}"
+            echo
+            echo "### Patch Notes"
+            cat "${SECTION_FILE}"
+            echo
+            echo "### Included artifacts"
+            echo "- Debian package (.deb)"
+            echo "- RPM package (.rpm)"
+            echo
+            echo "### Quality gates"
+            echo "- cargo test"
+            echo "- npm run check"
+            echo "- npm run check:visual-budgets"
+            echo "- npm run extensions:validate"
+            echo
+            echo "### Known issues"
+            echo "- AppImage bundling remains disabled due to linuxdeploy RELR compatibility issues."
+          } > "${BODY_FILE}"
+
+          echo "notes_path=${BODY_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Run backend tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Run frontend checks
+        run: npm run check
+
+      - name: Validate extension manifests
+        run: npm run extensions:validate
+
+      - name: Check visual performance budgets
         run: npm run check:visual-budgets
 
       - name: Build Vanta (Deb, RPM)
@@ -71,38 +170,20 @@ jobs:
           TAURI_ENVIRONMENT: production
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Verify Package Artifacts
+      - name: Verify package artifacts
         run: ./scripts/verify-release-packages.sh
 
-      - name: Get Version
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-      - name: Upload Assets
+      # AppImage intentionally excluded due to linuxdeploy RELR strip compatibility issues.
+      - name: Upload assets
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             src-tauri/target/**/bundle/deb/*.deb
             src-tauri/target/**/bundle/rpm/*.rpm
-          draft: true
+          draft: false
           prerelease: false
-          name: Vanta ${{ steps.get_version.outputs.VERSION }}
-          body: |
-            ## Vanta v5.16.0 -- Phase 47 Data Visualization And System Health UX
-
-            Adds a redesigned system health dashboard with clearer visual hierarchy, trend cards, and sparkline visualizations.
-
-            ### Highlights
-            - Redesigned diagnostics and health dashboards with semantic states.
-            - Added trend cards and sparkline visualizations for key metrics.
-            - Added a Health Risk summary for quick system interpretability.
-            - Kept visuals consistent with the universal design language.
-
-            ### Packaging
-            - Deb and RPM bundles with package verification checks.
-
-            ### Known Issues
-            - AppImage bundling remains disabled due to linuxdeploy strip failures on RELR ELF sections.
+          name: Vanta v${{ steps.versions.outputs.package_version }}
+          body_path: ${{ steps.notes.outputs.notes_path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

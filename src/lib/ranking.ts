@@ -257,6 +257,8 @@ export function commandToExec(command: import("$lib/types").CommandContract): st
       return `system-action:${command.action}`;
     case "macro_open":
       return `macro:${command.id}`;
+    case "macro_template_open":
+      return `macro-template:${command.template_id}`;
     case "extension_view":
       return `ext-view:${command.ext_id}:${command.command}`;
     case "extension_action":
@@ -316,6 +318,9 @@ export function inferCommandFromResult(
   }
   if (exec.startsWith("profile-switch:")) {
     return { kind: "profile_switch", id: exec.slice(15) };
+  }
+  if (exec.startsWith("macro-template:")) {
+    return { kind: "macro_template_open", template_id: exec.slice(15) };
   }
   if (exec.startsWith("macro:")) return { kind: "macro_open", id: exec.slice(6) };
   if (exec.startsWith("ext-view:")) {

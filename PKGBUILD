@@ -1,10 +1,10 @@
 # Maintainer: onxy <onxy@dev.vanta.app>
 pkgname=vanta
-pkgver=1.14.1
+pkgver=5.16.0
 pkgrel=1
 pkgdesc="Liquid Glass command palette for Linux (Tauri v2 + Svelte 5)"
 arch=('x86_64')
-url="https://github.com/yourusername/vanta"
+url="https://github.com/Misiix9/vanta"
 license=('MIT')
 depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3' 'fuse2') # Added fuse2 explicitly
 provides=('vanta')

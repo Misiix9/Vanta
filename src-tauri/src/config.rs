@@ -13,7 +13,7 @@ use crate::errors::VantaError;
 // Embedded default config for fallback writes.
 const DEFAULT_CONFIG_JSON: &str = include_str!("../resources/config.json");
 pub const CONFIG_SCHEMA_VERSION: u32 = 5;
-pub const WORKFLOWS_SCHEMA_VERSION: u32 = 1;
+pub const WORKFLOWS_SCHEMA_VERSION: u32 = 2;
 pub const PROFILES_SCHEMA_VERSION: u32 = 1;
 pub const PROFILE_EXPORT_SCHEMA_VERSION: u32 = 1;
 
@@ -209,8 +209,6 @@ pub struct SearchConfig {
     pub windows_max_results: usize,
     #[serde(default = "default_show_explain_panel")]
     pub show_explain_panel: bool,
-    #[serde(default = "default_layout_mode")]
-    pub layout_mode: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -247,7 +245,6 @@ impl Default for SearchConfig {
             files: SourcePreference::default(),
             windows_max_results: default_windows_cap(),
             show_explain_panel: default_show_explain_panel(),
-            layout_mode: default_layout_mode(),
         }
     }
 }
@@ -258,10 +255,6 @@ fn default_windows_cap() -> usize {
 
 fn default_show_explain_panel() -> bool {
     true
-}
-
-fn default_layout_mode() -> String {
-    "single".to_string()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
@@ -457,6 +450,8 @@ pub struct WorkflowsConfig {
     pub schema_version: u32,
     #[serde(default)]
     pub macros: Vec<WorkflowMacro>,
+    #[serde(default)]
+    pub command_templates: Vec<CommandTemplate>,
 }
 
 fn default_config_schema_version() -> u32 {
@@ -472,8 +467,20 @@ impl Default for WorkflowsConfig {
         Self {
             schema_version: default_workflows_schema_version(),
             macros: default_workflow_macros(),
+            command_templates: Vec::new(),
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
+pub struct CommandTemplate {
+    pub id: String,
+    pub name: String,
+    pub macro_id: String,
+    #[serde(default)]
+    pub args: HashMap<String, String>,
+    pub created_at_ms: u64,
+    pub updated_at_ms: u64,
 }
 
 fn default_workflow_macros() -> Vec<WorkflowMacro> {
@@ -1525,6 +1532,17 @@ mod tests {
                 timeout_behavior: TimeoutBehavior::Abort,
                 schedule: None,
             }],
+            command_templates: vec![CommandTemplate {
+                id: "template-1".to_string(),
+                name: "Open Sync Main".to_string(),
+                macro_id: "open-and-sync".to_string(),
+                args: HashMap::from([
+                    ("project_path".to_string(), "/tmp/project".to_string()),
+                    ("branch".to_string(), "main".to_string()),
+                ]),
+                created_at_ms: 1,
+                updated_at_ms: 2,
+            }],
         };
 
         let serialized = serde_json::to_string(&cfg).expect("serialize workflows config");
@@ -1532,6 +1550,13 @@ mod tests {
 
         assert_eq!(parsed.schema_version, WORKFLOWS_SCHEMA_VERSION);
         assert_eq!(parsed.macros.len(), 1);
+        assert_eq!(parsed.command_templates.len(), 1);
+        assert_eq!(parsed.command_templates[0].name, "Open Sync Main");
+        assert_eq!(parsed.command_templates[0].macro_id, "open-and-sync");
+        assert_eq!(
+            parsed.command_templates[0].args.get("branch"),
+            Some(&"main".to_string())
+        );
         let macro_def = &parsed.macros[0];
         assert!(macro_def.enabled);
         assert_eq!(macro_def.id, "open-and-sync");
@@ -1584,7 +1609,6 @@ mod tests {
                 files: SourcePreference { enabled: true, weight: 140 },
                 windows_max_results: 6,
                 show_explain_panel: true,
-                layout_mode: "single".to_string(),
             },
         });
 

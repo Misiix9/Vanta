@@ -210,9 +210,19 @@ export interface WorkflowMacro {
     schedule?: WorkflowSchedule | null;
 }
 
+export interface WorkflowCommandTemplate {
+    id: string;
+    name: string;
+    macro_id: string;
+    args: Record<string, string>;
+    created_at_ms: number;
+    updated_at_ms: number;
+}
+
 export interface WorkflowsConfig {
     schema_version?: number;
     macros?: WorkflowMacro[];
+    command_templates?: WorkflowCommandTemplate[];
 }
 
 export interface ProfileConfig {
@@ -418,6 +428,7 @@ export type CommandContract =
     | { kind: "move_window_current_workspace"; id: string }
     | { kind: "system_action"; action: string }
     | { kind: "macro_open"; id: string }
+    | { kind: "macro_template_open"; template_id: string }
     | { kind: "extension_view"; ext_id: string; command: string }
     | { kind: "extension_action"; ext_id: string; command: string }
     | { kind: "query_fill"; value: string }

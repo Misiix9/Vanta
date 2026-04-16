@@ -56,7 +56,7 @@
 
   function templateTitle(result: SearchResult): string {
     if (typeof result.source === "object") return "Extension Panel";
-    if (result.command?.kind === "macro_open") return "Workflow Panel";
+    if (result.command?.kind === "macro_open" || result.command?.kind === "macro_template_open") return "Workflow Panel";
     if (result.source === "File") return "File Panel";
     if (result.source === "Window") return "Window Panel";
     if (result.source === "Clipboard") return "Clipboard Panel";
@@ -100,7 +100,7 @@
         <p class="context-value">{ext?.manifest.description ?? "Extension action"}</p>
         <span class="v2-form-help">Capabilities: {formatPermissionCaps(ext?.manifest.permissions ?? [])}</span>
       </section>
-    {:else if result.command?.kind === "macro_open"}
+    {:else if result.command?.kind === "macro_open" || result.command?.kind === "macro_template_open"}
       <section class="context-section">
         <h4>Workflow Context</h4>
         <p class="context-value">Macro workflows can be dry-run and executed with argument previews.</p>

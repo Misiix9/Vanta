@@ -81,8 +81,10 @@
 }
 
 .view-fill {
-    width: 100%;
-    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .view-relative {
@@ -537,6 +539,7 @@ a:hover {
     padding: calc(var(--space-2) * var(--vanta-space-scale, 1));
     overflow-y: auto;
     overflow-x: hidden;
+    scrollbar-gutter: stable;
     display: flex;
     flex-direction: column;
     gap: calc(var(--space-1) * var(--vanta-space-scale, 1));
@@ -585,7 +588,6 @@ a:hover {
     overflow: visible;
 }
 
-/* The left accent rail that appears on selection */
 .result-item::before {
     content: '';
     position: absolute;
@@ -821,11 +823,10 @@ a:hover {
     position: relative;
     background: var(--ds-surface-0);
     padding: 20px 24px;
-    width: 100%;
-    height: 100%;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    flex: 1 1 0%;
+    min-height: 0;
 }
 
 .settings-header {
@@ -857,7 +858,7 @@ a:hover {
 
 
 .sections {
-    flex: 1 1 0%;
+    flex: 1;
     min-height: 0;
     overflow-y: auto;
 }

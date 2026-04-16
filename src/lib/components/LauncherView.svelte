@@ -8,6 +8,7 @@
     CommandContract,
     ThemeMeta,
     WorkflowMacro,
+    WorkflowCommandTemplate,
     MacroDryRunResult,
     ExtensionEntry,
     Capability,
@@ -37,7 +38,6 @@
   import KeyboardShortcutsModal from "$lib/components/KeyboardShortcutsModal.svelte";
   import PreviewPanel from "$lib/components/PreviewPanel.svelte";
   import ContextMenu from "$lib/components/ContextMenu.svelte";
-  import ContextualPanel from "$lib/components/ContextualPanel.svelte";
   import type { ToastOptions } from "$lib/sdk/types";
   import { toastHistory } from "$lib/stores/toastStore";
 
@@ -91,7 +91,6 @@
   let actionInFlight = $state(false);
   let searchInputRef: SearchInput | undefined = $state();
   let resultsListRef: ResultsList | undefined = $state();
-  let contextPanelRef: ContextualPanel | undefined = $state();
   let pendingScrollFrame: number | null = null;
   let isSearching = $state(false);
   let queryHistory: string[] = $state([]);
@@ -100,6 +99,7 @@
   let macroArgs = $state<Record<string, string>>({});
   let macroDryRun = $state<MacroDryRunResult | null>(null);
   let macroBusy = $state(false);
+  let macroTemplateBusy = $state(false);
   let macroError = $state<string | null>(null);
   let currentMacro = $derived(
     activeMacroId ? availableMacros.find((m) => m.id === activeMacroId) : null,
@@ -118,11 +118,13 @@
   let groupBySection = $derived(query.trim() === "");
   let totalItems = $derived(visibleRowCount);
   let notificationCount = $derived($toastHistory.length);
-  let workspaceLayout: "single" | "multi" = $derived(config?.search.layout_mode === "multi" ? "multi" : "single");
-  let selectedResult = $derived.by(() => {
-    const row = resultsListRef?.getVisibleRow(selectedIndex);
-    return row?.type === "item" ? row.result : null;
-  });
+  let statusHint = $derived(
+    activeMacroId
+      ? "Composer: Enter run · Ctrl+Enter dry-run · Esc close"
+      : query.trim().startsWith(">")
+        ? "Command mode active"
+        : null,
+  );
 
   $effect(() => {
     if (extensionView || currentMode !== "launcher") return;
@@ -197,7 +199,58 @@
   }
 
   function resetMacroState() {
-    activeMacroId = null; macroArgs = {}; macroDryRun = null; macroBusy = false; macroError = null;
+    activeMacroId = null; macroArgs = {}; macroDryRun = null; macroBusy = false; macroTemplateBusy = false; macroError = null;
+  }
+
+  function openMacroComposer(macroId: string, prefilledArgs: Record<string, string> = {}) {
+    const macro = availableMacros.find((m) => m.id === macroId);
+    if (!macro) {
+      onToast({ title: "Macro Not Found", message: macroId, type: "error" });
+      return;
+    }
+    activeMacroId = macro.id;
+    const defaults = Object.fromEntries((macro.args ?? []).map((a) => [a.name, a.default_value ?? ""]));
+    macroArgs = { ...defaults, ...prefilledArgs };
+    macroDryRun = null;
+    macroError = null;
+  }
+
+  async function openMacroTemplateComposer(templateId: string) {
+    try {
+      const templates = await invoke<WorkflowCommandTemplate[]>("get_command_templates");
+      const template = templates.find((item) => item.id === templateId);
+      if (!template) {
+        onToast({ title: "Template Not Found", message: templateId, type: "error" });
+        return;
+      }
+      openMacroComposer(template.macro_id, template.args ?? {});
+    } catch (e) {
+      console.error("Failed to open macro template", e);
+      onToast({ title: "Template Open Failed", message: String(e), type: "error" });
+    }
+  }
+
+  async function saveCurrentMacroTemplate(macro: WorkflowMacro, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      onToast({ title: "Template Name Required", message: "Enter a template name first.", type: "error" });
+      return;
+    }
+
+    macroTemplateBusy = true;
+    try {
+      await invoke<WorkflowCommandTemplate>("save_command_template", {
+        name: trimmed,
+        macroId: macro.id,
+        args: macroArgs,
+      });
+      onToast({ title: "Template Saved", message: `${trimmed} is now available in > command mode.`, type: "success" });
+    } catch (e) {
+      console.error("Failed to save macro template", e);
+      onToast({ title: "Template Save Failed", message: String(e), type: "error" });
+    } finally {
+      macroTemplateBusy = false;
+    }
   }
 
   async function dryRunMacro(macro: WorkflowMacro) {
@@ -310,12 +363,11 @@
     try {
       const command = commandForResult(result);
       if (command.kind === "macro_open") {
-        const macro = availableMacros.find((m) => m.id === command.id);
-        if (macro) {
-          activeMacroId = command.id;
-          macroArgs = Object.fromEntries((macro.args ?? []).map((a) => [a.name, a.default_value ?? ""]));
-          macroDryRun = null; macroError = null;
-        }
+        openMacroComposer(command.id);
+        return;
+      }
+      if (command.kind === "macro_template_open") {
+        await openMacroTemplateComposer(command.template_id);
         return;
       }
       if (command.kind === "extension_view" || command.kind === "extension_action") {
@@ -426,10 +478,6 @@
     handleActivate({ ...result, exec, command: action.command }, false);
   }
 
-  function handlePanelAction(result: SearchResult, exec: string, command?: ResultAction["command"]) {
-    void handleActivate({ ...result, exec, command }, false);
-  }
-
   function handleContextMenuAction(result: SearchResult, exec: string, command?: ResultAction["command"]) {
     handleActivate({ ...result, exec, command }, false);
   }
@@ -458,19 +506,6 @@
     requestAnimationFrame(() => searchInputRef?.focus?.());
   }
 
-  async function toggleWorkspaceLayout() {
-    const next = workspaceLayout === "multi" ? "single" : "multi";
-    if (!config) return;
-    await onSaveConfigUpdate((cfg) => {
-      cfg.search.layout_mode = next;
-      const profiles = cfg.profiles;
-      if (profiles?.entries?.length) {
-        const active = profiles.entries.find((p) => p.id === profiles.active_profile_id);
-        if (active) active.search.layout_mode = next;
-      }
-    });
-  }
-
   function handleKeydown(e: KeyboardEvent) {
     if (shortcutsOpen) return;
     if (pendingConfirmResult) {
@@ -480,11 +515,20 @@
     if (onboardingOpen || permissionPrompt) return;
     if (e.key === "?" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); shortcutsOpen = true; return; }
     if (e.key === "d" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); showScoreOverlay = !showScoreOverlay; return; }
-    if (activeMacroId && e.key === "Escape") { resetMacroState(); return; }
+    if (activeMacroId && currentMacro) {
+      if (e.key === "Escape") { e.preventDefault(); resetMacroState(); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (!macroBusy) void dryRunMacro(currentMacro);
+        return;
+      }
+      if (!e.shiftKey && !e.altKey && e.key === "Enter") {
+        e.preventDefault();
+        if (!macroBusy) void runMacro(currentMacro);
+        return;
+      }
+    }
     if (e.key === "," && e.ctrlKey) { e.preventDefault(); view = view === "launcher" ? "settings" : "launcher"; return; }
-    if (workspaceLayout === "multi" && e.ctrlKey && e.key === "ArrowRight") { e.preventDefault(); contextPanelRef?.focusFirstAction(); return; }
-    if (workspaceLayout === "multi" && e.ctrlKey && e.key === "ArrowLeft") { e.preventDefault(); searchInputRef?.focus?.(); return; }
-    if (e.ctrlKey && e.key === "\\") { e.preventDefault(); void toggleWorkspaceLayout(); return; }
     if (view === "settings" || view === "store") {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); view = "launcher"; }
       return;
@@ -570,51 +614,23 @@
   {#if currentMacro}
     <MacroPreview
       macro={currentMacro} args={macroArgs} dryRun={macroDryRun}
-      busy={macroBusy} error={macroError}
+      busy={macroBusy} saveTemplateBusy={macroTemplateBusy} error={macroError}
       onArgsChange={(name, value) => (macroArgs = { ...macroArgs, [name]: value })}
       onDryRun={() => dryRunMacro(currentMacro)} onRun={() => runMacro(currentMacro)} onClose={resetMacroState}
+      onSaveTemplate={(name) => saveCurrentMacroTemplate(currentMacro, name)}
     />
   {:else if activeMacroId}
     <div class="empty-state">Macro not found</div>
-  {:else if workspaceLayout === "multi"}
-    <div class="workspace-canvas">
-      <div class="workspace-pane-main">
-        <div class="workspace-results-region" id="vanta-results">
-          <ResultsList
-            bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
-            query={query}
-            showScore={showScoreOverlay}
-            onActivate={handleActivate}
-            onActionClick={handleActionClick}
-            onContextMenu={handleResultContextMenu}
-            on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
-          />
-        </div>
-        {#if query.trim() !== "" && config && config.search.show_explain_panel !== false}
-          <SearchExplainPanel query={query} results={results} searchConfig={config.search} />
-        {/if}
-      </div>
-      <ContextualPanel
-        bind:this={contextPanelRef}
-        result={selectedResult}
-        {availableExtensions}
-        onActivate={(result) => void handleActivate(result)}
-        onQuickLook={(result) => (previewResult = result)}
-        onAction={handlePanelAction}
-      />
-    </div>
   {:else}
-    <div class="workspace-results-region" id="vanta-results">
-      <ResultsList
-        bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
-        query={query}
-        showScore={showScoreOverlay}
-        onActivate={handleActivate}
-        onActionClick={handleActionClick}
-        onContextMenu={handleResultContextMenu}
-        on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
-      />
-    </div>
+    <ResultsList
+      bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
+      query={query}
+      showScore={showScoreOverlay}
+      onActivate={handleActivate}
+      onActionClick={handleActionClick}
+      onContextMenu={handleResultContextMenu}
+      on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
+    />
     {#if query.trim() !== "" && config && config.search.show_explain_panel !== false}
       <SearchExplainPanel query={query} results={results} searchConfig={config.search} />
     {/if}
@@ -628,10 +644,9 @@
     resultCount={activeMacroId ? macroDryRun?.steps.length ?? 0 : visibleRowCount}
     {searchTime}
     {isSearching}
+    hint={statusHint}
     {notificationCount}
-    layoutMode={workspaceLayout}
     onOpenNotifications={() => (showNotifications = true)}
-    onToggleLayout={() => void toggleWorkspaceLayout()}
   />
 
   {#if pendingConfirmResult}

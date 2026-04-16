@@ -5,6 +5,7 @@ src-tauri/gen/
 .agent/
 examples/
 PLAN.md
+PLAN2.md
 docs/
 dist/
 *.log

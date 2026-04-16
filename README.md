@@ -29,26 +29,24 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_5.15.0_amd64.deb
+sudo dpkg -i vanta_5.17.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.15.0-1.x86_64.rpm
+sudo rpm -i vanta-5.17.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.15.0)
-- Added contextual smart side panels with intent-specific templates for files, windows, clipboard, extensions, and workflows.
-- Added safety context messaging for destructive system actions and elevated extension capabilities.
-- Added keyboard-first panel navigation (`Ctrl+Right` to panel actions, `Ctrl+Left` back to search).
-- Improved multi-pane discoverability and action execution flow.
+### Latest Minor (v5.17.0)
+- Added reusable macro command templates with save/list/delete support for workflow-driven command composition.
+- Added `>` command-mode template discovery so saved workflow presets are instantly searchable and runnable.
+- Added keyboard-first macro composer flow (`Enter` run, `Ctrl+Enter` dry run, `Esc` close) with contextual status hints.
 
-### Previous Minor (v5.14.0)
-- Added optional workspace canvas multi-pane mode for complex workflows.
-- Added persisted `layout_mode` launcher preference (single pane vs multi pane).
-- Added right-side inspector/actions pane in multi mode while keeping launcher speed and keyboard flow.
-- Added quick layout switching from status bar and `Ctrl+\`.
+### Previous Minor (v5.16.0)
+- Redesigned diagnostics and health dashboards with trend cards, sparklines, and clear semantic states.
+- Added a Health Risk summary to make system health quickly interpretable and actionable.
+- Polished diagnostics visual hierarchy to align with the universal design language.
 
 ---
 
@@ -82,6 +80,17 @@ cargo tauri dev
 - `--hidden` or `VANTA_HIDDEN=1`: start minimized/hidden.
 - `--clipboard` or `-c`: open directly to clipboard mode on launch.
 - **Hotkeys:** `Alt+Space` (toggle), `Super+V` (clipboard).
+
+## Quality Gates
+
+Run these before opening a release PR:
+
+```bash
+cargo test --manifest-path src-tauri/Cargo.toml
+npm run check
+npm run check:visual-budgets
+npm run extensions:validate
+```
 
 ---
 

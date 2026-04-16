@@ -68,7 +68,7 @@
     "layout_mode": "single"
   },
   "workflows": {
-    "schema_version": 1,
+    "schema_version": 2,
     "macros": [
       {
         "id": "open-and-sync",
@@ -114,7 +114,8 @@
           }
         ]
       }
-    ]
+    ],
+    "command_templates": []
   },
   "profiles": {
     "schema_version": 1,

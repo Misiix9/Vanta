@@ -16,6 +16,8 @@
     { label: "Cycle results", keys: "Tab / Shift + Tab" },
     { label: "Open settings", keys: "Ctrl + ," },
     { label: "Show shortcuts", keys: "Ctrl + ?" },
+    { label: "Macro composer run", keys: "Enter" },
+    { label: "Macro composer dry run", keys: "Ctrl + Enter" },
     { label: "Dismiss / go back", keys: "Escape" },
     { label: "Skip to results", keys: "Tab (from search)" },
   ];

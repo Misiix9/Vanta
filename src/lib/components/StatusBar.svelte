@@ -6,6 +6,7 @@
     resultCount = 0,
     searchTime = null,
     isSearching = false,
+    hint = null,
     notificationCount = 0,
     layoutMode = "single",
     onOpenNotifications,
@@ -14,6 +15,7 @@
     resultCount: number;
     searchTime: number | null;
     isSearching?: boolean;
+    hint?: string | null;
     notificationCount?: number;
     layoutMode?: "single" | "multi";
     onOpenNotifications?: () => void;
@@ -46,6 +48,9 @@
         {resultCount} result{resultCount !== 1 ? "s" : ""}
         · {searchTime.toFixed(1)}ms
       </span>
+    {/if}
+    {#if hint}
+      <span class="status-hint">{hint}</span>
     {/if}
     <span class="status-version">v{appVersion}</span>
     <button
@@ -105,6 +110,12 @@
 
   .status-version {
     opacity: 0.5;
+  }
+
+  .status-hint {
+    opacity: 0.72;
+    font-size: 11px;
+    white-space: nowrap;
   }
 
   .status-layout-toggle,

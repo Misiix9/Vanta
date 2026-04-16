@@ -2,7 +2,6 @@
   import type {
     WorkflowMacro,
     MacroDryRunResult,
-    MacroDryRunStep,
     Capability,
   } from "$lib/types";
 
@@ -11,22 +10,35 @@
     args,
     dryRun,
     busy = false,
+    saveTemplateBusy = false,
     onArgsChange,
     onDryRun,
     onRun,
     onClose,
+    onSaveTemplate,
     error,
   }: {
     macro: WorkflowMacro;
     args: Record<string, string>;
     dryRun: MacroDryRunResult | null;
     busy?: boolean;
+    saveTemplateBusy?: boolean;
     error?: string | null;
     onArgsChange: (name: string, value: string) => void;
     onDryRun: () => void;
     onRun: () => void;
     onClose: () => void;
+    onSaveTemplate?: (name: string) => void | Promise<void>;
   } = $props();
+
+  let templateName = $state("");
+  let templateMacroId = $state<string | null>(null);
+
+  $effect(() => {
+    if (templateMacroId === macro.id) return;
+    templateMacroId = macro.id;
+    templateName = `${macro.name} preset`;
+  });
 
   const decisionLabel: Record<string, string> = {
     Allow: "Allowed",
@@ -101,6 +113,23 @@
             ? "Request Permission"
             : "Run Macro"}
       </button>
+      {#if onSaveTemplate}
+        <div class="template-save">
+          <input
+            type="text"
+            value={templateName}
+            placeholder="Template name"
+            oninput={(e) => (templateName = (e.target as HTMLInputElement).value)}
+          />
+          <button
+            class="secondary"
+            onclick={() => onSaveTemplate?.(templateName.trim())}
+            disabled={busy || saveTemplateBusy || !templateName.trim()}
+          >
+            {saveTemplateBusy ? "Saving..." : "Save Template"}
+          </button>
+        </div>
+      {/if}
     </div>
     <div class="right">
       {#if dryRun}
@@ -111,6 +140,7 @@
       {#if error}
         <span class="status-err">{error}</span>
       {/if}
+      <span class="muted">Enter run · Ctrl+Enter dry-run · Esc close</span>
     </div>
   </section>
 
@@ -184,8 +214,10 @@
   .arg-help { font-size: var(--type-body); opacity: 0.7; line-height: var(--leading-normal); }
   .arg-field input { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #fff; }
   .macro-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .macro-actions .left { display: flex; gap: 8px; align-items: center; }
+  .macro-actions .left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .macro-actions .right { display: flex; gap: 8px; align-items: center; }
+  .template-save { display: inline-flex; gap: 8px; align-items: center; }
+  .template-save input { min-width: 180px; padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: #fff; }
   button.primary { background: var(--vanta-accent, #7c6ff7); color: #fff; padding: 10px 14px; border-radius: 10px; border: none; font-weight: var(--weight-semibold); cursor: pointer; }
   button.secondary { background: transparent; color: #fff; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; }
   button.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 10px; border-radius: 10px; cursor: pointer; }
