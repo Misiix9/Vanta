@@ -124,7 +124,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="settings-panel v2-panel v2-stack" role="dialog" aria-modal="true" aria-label="Settings">
+<div class="settings-panel" role="dialog" aria-modal="true" aria-label="Settings">
     <header class="settings-header sticky">
         <div class="settings-header-main">
             <h2>Settings <span class="settings-version">v{appVersion}</span></h2>
@@ -141,7 +141,7 @@
         <div class="status-info settings-search-status">{sectionSearchStatus}</div>
     {/if}
 
-    <div class="sections v2-stack density-comfortable">
+    <div class="sections density-comfortable">
         {#each sections as name}
             <div class="accordion-item" class:active={activeSection === name}>
                 <button class="accordion-header" type="button" onclick={() => toggleSection(name)}

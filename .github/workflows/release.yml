@@ -1,4 +1,4 @@
-name: Release Vanta v5.15.0
+name: Release Vanta v5.16.0
 
 on:
   push:
@@ -89,15 +89,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v5.15.0 -- Phase 46 Contextual Surfaces And Smart Panels
+            ## Vanta v5.16.0 -- Phase 47 Data Visualization And System Health UX
 
-            Adds intent-sensitive contextual panels that surface the right details, actions, and safety cues for the currently selected result.
+            Adds a redesigned system health dashboard with clearer visual hierarchy, trend cards, and sparkline visualizations.
 
             ### Highlights
-            - Added context templates for file, window, clipboard, extension, and workflow results.
-            - Added safety-context messaging for destructive system actions and elevated extension capabilities.
-            - Added keyboard-first panel navigation (`Ctrl+Right` to panel actions, `Ctrl+Left` back to search).
-            - Improved discoverability and execution speed for advanced workflows in multi-pane mode.
+            - Redesigned diagnostics and health dashboards with semantic states.
+            - Added trend cards and sparkline visualizations for key metrics.
+            - Added a Health Risk summary for quick system interpretability.
+            - Kept visuals consistent with the universal design language.
 
             ### Packaging
             - Deb and RPM bundles with package verification checks.

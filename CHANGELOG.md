@@ -1,5 +1,10 @@
 # Changelog
 
+## 5.16.0
+- Completed Phase 47 data visualization and system health UX.
+- Redesigned diagnostics and health dashboards with trend cards, sparklines, and clear semantic states.
+- Added a Health Risk summary to make system health quickly interpretable and actionable.
+
 ## 5.15.0
 - Completed Phase 46 contextual surfaces and smart panels.
 - Added intent-specific contextual panel templates for files, windows, clipboard items, extension actions, and workflows.

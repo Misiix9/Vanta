@@ -16,6 +16,7 @@
     let resetBusy = $state(false);
     let showFactoryResetConfirm = $state(false);
     let loading = $state(true);
+    let lastUpdated = $state<Date | null>(null);
 
     async function loadDiagnostics() {
         try { diagnostics = await invoke<SearchDiagnostics>("get_search_diagnostics"); }
@@ -70,9 +71,15 @@
         }
     }
 
-    onMount(async () => {
+    async function refreshAll() {
+        loading = true;
         await Promise.all([loadDiagnostics(), loadHealthDashboard(), loadRecoveryHints(), loadConfigAudit(), loadSchemaValidation(), loadUsageAnalytics()]);
+        lastUpdated = new Date();
         loading = false;
+    }
+
+    onMount(async () => {
+        await refreshAll();
     });
 
     function statusTone(status: string): "ok" | "warn" | "bad" {
@@ -121,25 +128,34 @@
 {#if loading}
     <LoadingSkeleton lines={4} />
 {:else}
-    <div class="control-group">
-        <button class="close-btn" onclick={loadDiagnostics}>Refresh Metrics</button>
-        <button class="close-btn" onclick={loadHealthDashboard}>Refresh Health</button>
-        <button class="close-btn" onclick={loadRecoveryHints}>Refresh Hints</button>
-        <button class="close-btn" onclick={loadConfigAudit}>Refresh Config Audit</button>
-        <button class="close-btn" onclick={loadSchemaValidation}>Validate Config Schema</button>
-        <button class="close-btn" onclick={loadUsageAnalytics}>Refresh Usage Analytics</button>
-        <button class="close-btn" onclick={buildSupportBundle} disabled={supportBusy}>
-            {supportBusy ? "Building..." : "Create Support Bundle"}
-        </button>
-        <button class="close-btn danger-outline" onclick={() => (showFactoryResetConfirm = true)} disabled={resetBusy}>
-            {resetBusy ? "Resetting..." : "Factory Reset"}
-        </button>
+    <div class="control-group control-group-block v2-card">
+        <h4>Actions</h4>
+        <div class="preset-row">
+            <button class="preset-btn btn-secondary" onclick={refreshAll}>Refresh All</button>
+            <button class="preset-btn" onclick={loadDiagnostics}>Refresh Metrics</button>
+            <button class="preset-btn" onclick={loadHealthDashboard}>Refresh Health</button>
+            <button class="preset-btn" onclick={loadRecoveryHints}>Refresh Hints</button>
+            <button class="preset-btn" onclick={loadConfigAudit}>Refresh Audit</button>
+            <button class="preset-btn" onclick={loadSchemaValidation}>Validate Schema</button>
+            <button class="preset-btn" onclick={loadUsageAnalytics}>Refresh Analytics</button>
+            <button class="preset-btn" onclick={buildSupportBundle} disabled={supportBusy}>
+                {supportBusy ? "Building..." : "Create Support Bundle"}
+            </button>
+            <button class="preset-btn danger-outline" onclick={() => (showFactoryResetConfirm = true)} disabled={resetBusy}>
+                {resetBusy ? "Resetting..." : "Factory Reset"}
+            </button>
+        </div>
+        {#if lastUpdated}
+            <div class="status-info">Last refreshed: {lastUpdated.toLocaleString()}</div>
+        {/if}
     </div>
 
 
 
     {#if diagnostics}
-        <div class="control-group control-group-block diagnostics-cards">
+        <div class="control-group control-group-block">
+            <h4>Performance</h4>
+            <div class="diagnostics-cards">
             <article class="diag-card">
                 <span class="diag-label">Search Latency</span>
                 <strong>{diagnostics.search.avg_ms.toFixed(1)}ms</strong>
@@ -155,44 +171,51 @@
                 <strong>{diagnostics.launch.avg_ms.toFixed(1)}ms</strong>
                 <span class="diag-sub">max {diagnostics.launch.max_ms.toFixed(1)}ms · {diagnostics.launch.calls} calls</span>
             </article>
+            </div>
         </div>
     {/if}
 
     {#if healthDashboard}
-        <div class="control-group">
+        <div class="control-group control-group-block">
+            <h4>System Snapshot</h4>
             <label>Active Profile <input type="text" value={healthDashboard.active_profile_id} readonly /></label>
             <label>Config Schema <input type="text" value={`${healthDashboard.config_schema}`} readonly /></label>
             <label>Indexed Entries <input type="text" value={`${healthDashboard.file_index_entries}`} readonly /></label>
-        </div>
-        <div class="control-group">
             <label>Apps Cached <input type="text" value={`${healthDashboard.apps_cached}`} readonly /></label>
             <label>Extensions Cached <input type="text" value={`${healthDashboard.extensions_cached}`} readonly /></label>
             <label>Macro Jobs <input type="text" value={`${healthDashboard.macro_jobs_total}`} readonly /></label>
         </div>
 
-        <div class="control-group control-group-block diagnostics-cards">
-            <article class="diag-card">
-                <span class="diag-label">Healthy Checks</span>
-                <strong>{healthRisk.ok}</strong>
-                <span class="diag-sub">Stable subsystems</span>
-            </article>
-            <article class="diag-card warn">
-                <span class="diag-label">Warnings</span>
-                <strong>{healthRisk.warn}</strong>
-                <span class="diag-sub">Needs monitoring</span>
-            </article>
-            <article class="diag-card danger">
-                <span class="diag-label">High Risk</span>
-                <strong>{healthRisk.bad}</strong>
-                <span class="diag-sub">Investigate immediately</span>
-            </article>
+        <div class="control-group control-group-block">
+            <h4>Health Risk</h4>
+            <div class="diagnostics-cards">
+                <article class="diag-card">
+                    <span class="diag-label">Healthy<span class="diag-check-badge tone-ok">OK</span></span>
+                    <strong>{healthRisk.ok}</strong>
+                    <span class="diag-sub">Stable subsystems</span>
+                </article>
+                <article class="diag-card warn">
+                    <span class="diag-label">Warnings<span class="diag-check-badge tone-warn">WARN</span></span>
+                    <strong>{healthRisk.warn}</strong>
+                    <span class="diag-sub">Needs monitoring</span>
+                </article>
+                <article class="diag-card danger">
+                    <span class="diag-label">High Risk<span class="diag-check-badge tone-bad">RISK</span></span>
+                    <strong>{healthRisk.bad}</strong>
+                    <span class="diag-sub">Investigate immediately</span>
+                </article>
+            </div>
         </div>
 
         <div class="control-group control-group-block">
             <h4>Health Checks</h4>
             <ul class="hint-list">
                 {#each healthDashboard.checks as check}
-                    <li><strong>{check.name}</strong> [{check.status}] - {check.detail}</li>
+                    <li>
+                        <strong>{check.name}</strong>
+                        <span class={`diag-check-badge tone-${statusTone(check.status)}`}>{check.status}</span>
+                        - {check.detail}
+                    </li>
                 {/each}
             </ul>
         </div>
@@ -263,27 +286,30 @@
         </div>
 
 
-        <div class="control-group control-group-block diagnostics-cards">
-            <article class="diag-card wide">
-                <span class="diag-label">Hourly Usage Trend</span>
-                {#if usageHourSparkline}
-                    <svg viewBox="0 0 220 48" class="diag-sparkline" aria-label="Hourly usage sparkline">
-                        <path d={usageHourSparkline} fill="none" stroke="var(--ds-accent, #7b35f0)" stroke-width="2" stroke-linecap="round" />
-                    </svg>
-                {:else}
-                    <span class="diag-sub">No hourly data yet.</span>
-                {/if}
-            </article>
-            <article class="diag-card wide">
-                <span class="diag-label">App Frecency Trend</span>
-                {#if appFrecencySparkline}
-                    <svg viewBox="0 0 220 48" class="diag-sparkline" aria-label="App frecency sparkline">
-                        <path d={appFrecencySparkline} fill="none" stroke="var(--ds-info, #58a6ff)" stroke-width="2" stroke-linecap="round" />
-                    </svg>
-                {:else}
-                    <span class="diag-sub">No app usage trend yet.</span>
-                {/if}
-            </article>
+        <div class="control-group control-group-block">
+            <h4>Trends</h4>
+            <div class="diagnostics-cards">
+                <article class="diag-card wide">
+                    <span class="diag-label">Hourly Usage</span>
+                    {#if usageHourSparkline}
+                        <svg viewBox="0 0 220 48" class="diag-sparkline" aria-label="Hourly usage sparkline">
+                            <path d={usageHourSparkline} fill="none" stroke="var(--ds-accent, #7b35f0)" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    {:else}
+                        <span class="diag-sub">No hourly data yet.</span>
+                    {/if}
+                </article>
+                <article class="diag-card wide">
+                    <span class="diag-label">App Frecency</span>
+                    {#if appFrecencySparkline}
+                        <svg viewBox="0 0 220 48" class="diag-sparkline" aria-label="App frecency sparkline">
+                            <path d={appFrecencySparkline} fill="none" stroke="var(--ds-info, #58a6ff)" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    {:else}
+                        <span class="diag-sub">No app usage trend yet.</span>
+                    {/if}
+                </article>
+            </div>
         </div>
 
         <div class="control-group control-group-block">
@@ -345,80 +371,3 @@
         />
     {/if}
 {/if}
-
-<style>
-    .danger-outline {
-        border-color: color-mix(in srgb, var(--ds-danger, #d44) 45%, transparent);
-        color: var(--ds-danger, #d44);
-    }
-
-    .audit-diff-paths {
-        margin-top: 6px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    .audit-diff-paths code {
-        font-size: 0.78rem;
-        padding: 2px 6px;
-        border-radius: 6px;
-        background: color-mix(in srgb, var(--ds-surface, #1b1b1f) 80%, black 20%);
-        border: 1px solid color-mix(in srgb, var(--ds-border, rgba(255,255,255,0.16)) 70%, transparent);
-    }
-
-
-
-    .diagnostics-cards {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 10px;
-    }
-
-    .diag-card {
-        border: 1px solid color-mix(in srgb, var(--ds-border, rgba(255,255,255,0.14)) 70%, transparent);
-        border-radius: 10px;
-        background: color-mix(in srgb, var(--ds-surface-2, #15151a) 75%, transparent);
-        padding: 10px 12px;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .diag-card.warn {
-        border-color: color-mix(in srgb, var(--ds-warning, #f0b34d) 60%, transparent);
-    }
-
-    .diag-card.danger {
-        border-color: color-mix(in srgb, var(--ds-danger, #d44) 65%, transparent);
-    }
-
-    .diag-card.wide {
-        min-height: 88px;
-    }
-
-    .diag-label {
-        font-size: var(--type-caption, 11px);
-        color: var(--ds-text-muted, #a1a1aa);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-    }
-
-    .diag-sub {
-        font-size: var(--type-caption, 11px);
-        color: var(--ds-text-secondary, #b0b0b8);
-    }
-
-    .diag-sparkline {
-        width: 100%;
-        height: 54px;
-    }
-
-    .schema-ok {
-        color: #36a269;
-    }
-
-    .schema-bad {
-        color: var(--ds-danger, #d44);
-    }
-</style>
