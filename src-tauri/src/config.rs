@@ -209,6 +209,8 @@ pub struct SearchConfig {
     pub windows_max_results: usize,
     #[serde(default = "default_show_explain_panel")]
     pub show_explain_panel: bool,
+    #[serde(default = "default_layout_mode")]
+    pub layout_mode: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -245,6 +247,7 @@ impl Default for SearchConfig {
             files: SourcePreference::default(),
             windows_max_results: default_windows_cap(),
             show_explain_panel: default_show_explain_panel(),
+            layout_mode: default_layout_mode(),
         }
     }
 }
@@ -255,6 +258,10 @@ fn default_windows_cap() -> usize {
 
 fn default_show_explain_panel() -> bool {
     true
+}
+
+fn default_layout_mode() -> String {
+    "single".to_string()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
@@ -1577,6 +1584,7 @@ mod tests {
                 files: SourcePreference { enabled: true, weight: 140 },
                 windows_max_results: 6,
                 show_explain_panel: true,
+                layout_mode: "single".to_string(),
             },
         });
 

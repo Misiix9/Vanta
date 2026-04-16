@@ -126,6 +126,7 @@ export interface SearchConfig {
     files: SourcePreference;
     windows_max_results?: number;
     show_explain_panel: boolean;
+    layout_mode?: "single" | "multi" | string;
 }
 
 export interface MacroArg {

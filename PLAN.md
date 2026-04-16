@@ -733,3 +733,4 @@ Implementation notes (March 2026):
 - Phase 43: Added icon cache integrity checks and hard cap (`4096` entries) with stale/invalid path pruning plus scanner tests.
 - Phase 43: Lazy-loaded non-critical surfaces (`StoreView`, `CommunityHubWindow`, `ThemeStudioWindow`, `ExtensionsHubWindow`) via dynamic imports in `+page.svelte`.
 - Phase 43: Expanded file extension icon coverage for Java/C/C++/Python/Go/Kotlin/Ruby and Office formats (`.docx`/`.xlsx`/`.pptx`).
+- Phase 45: Added optional workspace canvas multi-pane mode (results + inspector/actions) with persisted `search.layout_mode` preference and single-pane default.

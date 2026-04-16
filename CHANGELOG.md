@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.14.0
+- Completed Phase 45 workspace canvas and multi-pane launcher views.
+- Added optional multi-pane composition (results + inspector/actions) while preserving single-pane default mode.
+- Added persisted `search.layout_mode` preference with per-profile carryover during profile snapshot updates.
+- Added keyboard and status-bar layout switching (`Ctrl+\` and status toggle).
+- Added workspace layout preference control in Settings > General.
+
 ## 5.13.0
 - Completed Phase 44 universal layout runtime: canonical v2 layout vocabulary with documented primitives.
 - Migrated all hub windows, StoreView, settings, and SDK components to use `v2-shell`/`v2-panel`/`v2-card`/`v2-stack` classes.

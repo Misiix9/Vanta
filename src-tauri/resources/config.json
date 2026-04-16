@@ -47,12 +47,25 @@
     "indexed_at": null
   },
   "search": {
-    "applications": { "enabled": true, "weight": 100 },
-    "windows": { "enabled": true, "weight": 100 },
-    "calculator": { "enabled": true, "weight": 100 },
-    "files": { "enabled": true, "weight": 100 },
+    "applications": {
+      "enabled": true,
+      "weight": 100
+    },
+    "windows": {
+      "enabled": true,
+      "weight": 100
+    },
+    "calculator": {
+      "enabled": true,
+      "weight": 100
+    },
+    "files": {
+      "enabled": true,
+      "weight": 100
+    },
     "windows_max_results": 0,
-    "show_explain_panel": true
+    "show_explain_panel": true,
+    "layout_mode": "single"
   },
   "workflows": {
     "schema_version": 1,
@@ -80,15 +93,24 @@
           {
             "kind": "system",
             "command": "xdg-open",
-            "args": ["{project_path}"],
-            "capabilities": ["Filesystem"]
+            "args": [
+              "{project_path}"
+            ],
+            "capabilities": [
+              "Filesystem"
+            ]
           },
           {
             "kind": "extension",
             "ext_id": "sync-project",
             "command": "sync",
-            "args": ["--branch", "{branch}"],
-            "capabilities": ["Shell"]
+            "args": [
+              "--branch",
+              "{branch}"
+            ],
+            "capabilities": [
+              "Shell"
+            ]
           }
         ]
       }
@@ -104,12 +126,25 @@
         "hotkey": "Alt+Space",
         "theme": "default",
         "search": {
-          "applications": { "enabled": true, "weight": 100 },
-          "windows": { "enabled": true, "weight": 100 },
-          "calculator": { "enabled": true, "weight": 100 },
-          "files": { "enabled": true, "weight": 100 },
+          "applications": {
+            "enabled": true,
+            "weight": 100
+          },
+          "windows": {
+            "enabled": true,
+            "weight": 100
+          },
+          "calculator": {
+            "enabled": true,
+            "weight": 100
+          },
+          "files": {
+            "enabled": true,
+            "weight": 100
+          },
           "windows_max_results": 0,
-          "show_explain_panel": true
+          "show_explain_panel": true,
+          "layout_mode": "single"
         }
       }
     ]

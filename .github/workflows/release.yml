@@ -1,4 +1,4 @@
-name: Release Vanta v5.13.0
+name: Release Vanta v5.14.0
 
 on:
   push:
@@ -89,17 +89,15 @@ jobs:
           prerelease: false
           name: Vanta ${{ steps.get_version.outputs.VERSION }}
           body: |
-            ## Vanta v5.13.0 -- Phase 44 Universal Layout Runtime
+            ## Vanta v5.14.0 -- Phase 45 Workspace Canvas And Multi-Pane Views
 
-            Establishes a canonical layout vocabulary (v2 primitives) used by every first-party surface and SDK component.
+            Introduces optional workspace canvas layouts for advanced workflows while preserving single-pane launcher speed as default.
 
             ### Highlights
-            - Canonical `v2-shell`, `v2-panel`, `v2-card`, `v2-stack`, `v2-hstack`, `v2-form-field` primitives documented and adopted.
-            - New modifier classes: `v2-fill`, `v2-scroll`, `v2-header`, `v2-gap-xs`, `v2-gap-lg`.
-            - Migrated hub windows, store, settings, and extension SDK to v2 classes.
-            - Moved notification and permission modal styles from scoped to global CSS.
-            - Removed dead universal layout compatibility layer.
-            - Added `docs/layout-primitives.md` migration guide for extension authors.
+            - Added optional multi-pane composition for results + details + quick actions.
+            - Persisted per-profile workspace layout preference via `search.layout_mode`.
+            - Added status bar and keyboard (`Ctrl+\`) toggles between single and multi pane modes.
+            - Kept single-pane fast mode as first-class default for instant launch/search flow.
 
             ### Packaging
             - Deb and RPM bundles with package verification checks.

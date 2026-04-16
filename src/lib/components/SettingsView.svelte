@@ -109,6 +109,7 @@
     onMount(() => {
         if (config.general.community_feed_opt_in === undefined) config.general.community_feed_opt_in = false;
         if (config.search.show_explain_panel === undefined) config.search.show_explain_panel = true;
+        if (config.search.layout_mode === undefined) config.search.layout_mode = "single";
         applyTheme(config);
     });
 

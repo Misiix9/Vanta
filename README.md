@@ -29,28 +29,25 @@ yay -S vanta-bin
 ### Ubuntu / Debian
 Download the latest `.deb` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo dpkg -i vanta_5.13.0_amd64.deb
+sudo dpkg -i vanta_5.14.0_amd64.deb
 ```
 
 ### Fedora / OpenSUSE
 Download the latest `.rpm` from [Releases](https://github.com/Misiix9/vanta/releases).
 ```bash
-sudo rpm -i vanta-5.13.0-1.x86_64.rpm
+sudo rpm -i vanta-5.14.0-1.x86_64.rpm
 ```
 
-### Latest Minor (v5.13.0)
+### Latest Minor (v5.14.0)
+- Added optional workspace canvas multi-pane mode for complex workflows.
+- Added persisted `layout_mode` launcher preference (single pane vs multi pane).
+- Added right-side inspector/actions pane in multi mode while keeping launcher speed and keyboard flow.
+- Added quick layout switching from status bar and `Ctrl+\`.
+
+### Previous Minor (v5.13.0)
 - Canonical v2 layout runtime: `v2-shell`, `v2-panel`, `v2-card`, `v2-stack`, `v2-header` adopted across all surfaces.
 - Migrated hub windows, store, settings, and SDK components to the shared v2 vocabulary.
-- Moved notification center and permission modal styles from scoped CSS to global `base.css`.
-- Removed dead universal layout compatibility layer.
 - Added `docs/layout-primitives.md` migration guide for extension authors.
-
-### Previous Minor (v5.12.0)
-- Extracted shared theme/component primitives into `base.css` and kept theme files focused on tokens and overrides.
-- Added release-time visual budget checks for inline layout styles and theme CSS size drift.
-- Added icon cache bounds and integrity pruning for stale or invalid cached icon paths.
-- Lazy-loaded non-critical hub surfaces to reduce startup/bundle waste.
-- Pinned `svelte` to an exact version for build stability across releases.
 
 ---
 

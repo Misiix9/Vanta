@@ -314,6 +314,52 @@ a:hover {
     min-height: 0;
 }
 
+.workspace-canvas {
+    min-height: 0;
+    height: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
+.workspace-pane-main {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-1) * var(--vanta-space-scale, 1));
+}
+
+.workspace-pane-side {
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-2) * var(--vanta-space-scale, 1));
+}
+
+.workspace-pane-head h3 {
+    margin: 0;
+    font-size: var(--type-heading);
+    color: var(--ds-text-primary);
+}
+
+.workspace-pane-head p {
+    margin: calc(var(--space-1) * var(--vanta-space-scale, 1)) 0;
+    color: var(--ds-text-secondary);
+    font-size: var(--type-body);
+}
+
+.workspace-pane-actions {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--space-1) * var(--vanta-space-scale, 1));
+}
+
+.workspace-pane-empty {
+    color: var(--ds-text-muted);
+    font-size: var(--type-body);
+}
+
 /* Top-edge purple shimmer — the signature detail */
 
 /* Subtle purple ambient breath at the top */

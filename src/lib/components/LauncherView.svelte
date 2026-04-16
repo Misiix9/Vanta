@@ -116,6 +116,11 @@
   let groupBySection = $derived(query.trim() === "");
   let totalItems = $derived(visibleRowCount);
   let notificationCount = $derived($toastHistory.length);
+  let workspaceLayout: "single" | "multi" = $derived(config?.search.layout_mode === "multi" ? "multi" : "single");
+  let selectedResult = $derived.by(() => {
+    const row = resultsListRef?.getVisibleRow(selectedIndex);
+    return row?.type === "item" ? row.result : null;
+  });
 
   $effect(() => {
     if (extensionView || currentMode !== "launcher") return;
@@ -447,6 +452,24 @@
     requestAnimationFrame(() => searchInputRef?.focus?.());
   }
 
+  async function toggleWorkspaceLayout() {
+    const next = workspaceLayout === "multi" ? "single" : "multi";
+    if (!config) return;
+    await onSaveConfigUpdate((cfg) => {
+      cfg.search.layout_mode = next;
+      const profiles = cfg.profiles;
+      if (profiles?.entries?.length) {
+        const active = profiles.entries.find((p) => p.id === profiles.active_profile_id);
+        if (active) active.search.layout_mode = next;
+      }
+    });
+  }
+
+  function sourceLabel(source: SearchResult["source"]): string {
+    if (typeof source === "object") return `Extension (${source.Extension.ext_id})`;
+    return source;
+  }
+
   function handleKeydown(e: KeyboardEvent) {
     if (shortcutsOpen) return;
     if (pendingConfirmResult) {
@@ -458,6 +481,7 @@
     if (e.key === "d" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); showScoreOverlay = !showScoreOverlay; return; }
     if (activeMacroId && e.key === "Escape") { resetMacroState(); return; }
     if (e.key === "," && e.ctrlKey) { e.preventDefault(); view = view === "launcher" ? "settings" : "launcher"; return; }
+    if (e.ctrlKey && e.key === "\\") { e.preventDefault(); void toggleWorkspaceLayout(); return; }
     if (view === "settings" || view === "store") {
       if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); view = "launcher"; }
       return;
@@ -549,6 +573,43 @@
     />
   {:else if activeMacroId}
     <div class="empty-state">Macro not found</div>
+  {:else if workspaceLayout === "multi"}
+    <div class="workspace-canvas">
+      <div class="workspace-pane-main">
+        <ResultsList
+          bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
+          query={query}
+          showScore={showScoreOverlay}
+          onActivate={handleActivate}
+          onActionClick={handleActionClick}
+          onContextMenu={handleResultContextMenu}
+          on:visiblecount={(event) => (visibleRowCount = event.detail.count)}
+        />
+        {#if query.trim() !== "" && config && config.search.show_explain_panel !== false}
+          <SearchExplainPanel query={query} results={results} searchConfig={config.search} />
+        {/if}
+      </div>
+      <aside class="workspace-pane-side v2-panel" aria-label="Result details and actions">
+        {#if selectedResult}
+          <div class="workspace-pane-head">
+            <h3>{selectedResult.title}</h3>
+            <p>{selectedResult.subtitle ?? "No description"}</p>
+            <span class="v2-form-help">{sourceLabel(selectedResult.source)}</span>
+          </div>
+          <div class="workspace-pane-actions">
+            <button class="btn-secondary" onclick={() => handleActivate(selectedResult)}>Open</button>
+            <button class="btn-ghost" onclick={() => (previewResult = selectedResult)}>Quick Look</button>
+            {#if selectedResult.actions?.length}
+              {#each selectedResult.actions as action}
+                <button class="btn-ghost" onclick={() => handleActionClick(selectedResult, action)}>{action.label}</button>
+              {/each}
+            {/if}
+          </div>
+        {:else}
+          <p class="workspace-pane-empty">Select a result to inspect details and actions.</p>
+        {/if}
+      </aside>
+    </div>
   {:else}
     <ResultsList
       bind:this={resultsListRef} {results} {groupBySection} bind:selectedIndex
@@ -573,7 +634,9 @@
     {searchTime}
     {isSearching}
     {notificationCount}
+    layoutMode={workspaceLayout}
     onOpenNotifications={() => (showNotifications = true)}
+    onToggleLayout={() => void toggleWorkspaceLayout()}
   />
 
   {#if pendingConfirmResult}

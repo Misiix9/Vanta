@@ -69,6 +69,14 @@
     </label>
 </div>
 <div class="control-group">
+    <label>Workspace Layout
+        <select class="vanta-select" bind:value={config.search.layout_mode} onchange={onSave}>
+            <option value="single">Single Pane (default)</option>
+            <option value="multi">Multi Pane Canvas</option>
+        </select>
+    </label>
+</div>
+<div class="control-group">
     <label>Hotkey (Restart Required)
         <input type="text" bind:value={config.general.hotkey} oninput={onSave} />
     </label>

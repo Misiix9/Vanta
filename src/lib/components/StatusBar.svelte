@@ -7,13 +7,17 @@
     searchTime = null,
     isSearching = false,
     notificationCount = 0,
+    layoutMode = "single",
     onOpenNotifications,
+    onToggleLayout,
   }: {
     resultCount: number;
     searchTime: number | null;
     isSearching?: boolean;
     notificationCount?: number;
+    layoutMode?: "single" | "multi";
     onOpenNotifications?: () => void;
+    onToggleLayout?: () => void;
   } = $props();
 
   let appVersion = $state("…");
@@ -44,6 +48,14 @@
       </span>
     {/if}
     <span class="status-version">v{appVersion}</span>
+    <button
+      class="status-layout-toggle"
+      onclick={() => onToggleLayout?.()}
+      aria-label="Toggle workspace layout"
+      title="Toggle workspace layout (Ctrl+\)"
+    >
+      {layoutMode === "multi" ? "Multi Pane" : "Single Pane"}
+    </button>
     <button
       class="status-notifications"
       onclick={() => onOpenNotifications?.()}
@@ -95,6 +107,7 @@
     opacity: 0.5;
   }
 
+  .status-layout-toggle,
   .status-notifications {
     border: 1px solid var(--ds-border, rgba(255, 255, 255, 0.12));
     border-radius: 999px;
@@ -108,8 +121,14 @@
     cursor: pointer;
   }
 
+  .status-layout-toggle:hover,
   .status-notifications:hover {
     color: var(--ds-text-primary, #ddd);
+  }
+
+  .status-layout-toggle {
+    min-width: 86px;
+    justify-content: center;
   }
 
   .notification-count {
