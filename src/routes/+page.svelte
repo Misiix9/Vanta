@@ -470,40 +470,6 @@
   >
     <div class="sr-only" aria-live="polite" aria-atomic="true">{viewAnnouncement}</div>
 
-    {#if view !== "launcher"}
-      <div class="global-wayfinding" role="navigation" aria-label="Global wayfinding">
-        <div class="global-wayfinding-breadcrumbs">
-          {#each breadcrumbTrail as crumb, index}
-            <span>{viewLabels[crumb]}</span>
-            {#if index < breadcrumbTrail.length - 1}
-              <span class="global-wayfinding-separator">/</span>
-            {/if}
-          {/each}
-        </div>
-        <div class="global-wayfinding-actions">
-          <button class="global-wayfinding-btn" disabled={!canGoBack} onclick={goBackInNavigation}>
-            Back
-          </button>
-          <button class="global-wayfinding-btn" onclick={goHomeInNavigation}>Search</button>
-          {#if wayfindingNextAction}
-            <button class="global-wayfinding-btn" onclick={() => (view = wayfindingNextAction.target)}>
-              {wayfindingNextAction.label}
-            </button>
-          {/if}
-        </div>
-        <div class="global-wayfinding-hints">
-          <span>Alt+Left</span>
-          <span>Alt+Home</span>
-          {#if lastReturnView && lastReturnView !== view}
-            <span>Return: {viewLabels[lastReturnView]}</span>
-          {/if}
-          {#if wayfindingNextStep}
-            <span>Next: {wayfindingNextStep}</span>
-          {/if}
-        </div>
-      </div>
-    {/if}
-
     {#if view === "store"}
       <div in:fade={{ duration: fadeDuration }} class="shell-pane shell-pane-relative">
         <StoreView onClose={() => (view = "launcher")} onToast={notify} />
@@ -609,6 +575,7 @@
   .shell-pane {
     height: 100%;
     width: 100%;
+    overflow-y: auto;
   }
 
   .shell-pane-relative {

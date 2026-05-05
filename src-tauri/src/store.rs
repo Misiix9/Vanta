@@ -8,6 +8,7 @@ use crate::extensions::{self, ExtensionDependency, ExtensionManifest};
 use crate::errors::VantaError;
 use crate::config;
 use crate::permissions;
+use tauri::Emitter;
 
 const REGISTRY_URL: &str =
     "https://raw.githubusercontent.com/Misiix9/vanta-extensions/main/registry.json";
@@ -861,7 +862,11 @@ async fn download_file(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, V
 }
 
 #[tauri::command]
-pub async fn install_store_extension(name: String) -> Result<(), VantaError> {
+pub async fn install_store_extension(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::AppState>,
+    name: String,
+) -> Result<(), VantaError> {
     validate_requested_name(&name)?;
 
     let cfg = config::load_or_create_default();
@@ -992,11 +997,21 @@ pub async fn install_store_extension(name: String) -> Result<(), VantaError> {
         }
     }
 
+    let refreshed_exts = extensions::scan_extensions();
+    if let Ok(mut exts) = state.extensions_cache.lock() {
+        *exts = refreshed_exts.clone();
+    }
+    let _ = app.emit("extensions-changed", &refreshed_exts);
+
     Ok(())
 }
 
 #[tauri::command]
-pub async fn rollback_store_extension(name: String) -> Result<String, VantaError> {
+pub async fn rollback_store_extension(
+    _app: tauri::AppHandle,
+    _state: tauri::State<'_, crate::AppState>,
+    name: String,
+) -> Result<String, VantaError> {
     validate_requested_name(&name)?;
 
     let ext_dir = extensions::extensions_dir().join(&name);
@@ -1027,7 +1042,11 @@ pub async fn rollback_store_extension(name: String) -> Result<String, VantaError
 }
 
 #[tauri::command]
-pub async fn uninstall_extension(name: String) -> Result<(), VantaError> {
+pub async fn uninstall_extension(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, crate::AppState>,
+    name: String,
+) -> Result<(), VantaError> {
     let ext_dir = extensions::extensions_dir().join(&name);
     if !ext_dir.exists() {
         return Err(format!("Extension '{}' is not installed", name).into());
@@ -1065,6 +1084,13 @@ pub async fn uninstall_extension(name: String) -> Result<(), VantaError> {
         "allowed",
         None,
     );
+
+    let refreshed_exts = extensions::scan_extensions();
+    if let Ok(mut exts) = state.extensions_cache.lock() {
+        *exts = refreshed_exts.clone();
+    }
+    let _ = app.emit("extensions-changed", &refreshed_exts);
+
     Ok(())
 }
 
